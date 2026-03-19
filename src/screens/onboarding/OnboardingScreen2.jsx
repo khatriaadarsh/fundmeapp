@@ -226,13 +226,13 @@ const OnboardingScreen2 = ({ navigation }) => {
       >
         <Text style={styles.headline}>Zero Commission.{'\n'}Full Impact.</Text>
         <Text style={styles.description}>
-          We charge nothing. '100%' of your donation goes directly to the
+          We charge nothing. 100% of your donation goes directly to the
           beneficiary. No hidden fees ever.
         </Text>
+        <StepDots active={1} />
       </Animated.View>
 
       {/* Step dots */}
-      <StepDots active={1} />
 
       {/* Next button */}
       <Animated.View
@@ -266,7 +266,7 @@ const illus = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginBottom: 10,
+    marginBottom: 25,
   },
   bgCircle: {
     position: 'absolute',
@@ -370,6 +370,8 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 24,
+    position: 'relative',
+    top: 25,
   },
   headline: {
     fontSize: 22,
@@ -393,6 +395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 32,
+    marginTop: 15,
     gap: 6,
   },
   dot: { height: 5, borderRadius: 3 },

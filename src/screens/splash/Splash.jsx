@@ -147,7 +147,6 @@ const Splash = ({ navigation }) => {
       <Animated.View style={[styles.dotsRow, { opacity: dotOpacity }]}>
         <View style={[styles.dot, styles.dotActive]} />
         <View style={[styles.dot, styles.dotInactive]} />
-        <View style={[styles.dot, styles.dotInactive]} />
       </Animated.View>
     </LinearGradient>
   );
@@ -265,18 +264,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 48,
-    gap: 6,
   },
   dot: {
     height: 4,
     borderRadius: 2,
   },
   dotActive: {
-    width: 24,
+    width: 30,
     backgroundColor: COLORS.dotActive,
   },
-  dotInactive: {
-    width: 8,
+  dotInactive: {  
+    width: 22,
     backgroundColor: COLORS.dotInactive,
   },
 });

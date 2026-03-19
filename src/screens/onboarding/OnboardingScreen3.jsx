@@ -229,10 +229,9 @@ const OnboardingScreen3 = ({ navigation }) => {
           Every campaign creator is CNIC verified. Our AI fraud detection
           protects your donations automatically.
         </Text>
+        {/* Step dots — 3rd dot active */}
+        <StepDots active={2} />
       </Animated.View>
-
-      {/* Step dots — 3rd dot active */}
-      <StepDots active={2} />
 
       {/* Get Started button */}
       <Animated.View
@@ -264,9 +263,9 @@ const illus = StyleSheet.create({
     width: '100%',
     height: 240,
     alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative',
+    bottom: 55,
   },
-
   // Card
   card: {
     width: 220,
@@ -430,7 +429,8 @@ const styles = StyleSheet.create({
   contentWrap: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 24,
+    position: 'relative',
+    bottom: 20,
   },
   headline: {
     fontSize: 22,
@@ -452,6 +452,7 @@ const styles = StyleSheet.create({
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 15,
     marginBottom: 32,
     gap: 6,
   },
@@ -467,7 +468,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     position: 'absolute',
-    top: 150,
+    top: 145,
   },
   btnPrimaryText: {
     color: '#FFFFFF',

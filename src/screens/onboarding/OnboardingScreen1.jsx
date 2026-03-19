@@ -146,15 +146,15 @@ const OnboardingScreen1 = ({ navigation }) => {
           { opacity: contentAnim, transform: [{ translateY: contentSlide }] },
         ]}
       >
-        <Text style={styles.headline}>"Fund Someone's Future"</Text>
+        <Text style={styles.headline}>Fund Someone Future </Text>
         <Text style={styles.description}>
           Make a real impact with secure and transparent crowdfunding. Every
           rupee reaches those who need it.
         </Text>
+        <StepDots active={0} />
       </Animated.View>
 
       {/* Step dots */}
-      <StepDots active={0} />
 
       {/* Buttons */}
       <Animated.View
@@ -199,6 +199,7 @@ const illus = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: 20,
     position: 'relative',
+    bottom: 25,
     height: 220,
   },
   glowCircle: {
@@ -339,8 +340,10 @@ const styles = StyleSheet.create({
   contentWrap: {
     width: '100%',
     alignItems: 'center',
-    mariginTop: 20,
+    // mariginTop: 20,
     // marginBottom: 20,
+    position: 'relative',
+    top: 28,
   },
   headline: {
     fontSize: 22,
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 28,
     gap: 6,
-    marginTop:10
+    marginTop: 15,
   },
   dot: { height: 5, borderRadius: 3 },
   dotActive: { width: 22, backgroundColor: COLORS.dotActive },
