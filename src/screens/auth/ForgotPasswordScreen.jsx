@@ -38,7 +38,7 @@ const C = {
   inputBg: '#FFFFFF',
 };
 
-const ForgotPassword = ({ navigation }) => {
+const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [focused, setFocused] = useState(false);
 
@@ -125,7 +125,7 @@ const ForgotPassword = ({ navigation }) => {
 
             {/* Send Reset Code button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate('NewPassword')}
+              onPress={() => navigation.navigate('NewPasswordScreen')}
               activeOpacity={0.85}
               style={{ width: '100%' }}
             >
@@ -154,7 +154,7 @@ const ForgotPassword = ({ navigation }) => {
   );
 };
 
-export default ForgotPassword;
+export default ForgotPasswordScreen;
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },

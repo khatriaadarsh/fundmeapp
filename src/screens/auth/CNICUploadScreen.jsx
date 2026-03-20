@@ -164,9 +164,7 @@ const CNICUpload = ({ navigation }) => {
             )}
 
             {/* ── CNIC Back Side ── */}
-            <Text style={[s.fieldLabel, { marginTop: 16 }]}>
-              CNIC Back Side
-            </Text>
+            <Text style={s.fieldLabel}>CNIC Back Side</Text>
             {!backUploaded ? (
               <TouchableOpacity
                 style={s.uploadArea}
@@ -271,6 +269,7 @@ const s = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
+    marginTop: 20,
   },
   inputRow: {
     flexDirection: 'row',
@@ -305,7 +304,7 @@ const s = StyleSheet.create({
 
   // Preview area (teal border, image uploaded)
   previewArea: {
-    height: 110,
+    height: 140,
     backgroundColor: C.previewBg,
     borderRadius: 10,
     borderWidth: 1.5,
@@ -315,7 +314,7 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   previewAreaActive: {
-    height: 110,
+    height: 140,
     backgroundColor: C.previewBg,
     borderRadius: 10,
     borderWidth: 2,

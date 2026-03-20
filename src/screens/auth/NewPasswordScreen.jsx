@@ -80,7 +80,7 @@ const StrengthBar = ({ password }) => {
 };
 
 // ── Main screen ────────────────────────────────────────────
-const NewPassword = ({ navigation }) => {
+const NewPasswordScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -242,7 +242,7 @@ const NewPassword = ({ navigation }) => {
   );
 };
 
-export default NewPassword;
+export default NewPasswordScreen;
 
 // ── Strength bar styles ────────────────────────────────────
 const sb = StyleSheet.create({

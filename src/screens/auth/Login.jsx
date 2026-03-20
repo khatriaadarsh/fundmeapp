@@ -1,3 +1,5 @@
+// src/screens/auth/Login.jsx
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -13,28 +15,28 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import LogoImg from '../../assets/logo.png';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import LogoImg from '../../assets/logo.png';
 
 const { width } = Dimensions.get('window');
 
-// ── Colour tokens (match screenshot exactly) ───────────────
+// ── Colour tokens ──────────────────────────────────────────
 const COLORS = {
-  bgGradientTop: '#D6F0F4', // very light teal top
-  bgGradientBot: '#FFFFFF', // pure white bottom
-  tealPrimary: '#00B4CC', // button + links
-  tealDark: '#0097AA', // button gradient end
-  tealLogo: '#0D6B7A', // logo icon colour
-  tealLogoText: '#7BBFC8', // muted "FundMe" text
-  textDark: '#1A1A2E', // "Welcome Back"
-  textGray: '#6B7280', // subtitle + "or"
-  textPlaceholder: '#474a4f', // input placeholders
-  inputBorder: '#606265', // input border
-  inputBg: '#FFFFFF', // input background
-  iconColor: '#9CA3AF', // envelope / lock icons
+  bgTop: '#D6F0F4',
+  bgBot: '#FFFFFF',
+  tealPrimary: '#00B4CC',
+  tealDark: '#0097AA',
+  textDark: '#1A1A2E',
+  textGray: '#6B7280',
+  textPlaceholder: '#9CA3AF',
+  inputBorder: '#D1D5DB',
+  inputBg: '#FFFFFF',
+  iconColor: '#253133',
   white: '#FFFFFF',
 };
+
+// ── Main Screen ────────────────────────────────────────────
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,13 +45,12 @@ const Login = ({ navigation }) => {
   const [passFocused, setPassFocused] = useState(false);
 
   const logoAnim = useRef(new Animated.Value(0)).current;
-  const logoSlide = useRef(new Animated.Value(-20)).current;
+  const logoSlide = useRef(new Animated.Value(-10)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
-  const formSlide = useRef(new Animated.Value(30)).current;
+  const formSlide = useRef(new Animated.Value(20)).current;
   const btnScale = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
-    // Logo drops in
     Animated.parallel([
       Animated.timing(logoAnim, {
         toValue: 1,
@@ -64,31 +65,29 @@ const Login = ({ navigation }) => {
       }),
     ]).start();
 
-    // Form slides up
     Animated.sequence([
       Animated.delay(250),
       Animated.parallel([
         Animated.timing(formAnim, {
           toValue: 1,
-          duration: 450,
+          duration: 350,
           useNativeDriver: true,
         }),
         Animated.spring(formSlide, {
           toValue: 0,
-          tension: 50,
+          tension: 40,
           friction: 8,
           useNativeDriver: true,
         }),
       ]),
     ]).start();
 
-    // Button pops
     Animated.sequence([
       Animated.delay(550),
       Animated.spring(btnScale, {
         toValue: 1,
-        tension: 55,
-        friction: 6,
+        tension: 35,
+        friction: 4,
         useNativeDriver: true,
       }),
     ]).start();
@@ -99,186 +98,269 @@ const Login = ({ navigation }) => {
   const handlePressOut = () =>
     Animated.spring(btnScale, { toValue: 1, useNativeDriver: true }).start();
 
-  const handleLogin = () => {
-    // Add your auth logic here
-    // navigation.navigate('Home');
-  };
+  const handleLogin = () => navigation.navigate('HomeScreen');
+  const handleForgotPassword = () =>
+    navigation.navigate('ForgotPasswordScreen');
+  const handleSignUp = () => navigation.navigate('SignUpScreen');
 
   return (
-    <View style={styles.container}>
-      <Image source={LogoImg} style={styles.fundmeLogo} />
+    <LinearGradient
+      colors={[COLORS.bgTop, '#EBF7FA', COLORS.bgBot]}
+      locations={[0, 0.3, 1]}
+      style={styles.gradient}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bgTop} />
 
-      <View style={styles.contentWrap}>
-        <Text style={styles.headline}>Welcome Back</Text>
-        <Text style={styles.subTitle}>Login in to your account</Text>
-      </View>
-
-      <View style={styles.inputFieldWrap}>
-        {/* Input fields will go here */}
-        <View style={styles.fieldWrap}>
-          <Icon
-            name="email"
-            size={25}
-            style={styles.inputIcon}
-            color="#253133"
-          />
-          <TextInput
-            style={styles.inputField}
-            placeholder="Enter your email"
-            placeholderTextColor={COLORS.textPlaceholder}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onFocus={() => setEmailFocused(true)}
-            onBlur={() => setEmailFocused(false)}
-          />
-        </View>
-        <View style={styles.fieldWrap}>
-          <Icon
-            name="password"
-            size={25}
-            style={styles.inputIcon}
-            color="#253133"
-          />
-          <TextInput
-            style={styles.inputField}
-            placeholder="Enter your password"
-            placeholderTextColor={COLORS.textPlaceholder}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            onFocus={() => setPassFocused(true)}
-            onBlur={() => setPassFocused(false)}
-          />
-        </View>
-      </View>
-      <Text
-        style={styles.forgetPassText}
-        onPress={() => navigation.navigate('ForgotPasswordScreen')}
+      <KeyboardAvoidingView
+        style={styles.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        Forgot Password?
-      </Text>
-      {/* Log In button */}
-      <Animated.View style={{ transform: [{ scale: btnScale }] }}>
-        <TouchableOpacity
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          onPress={handleLogin}
-          activeOpacity={1}
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <LinearGradient
-            colors={[COLORS.tealPrimary, COLORS.tealDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.btnLogin}
+          {/* ── Logo ── */}
+          <Animated.View
+            style={[
+              styles.logoWrap,
+              { opacity: logoAnim, transform: [{ translateY: logoSlide }] },
+            ]}
           >
-            <Text
-              style={styles.btnLoginText}
-              onPress={() => navigation.navigate('HomeScreen')}
+            <Image source={LogoImg} style={styles.logo} />
+          </Animated.View>
+
+          {/* ── Headline ── */}
+          <Animated.View
+            style={[
+              styles.headlineWrap,
+              { opacity: formAnim, transform: [{ translateY: formSlide }] },
+            ]}
+          >
+            <Text style={styles.headline}>Welcome Back</Text>
+            <Text style={styles.subtitle}>{'Log in to your account'}</Text>
+          </Animated.View>
+
+          {/* ── Input fields ── */}
+          <Animated.View
+            style={[
+              styles.fieldsWrap,
+              { opacity: formAnim, transform: [{ translateY: formSlide }] },
+            ]}
+          >
+            {/* Email */}
+            <View
+              style={[styles.fieldRow, emailFocused && styles.fieldFocused]}
             >
-              Log In
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
+              <Icon
+                name="email"
+                size={22}
+                color={COLORS.iconColor}
+                style={styles.fieldIcon}
+              />
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="Enter your email"
+                placeholderTextColor={COLORS.textPlaceholder}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+              />
+            </View>
 
-      {/* Divider */}
-      <View style={styles.dividerRow}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or</Text>
-        <View style={styles.dividerLine} />
-      </View>
+            {/* Password */}
+            <View style={[styles.fieldRow, passFocused && styles.fieldFocused]}>
+              <Icon
+                name="lock"
+                size={22}
+                color={COLORS.iconColor}
+                style={styles.fieldIcon}
+              />
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="Enter your password"
+                placeholderTextColor={COLORS.textPlaceholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setPassFocused(true)}
+                onBlur={() => setPassFocused(false)}
+              />
+              {/* ✅ Eye toggle added */}
+              <TouchableOpacity
+                onPress={() => setShowPassword(prev => !prev)}
+                style={styles.eyeBtn}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  name={showPassword ? 'visibility' : 'visibility-off'}
+                  size={20}
+                  color={COLORS.textPlaceholder}
+                />
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
 
-      {/* Sign Up link */}
-      <View style={styles.signUpRow}>
-        <Text style={styles.signUpText}>Don{'\u2019'}t have an account? </Text>
-        <TouchableOpacity
-          onPress={() => navigation?.navigate('SignUp')}
-          activeOpacity={0.7}
-        >
-          <Text
-            style={styles.signUpLink}
-            onPress={() => navigation.navigate('SignUpScreen')}
+          {/* ── Forgot Password ── */}
+          <TouchableOpacity
+            onPress={handleForgotPassword}
+            style={styles.forgotWrap}
+            activeOpacity={0.7}
           >
-            Sign Up
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
+
+          {/* ── Log In button ── */}
+          <Animated.View
+            style={[styles.btnWrap, { transform: [{ scale: btnScale }] }]}
+          >
+            <TouchableOpacity
+              onPressIn={handlePressIn}
+              onPressOut={handlePressOut}
+              onPress={handleLogin}
+              activeOpacity={1}
+            >
+              <LinearGradient
+                colors={[COLORS.tealPrimary, COLORS.tealDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.btnLogin}
+              >
+                <Text style={styles.btnLoginText}>Log In</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* ── Divider ── */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* ── Sign Up link ── */}
+          {/* ✅ Fixed: onPress only on TouchableOpacity, removed from Text */}
+          <View style={styles.signUpRow}>
+            <Text style={styles.signUpText}>
+              {'Don\u2019t have an account? '}
+            </Text>
+            <TouchableOpacity onPress={handleSignUp} activeOpacity={0.7}>
+              <Text style={styles.signUpLink}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 };
 
 export default Login;
 
+// ── Styles ─────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  // ✅ Root uses LinearGradient flex:1 — fills screen naturally
+  gradient: { flex: 1 },
+  kav: { flex: 1 },
+
+  // ✅ ScrollView centres content — works on all screen heights
+  scroll: {
+    flexGrow: 1,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    gap: 20,
-    position: 'relative',
-    top: 160,
+    justifyContent: 'center', // vertically centres on tall screens
+    paddingHorizontal: 28,
+    paddingTop: 48,
+    paddingBottom: 36,
+    gap: 8,
   },
 
-  fundmeLogo: {
-    width: 70,
-    height: 70,
-  },
-  contentWrap: {
-    marginTop: 30,
+  // Logo
+  logoWrap: {
     alignItems: 'center',
-    gap: 6,
+    marginBottom: 24,
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    resizeMode: 'contain',
+  },
+
+  // Headline
+  headlineWrap: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
   headline: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    letterSpacing: 0.2,
-  },
-  subTitle: {
-    fontSize: 16,
-    color: '#707070',
-    letterSpacing: 0.2,
-  },
-  inputFieldWrap: {
-    position: 'relative',
-    top: 60,
-    gap: 18,
-  },
-  inputIcon: {
-    paddingLeft: 10,
-  },
-  fieldWrap: {
-    paddingHorizontal: 5,
-    backgroundColor: COLORS.inputBg,
-    width: 340,
-    fontSize: 15,
+    fontSize: 28,
+    fontWeight: '800',
     color: COLORS.textDark,
-    borderBlockColor: COLORS.inputBorder,
-    borderWidth: 1,
-    borderRadius: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
+    letterSpacing: 0.2,
+    marginBottom: 6,
   },
-  forgetPassText: {
-    color: COLORS.tealPrimary,
+  subtitle: {
     fontSize: 15,
-    fontWeight: '500',
-    position: 'relative',
-    left: 108,
-    top: 55,
+    color: COLORS.textGray,
+    letterSpacing: 0.1,
   },
 
-  // Log In button
+  // ✅ Fields use width:'100%' — stretches to parent padding, not 340px
+  fieldsWrap: {
+    width: '100%',
+    gap: 14,
+    marginBottom: 8,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1.5,
+    borderColor: COLORS.inputBorder,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  fieldFocused: {
+    borderColor: COLORS.tealPrimary,
+    elevation: 2,
+    shadowColor: COLORS.tealPrimary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  fieldIcon: { marginRight: 10 },
+  fieldInput: {
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.textDark,
+    paddingVertical: 0,
+  },
+  eyeBtn: { padding: 4 },
+
+  // ✅ Forgot — alignSelf flex-end, no hardcoded left/top
+  forgotWrap: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    marginBottom: 24,
+  },
+  forgotText: {
+    color: COLORS.tealPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // ✅ Button — width:'100%', no hardcoded top
+  btnWrap: {
+    width: '100%',
+    marginBottom: 24,
+  },
   btnLogin: {
-    position: 'relative',
-    top: 75,
-    width: width - 56,
+    width: '100%',
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
@@ -294,13 +376,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
   },
-  // Divider
+
+  // ✅ Divider — no hardcoded top
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    position: 'relative',
-    top: 90,
+    marginBottom: 20,
   },
   dividerLine: {
     flex: 1,
@@ -312,15 +394,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textGray,
   },
-  // Sign Up
+
+  // ✅ Sign Up row — no hardcoded top
   signUpRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
-    top: 110,
   },
   signUpText: {
-    fontSize: 15,
+    fontSize: 14,
     color: COLORS.textGray,
   },
   signUpLink: {
