@@ -12,6 +12,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   Animated,
   Dimensions,
@@ -19,7 +20,7 @@ import {
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-
+import ImgOnboarding1 from '../../assets/onBoardScreenImg01.jpeg';
 const { width } = Dimensions.get('window');
 
 // ── Colour tokens ──────────────────────────────────────────
@@ -33,45 +34,6 @@ const COLORS = {
   dotInactive: '#D1D5DB',
   logIn: '#00B4CC',
 };
-
-// ── Illustration placeholder (phone + heart visual) ────────
-const PhoneIllustration = () => (
-  <View style={illus.wrap}>
-    {/* Teal glow background circle */}
-    <View style={illus.glowCircle} />
-
-    {/* Phone shape */}
-    <View style={illus.phone}>
-      <View style={illus.phoneScreen}>
-        {/* Heart on phone screen */}
-        <View style={illus.heartOnPhone}>
-          <View style={illus.heartL} />
-          <View style={illus.heartR} />
-          <View style={illus.heartB} />
-        </View>
-        {/* Energy lines */}
-        <View style={illus.line1} />
-        <View style={illus.line2} />
-        <View style={illus.line3} />
-      </View>
-    </View>
-
-    {/* People silhouette group */}
-    <View style={illus.peopleRow}>
-      {[28, 36, 44, 36, 28].map((h, i) => (
-        <View key={i} style={[illus.person, { height: h }]}>
-          <View
-            style={[
-              illus.personHead,
-              { width: h * 0.45, height: h * 0.45, borderRadius: h * 0.225 },
-            ]}
-          />
-          <View style={[illus.personBody, { height: h * 0.5 }]} />
-        </View>
-      ))}
-    </View>
-  </View>
-);
 
 // ── Step dots ──────────────────────────────────────────────
 const StepDots = ({ active }) => (
@@ -136,7 +98,7 @@ const OnboardingScreen1 = ({ navigation }) => {
 
       {/* Illustration area */}
       <Animated.View style={[styles.illustWrap, { opacity: illustAnim }]}>
-        <PhoneIllustration />
+        <Image source={ImgOnboarding1} style={styles.imgOnboard} />
       </Animated.View>
 
       {/* Text content */}
@@ -191,135 +153,6 @@ const OnboardingScreen1 = ({ navigation }) => {
 
 export default OnboardingScreen1;
 
-// ── Illustration styles ────────────────────────────────────
-const illus = StyleSheet.create({
-  wrap: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: 20,
-    position: 'relative',
-    bottom: 25,
-    height: 220,
-  },
-  glowCircle: {
-    position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(0,180,204,0.12)',
-    top: 10,
-    alignSelf: 'center',
-  },
-
-  // Phone
-  phone: {
-    width: 68,
-    height: 110,
-    borderRadius: 10,
-    backgroundColor: '#1A1A2E',
-    position: 'absolute',
-    left: width * 0.28,
-    top: 20,
-    overflow: 'hidden',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  phoneScreen: {
-    flex: 1,
-    margin: 4,
-    borderRadius: 7,
-    backgroundColor: '#0D6B7A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-
-  // Heart on phone
-  heartOnPhone: {
-    width: 28,
-    height: 24,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  heartL: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#FFFFFF',
-    top: 0,
-    left: 0,
-  },
-  heartR: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#FFFFFF',
-    top: 0,
-    right: 0,
-  },
-  heartB: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    backgroundColor: '#FFFFFF',
-    bottom: 0,
-    transform: [{ rotate: '45deg' }],
-  },
-
-  // Energy lines
-  line1: {
-    width: 40,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(0,220,255,0.6)',
-    marginVertical: 2,
-  },
-  line2: {
-    width: 30,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(0,220,255,0.4)',
-    marginVertical: 2,
-  },
-  line3: {
-    width: 20,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(0,220,255,0.3)',
-    marginVertical: 2,
-  },
-
-  // People
-  peopleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-    position: 'absolute',
-    right: width * 0.1,
-    bottom: 20,
-  },
-  person: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  personHead: {
-    backgroundColor: '#0097AA',
-    marginBottom: 2,
-  },
-  personBody: {
-    width: 14,
-    backgroundColor: '#00B4CC',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-  },
-});
-
 // ── Screen styles ──────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
@@ -331,17 +164,22 @@ const styles = StyleSheet.create({
   },
 
   illustWrap: {
-    paddingBottom: 40,
     width: '100%',
+    alignItems: 'center',
     marginBottom: 8,
     marginTop: 140,
+    paddingBottom: 40,
+  },
+
+  imgOnboard: {
+    width: 280,
+    height: 280,
+    borderRadius: 20,
   },
 
   contentWrap: {
     width: '100%',
     alignItems: 'center',
-    // mariginTop: 20,
-    // marginBottom: 20,
     position: 'relative',
     top: 28,
   },

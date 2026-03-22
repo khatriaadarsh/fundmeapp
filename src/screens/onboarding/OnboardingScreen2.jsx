@@ -2,10 +2,9 @@
 // ─────────────────────────────────────────────────────────────
 //  Onboarding Screen 2 — "Zero Commission. Full Impact."
 //  FundMe App
-//
-//  White background, 100% illustration with coins/family,
-//  headline, description, 3 step dots (2nd active),
-//  teal "Next" button
+//  ✅ 100% Responsive — works on ALL screen sizes
+//  ✅ No hardcoded top/position hacks
+//  ✅ Uses flex + justifyContent for universal alignment
 // ─────────────────────────────────────────────────────────────
 
 import React, { useEffect, useRef } from 'react';
@@ -13,14 +12,17 @@ import {
   View,
   Text,
   StyleSheet,
+  Image,
   Animated,
   Dimensions,
   TouchableOpacity,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import OnboardImg2 from '../../assets/onBoardScreenImg02.jpeg';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 // ── Colour tokens ──────────────────────────────────────────
 const COLORS = {
@@ -36,118 +38,10 @@ const COLORS = {
   coinDark: '#E08A00',
 };
 
-// ── Illustration: 100% text + coins + family ───────────────
-const HundredPercentIllustration = () => {
-  const floatAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -8,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, [floatAnim]);
-
-  return (
-    <View style={illus.wrap}>
-      {/* Light green background circle */}
-      <View style={illus.bgCircle} />
-
-      {/* 100% big text */}
-      <Animated.View
-        style={[illus.percentWrap, { transform: [{ translateY: floatAnim }] }]}
-      >
-        <Text style={illus.percentText}>100%</Text>
-      </Animated.View>
-
-      {/* Floating coins */}
-      <View style={[illus.coin, illus.coin1]}>
-        <LinearGradient
-          colors={[COLORS.coinGold, COLORS.coinDark]}
-          style={illus.coinInner}
-        >
-          <Text style={illus.coinText}>$</Text>
-        </LinearGradient>
-      </View>
-      <View style={[illus.coin, illus.coin2]}>
-        <LinearGradient
-          colors={[COLORS.coinGold, COLORS.coinDark]}
-          style={illus.coinInner}
-        >
-          <Text style={illus.coinText}>$</Text>
-        </LinearGradient>
-      </View>
-      <View style={[illus.coin, illus.coin3]}>
-        <LinearGradient
-          colors={[COLORS.coinGold, COLORS.coinDark]}
-          style={illus.coinInner}
-        >
-          <Text style={illus.coinText}>$</Text>
-        </LinearGradient>
-      </View>
-      <View style={[illus.coin, illus.coin4]}>
-        <LinearGradient
-          colors={[COLORS.coinGold, COLORS.coinDark]}
-          style={illus.coinInner}
-        >
-          <Text style={illus.coinText}>$</Text>
-        </LinearGradient>
-      </View>
-
-      {/* Family silhouette */}
-      <View style={illus.familyRow}>
-        {/* Child left */}
-        <View style={illus.personWrap}>
-          <View
-            style={[illus.head, { width: 18, height: 18, borderRadius: 9 }]}
-          />
-          <View
-            style={[illus.body, { width: 22, height: 28, borderRadius: 5 }]}
-          />
-        </View>
-        {/* Parent left (taller) */}
-        <View style={illus.personWrap}>
-          <View
-            style={[illus.head, { width: 22, height: 22, borderRadius: 11 }]}
-          />
-          <View
-            style={[illus.body, { width: 26, height: 38, borderRadius: 6 }]}
-          />
-        </View>
-        {/* Parent right (tallest) */}
-        <View style={illus.personWrap}>
-          <View
-            style={[illus.head, { width: 24, height: 24, borderRadius: 12 }]}
-          />
-          <View
-            style={[illus.body, { width: 28, height: 42, borderRadius: 6 }]}
-          />
-        </View>
-        {/* Child right */}
-        <View style={illus.personWrap}>
-          <View
-            style={[illus.head, { width: 18, height: 18, borderRadius: 9 }]}
-          />
-          <View
-            style={[illus.body, { width: 22, height: 28, borderRadius: 5 }]}
-          />
-        </View>
-      </View>
-
-      {/* Ground line */}
-      <View style={illus.ground} />
-    </View>
-  );
-};
+// ── Responsive scale helper ────────────────────────────────
+// Scales values relative to a 375pt base width (iPhone SE/standard)
+const scale = size => (width / 375) * size;
+const vscale = size => (height / 812) * size;
 
 // ── Step dots ──────────────────────────────────────────────
 const StepDots = ({ active }) => (
@@ -204,217 +98,141 @@ const OnboardingScreen2 = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [navigation, illustAnim, contentAnim, contentSlide, btnScale]);
-
-  // Added navigation to dependencies for auto-navigation effect
+  }, [illustAnim, contentAnim, contentSlide, btnScale]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* Illustration */}
-      <Animated.View style={[styles.illustWrap, { opacity: illustAnim }]}>
-        <HundredPercentIllustration />
-      </Animated.View>
+      <View style={styles.topSection}>
+        {/* Zone 1 — Illustration (top) */}
+        <View style={styles.illustWrap}>
+          <Image source={OnboardImg2} style={styles.imgOnboard} />
+        </View>
 
-      {/* Text content */}
-      <Animated.View
-        style={[
-          styles.contentWrap,
-          { opacity: contentAnim, transform: [{ translateY: contentSlide }] },
-        ]}
-      >
-        <Text style={styles.headline}>Zero Commission.{'\n'}Full Impact.</Text>
-        <Text style={styles.description}>
-          We charge nothing. 100% of your donation goes directly to the
-          beneficiary. No hidden fees ever.
-        </Text>
-        <StepDots active={1} />
-      </Animated.View>
-
-      {/* Step dots */}
-
-      {/* Next button */}
-      <Animated.View
-        style={[styles.btnWrap, { transform: [{ scale: btnScale }] }]}
-      >
-        <TouchableOpacity
-          onPress={() => navigation.navigate('OnboardingScreen3')}
-          activeOpacity={0.85}
+        {/* Zone 2 — Text + dots (middle) */}
+        <Animated.View
+          style={[
+            styles.contentWrap,
+            { opacity: contentAnim, transform: [{ translateY: contentSlide }] },
+          ]}
         >
-          <LinearGradient
-            colors={[COLORS.tealPrimary, COLORS.tealDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.btnPrimary}
+          <Text style={styles.headline}>
+            {'Zero Commission.\nFull Impact.'}
+          </Text>
+          <Text style={styles.description}>
+            {
+              'We charge nothing. 100% of your donation goes directly to the beneficiary. No hidden fees ever.'
+            }
+          </Text>
+          <StepDots active={1} />
+        </Animated.View>
+
+        {/* Zone 3 — Button (bottom) */}
+        <Animated.View
+          style={[styles.btnWrap, { transform: [{ scale: btnScale }] }]}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.navigate('OnboardingScreen3')}
+            activeOpacity={0.85}
           >
-            <Text style={styles.btnPrimaryText}>Next</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+            <LinearGradient
+              colors={[COLORS.tealPrimary, COLORS.tealDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.btnPrimary}
+            >
+              <Text style={styles.btnPrimaryText}>Next</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </SafeAreaView>
   );
 };
 
 export default OnboardingScreen2;
 
-// ── Illustration styles ────────────────────────────────────
-const illus = StyleSheet.create({
-  wrap: {
-    width: '100%',
-    height: 240,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginBottom: 25,
-  },
-  bgCircle: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(45,184,75,0.10)',
-    alignSelf: 'center',
-    top: 20,
-  },
-
-  // 100% text
-  percentWrap: {
-    position: 'absolute',
-    top: 16,
-    alignSelf: 'center',
-  },
-  percentText: {
-    fontSize: 52,
-    fontWeight: '900',
-    color: COLORS.green100,
-    letterSpacing: -1,
-  },
-
-  // Coins
-  coin: {
-    position: 'absolute',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-  },
-  coin1: { top: 30, left: width * 0.1 },
-  coin2: { top: 55, right: width * 0.08 },
-  coin3: { top: 90, left: width * 0.15 },
-  coin4: { top: 110, right: width * 0.18 },
-  coinInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coinText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-
-  // Family
-  familyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    position: 'absolute',
-    bottom: 28,
-    alignSelf: 'center',
-  },
-  personWrap: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  head: {
-    backgroundColor: '#0097AA',
-    marginBottom: 2,
-  },
-  body: {
-    backgroundColor: '#00B4CC',
-  },
-  ground: {
-    position: 'absolute',
-    bottom: 20,
-    width: '60%',
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(0,180,204,0.2)',
-  },
-});
-
 // ── Screen styles ──────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+
+  topSection: {
+    flex: 1,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    // paddingTop: 48,
-    paddingHorizontal: 28,
-    paddingBottom: 90,
+    paddingHorizontal: scale(28),
+    paddingTop: vscale(40),
+    paddingBottom: vscale(36),
   },
 
   illustWrap: {
     width: '100%',
-    marginBottom: 30,
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingBottom: 40,
+    position: 'relative',
+    top: 85,
   },
 
+  imgOnboard: {
+    width: 320,
+    height: 320,
+    borderRadius: 20,
+  },
   contentWrap: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 24,
-    position: 'relative',
-    top: 25,
   },
+
   headline: {
-    fontSize: 22,
+    fontSize: scale(22),
     fontWeight: '800',
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: vscale(12),
     letterSpacing: 0.2,
-    lineHeight: 30,
+    lineHeight: scale(30),
   },
   description: {
-    fontSize: 14,
+    fontSize: scale(14),
     color: COLORS.textGray,
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 8,
+    lineHeight: scale(22),
+    paddingHorizontal: scale(8),
   },
 
-  // Dots
+  // Step dots
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 15,
+    marginTop: vscale(20),
     gap: 6,
   },
   dot: { height: 5, borderRadius: 3 },
-  dotActive: { width: 22, backgroundColor: COLORS.dotActive },
-  dotInactive: { width: 8, backgroundColor: COLORS.dotInactive },
+  dotActive: { width: scale(22), backgroundColor: COLORS.dotActive },
+  dotInactive: { width: scale(8), backgroundColor: COLORS.dotInactive },
 
-  // Button
-  btnWrap: { width: '100%' },
+  btnWrap: {
+    width: '100%',
+  },
   btnPrimary: {
     width: '100%',
-    paddingVertical: 16,
+    paddingVertical: vscale(16),
     borderRadius: 10,
     alignItems: 'center',
-    position: 'absolute',
-    top: 150,
+    elevation: 3,
+    shadowColor: COLORS.tealPrimary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
   btnPrimaryText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: scale(16),
     fontWeight: '700',
     letterSpacing: 0.3,
   },

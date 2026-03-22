@@ -10,6 +10,7 @@
 //  "I want to:" — Donate | Create Campaigns toggles
 //  Continue → button | Already have account? Log In
 // ─────────────────────────────────────────────────────────────
+import Icons from 'react-native-vector-icons/Feather';
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -157,14 +158,29 @@ const SignupForm = ({ navigation }) => {
               placeholder="Enter your first name"
               value={firstName}
               onChangeText={setFirstName}
-              leftContent={<Text style={s.fieldIcon}>👤</Text>}
+              leftContent={
+                <Icons
+                  name="user"
+                  size={14}
+                  color={C.textLight}
+                  style={field.inputIcon}
+                />
+              }
             />
             <Field
               label="Last Name"
               placeholder="Enter your last name"
               value={lastName}
               onChangeText={setLastName}
-              leftContent={<Text style={s.fieldIcon}>👤</Text>}
+              leftContent={
+                <Icons
+                  name="user"
+                  size={14}
+                  color={C.textLight}
+                  style={field.inputIcon}
+                />
+              }
+              // leftContent={<Text style={s.fieldIcon}>👤</Text>}
             />
             <Field
               label="Email"
@@ -173,7 +189,15 @@ const SignupForm = ({ navigation }) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              leftContent={<Text style={s.fieldIcon}>✉️</Text>}
+              leftContent={
+                <Icons
+                  name="mail"
+                  size={14}
+                  color={C.textLight}
+                  style={field.inputIcon}
+                />
+              }
+              // leftContent={<Text style={s.fieldIcon}>✉️</Text>}
             />
 
             {/* Phone with +92 prefix */}
@@ -181,7 +205,11 @@ const SignupForm = ({ navigation }) => {
               <Text style={field.label}>Phone</Text>
               <View style={[field.inputRow]}>
                 <View style={s.phonePrefix}>
-                  <Text style={s.fieldIcon}>📞</Text>
+                  <Icons
+                    name="phone"
+                    color={C.textLight}
+                    style={field.inputIcon}
+                  />
                   <Text style={s.prefixText}>+92</Text>
                   <View style={s.prefixDivider} />
                 </View>
@@ -202,7 +230,11 @@ const SignupForm = ({ navigation }) => {
               <Text style={field.label}>Password</Text>
               <View style={field.inputRow}>
                 <View style={field.left}>
-                  <Text style={s.fieldIcon}>🔒</Text>
+                  <Icons
+                    name="lock"
+                    color={C.textLight}
+                    style={field.inputIcon}
+                  />
                 </View>
                 <TextInput
                   style={field.input}
@@ -217,7 +249,21 @@ const SignupForm = ({ navigation }) => {
                   onPress={() => setShowPass(p => !p)}
                   style={field.right}
                 >
-                  <Text style={s.eyeIcon}>{showPass ? '🙈' : '👁️'}</Text>
+                  <Text style={s.eyeIcon}>
+                    {showPass ? (
+                      <Icons
+                        name="eye"
+                        color={C.textLight}
+                        style={field.inputIcon}
+                      />
+                    ) : (
+                      <Icons
+                        name="eye-off"
+                        color={C.textLight}
+                        style={field.inputIcon}
+                      />
+                    )}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -227,7 +273,11 @@ const SignupForm = ({ navigation }) => {
               <Text style={field.label}>Confirm Password</Text>
               <View style={field.inputRow}>
                 <View style={field.left}>
-                  <Text style={s.fieldIcon}>🔒</Text>
+                  <Icons
+                    name="lock"
+                    color={C.textLight}
+                    style={field.inputIcon}
+                  />
                 </View>
                 <TextInput
                   style={field.input}
@@ -242,7 +292,21 @@ const SignupForm = ({ navigation }) => {
                   onPress={() => setShowConfirm(p => !p)}
                   style={field.right}
                 >
-                  <Text style={s.eyeIcon}>{showConfirm ? '🙈' : '👁️'}</Text>
+                  <Text style={s.eyeIcon}>
+                    {showConfirm ? (
+                      <Icons
+                        name="eye"
+                        color={C.textLight}
+                        style={field.inputIcon}
+                      />
+                    ) : (
+                      <Icons
+                        name="eye-off"
+                        color={C.textLight}
+                        style={field.inputIcon}
+                      />
+                    )}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -261,7 +325,7 @@ const SignupForm = ({ navigation }) => {
                     role === 'donate' && s.roleBtnTextActive,
                   ]}
                 >
-                  {'🤍  Donate'}
+                  {'🤍  Donor'}
                 </Text>
               </TouchableOpacity>
 
@@ -276,7 +340,7 @@ const SignupForm = ({ navigation }) => {
                     role === 'campaign' && s.roleBtnTextActive,
                   ]}
                 >
-                  {'📋  Create Campaigns'}
+                  {'📋  Creator '}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -285,7 +349,7 @@ const SignupForm = ({ navigation }) => {
             <TouchableOpacity
               onPress={() => navigation.navigate('OTPVerificationScreen')}
               activeOpacity={0.85}
-              style={{ marginTop: 24 }}
+              style={{ marginTop: 45 }}
             >
               <LinearGradient
                 colors={[C.teal, C.tealDark]}
@@ -293,7 +357,14 @@ const SignupForm = ({ navigation }) => {
                 end={{ x: 1, y: 0 }}
                 style={s.continueBtn}
               >
-                <Text style={s.continueBtnText}>Continue →</Text>
+                <Text style={s.continueBtnText}>
+                  Continue{' '}
+                  <Icons
+                    name="arrow-right"
+                    color={C.white}
+                    style={s.continueBtnIcon}
+                  />
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -319,7 +390,7 @@ export default SignupForm;
 // ── Field component styles ─────────────────────────────────
 const field = StyleSheet.create({
   wrap: { marginBottom: 14 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  label: { fontSize: 15, fontWeight: '600', color: '#aeafb0', marginBottom: 6 },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -328,12 +399,13 @@ const field = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: C.inputBg,
     paddingHorizontal: 12,
-    height: 48,
+    height: 55,
   },
   focused: { borderColor: C.borderFocus },
   left: { marginRight: 8 },
   right: { marginLeft: 8 },
-  input: { flex: 1, fontSize: 14, color: C.textDark, paddingVertical: 0 },
+  input: { flex: 1, fontSize: 15, color: C.textDark, paddingVertical: 0 },
+  inputIcon: { fontSize: 17, marginRight: 5 },
 });
 
 // ── Screen styles ──────────────────────────────────────────
@@ -386,7 +458,7 @@ const s = StyleSheet.create({
   },
   prefixText: {
     fontSize: 14,
-    color: C.textDark,
+    color: '#a3a3a3',
     fontWeight: '600',
     marginLeft: 6,
     marginRight: 4,
@@ -402,13 +474,13 @@ const s = StyleSheet.create({
   roleLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: C.textLight,
     marginBottom: 10,
   },
   roleRow: { flexDirection: 'row', gap: 10 },
   roleBtn: {
     flex: 1,
-    height: 44,
+    height: 60,
     borderRadius: 8,
     borderWidth: 1.5,
     borderColor: C.border,
@@ -426,7 +498,7 @@ const s = StyleSheet.create({
   // Continue button
   continueBtn: {
     width: '100%',
-    paddingVertical: 15,
+    paddingVertical: 18,
     borderRadius: 10,
     alignItems: 'center',
     elevation: 3,
@@ -441,6 +513,7 @@ const s = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
+  continueBtnIcon: { fontSize: 16, marginLeft: 6 },
 
   // Log in
   loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },

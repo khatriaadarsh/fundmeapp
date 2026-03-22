@@ -32,7 +32,7 @@ const COLORS = {
   textPlaceholder: '#9CA3AF',
   inputBorder: '#D1D5DB',
   inputBg: '#FFFFFF',
-  iconColor: '#253133',
+  iconColor: '#6B7280',
   white: '#FFFFFF',
 };
 
