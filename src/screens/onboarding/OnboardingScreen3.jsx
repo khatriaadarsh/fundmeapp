@@ -129,7 +129,7 @@ const OnboardingScreen3 = ({ navigation }) => {
           style={[styles.btnWrap, { transform: [{ scale: btnScale }] }]}
         >
           <TouchableOpacity
-            onPress={() => navigation.navigate('SignUpScreen')}
+            onPress={() => navigation.navigate('Login')}
             activeOpacity={0.85}
           >
             <LinearGradient

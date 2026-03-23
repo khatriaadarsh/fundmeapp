@@ -1,4 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+// src/screens/home/HomeScreen.jsx
+// ─────────────────────────────────────────────────────────────
+//  Home Screen  |  FundMe App (React Native CLI)
+//
+//  Layout:
+//  ┌─ SafeAreaView ──────────────────────────────────────────┐
+//  │  [TopBar — avatar + username + bell]         (fixed)   │
+//  │  ┌─ ScrollView ──────────────────────────────────────┐  │
+//  │  │  Search · Banner · Stats · Categories ·          │  │
+//  │  │  Urgent (horizontal) · Featured (list)           │  │
+//  │  └───────────────────────────────────────────────────┘  │
+//  │  [BottomTabBar — shared component]           (fixed)   │
+//  └─────────────────────────────────────────────────────────┘
+//  [ProfileDrawer — slides in from left on avatar tap]
+//
+//  Imports:
+//    BottomTabBar  from '../../components/BottomTabBar'
+//    ProfileDrawer from '../../components/ProfileDrawer'
+// ─────────────────────────────────────────────────────────────
+
+import React, { useState, memo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,747 +28,606 @@ import {
   TextInput,
   StatusBar,
   Dimensions,
-  Animated,
   Image,
   SafeAreaView,
+  Platform,
 } from 'react-native';
-import LogoImg from '../../assets/logo.png';
 import LinearGradient from 'react-native-linear-gradient';
+import Icons from 'react-native-vector-icons/Feather';
 
-const { width } = Dimensions.get('window');
-const URGENT_CARD_W = width * 0.6;
+// Shared components
+import BottomTabBar from '../../components/BottomTabBar';
 
-const C = {
-  screenBg: '#F4F5F7',
-  white: '#FFFFFF',
-  teal: '#00B4CC',
-  tealDark: '#0097AA',
-  bannerTop: '#0B5E6B',
-  bannerBot: '#0D8FA0',
-  textDark: '#111827',
-  textGray: '#6B7280',
-  textLight: '#9CA3AF',
-  border: '#E5E7EB',
-  searchBg: '#F3F4F6',
-  red: '#EF4444',
-  tabActive: '#00B4CC',
-  tabInactive: '#9CA3AF',
+// ── Responsive scale (base 375 pt) ─────────────────────────
+const { width: SW } = Dimensions.get('window');
+const sp = n => (SW / 375) * n;
+
+// Android status bar offset
+const STATUSBAR_H =
+  Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
+// Urgent card width
+const URGENT_W = SW * 0.62;
+
+// ── Palette ─────────────────────────────────────────────────
+const P = {
+  bg:         '#F4F5F7',
+  white:      '#FFFFFF',
+  teal:       '#00B4CC',
+  tealDark:   '#0097AA',
+  tealLight:  'rgba(0,180,204,0.10)',
+  bannerFrom: '#0B5E6B',
+  bannerTo:   '#0D8FA0',
+  dark:       '#111827',
+  gray:       '#6B7280',
+  light:      '#9CA3AF',
+  border:     '#E5E7EB',
+  searchBg:   '#F3F4F6',
+  red:        '#EF4444',
 };
 
-
+// ── Static data ─────────────────────────────────────────────
 const CATEGORIES = [
-  { id: 'medical', label: 'Medical', icon: '🏥' },
+  { id: 'all',       label: 'All',       icon: '✦'  },
+  { id: 'medical',   label: 'Medical',   icon: '🏥' },
   { id: 'education', label: 'Education', icon: '🎓' },
   { id: 'emergency', label: 'Emergency', icon: '🚨' },
-  { id: 'food', label: 'Food', icon: '🍲' },
-  { id: 'shelter', label: 'Shelter', icon: '🏠' },
+  { id: 'food',      label: 'Food',      icon: '🍲' },
+  { id: 'shelter',   label: 'Shelter',   icon: '🏠' },
 ];
 
 const URGENT = [
   {
-    id: '1',
-    imgBg: '#CBD5E1',
-    imgEmoji: '🏥',
-    badge: 'URGENT',
-    category: 'Medical',
-    catColor: '#00B4CC',
-    title: "Urgent Surgery for Little Ali's Heart Condition",
-    raised: 'PKR 325,000',
-    goal: '500,000',
-    pct: 65,
-    user: 'Ali Hassan',
-    verified: true,
-    timeLeft: '13d left',
+    id: '1', imgBg: '#4A7C8A', imgEmoji: '🏥', badge: 'URGENT',
+    category: 'Medical',   catColor: '#00B4CC',
+    title: "Help Little Amina Fight Leukemia Before It's Too Late",
+    raised: 'PKR 325,000', goal: '500,000', pct: 65,
+    user: 'Ali Hassan', verified: true, timeLeft: '12d left',
   },
   {
-    id: '2',
-    imgBg: '#D4B8A0',
-    imgEmoji: '🤲',
-    badge: 'URGENT',
-    category: 'Education',
-    catColor: '#3B82F6',
-    title: 'Help Fatima Get Medical Education',
-    raised: 'PKR 128,000',
-    goal: '300,000',
-    pct: 43,
-    user: 'Fatima Malik',
-    verified: false,
-    timeLeft: '7d left',
+    id: '2', imgBg: '#7B6FA0', imgEmoji: '🤲', badge: 'URGENT',
+    category: 'Orphan Care', catColor: '#8B5CF6',
+    title: 'Provide Warm Meals to 200 Street Children This Winter',
+    raised: 'PKR 120,000', goal: '250,000', pct: 48,
+    user: 'Zara K.', verified: true, timeLeft: '5d left',
   },
   {
-    id: '3',
-    imgBg: '#B0C4B8',
-    imgEmoji: '🌊',
-    badge: 'URGENT',
-    category: 'Emergency',
-    catColor: '#F59E0B',
+    id: '3', imgBg: '#4A8A6A', imgEmoji: '🌊', badge: 'URGENT',
+    category: 'Emergency', catColor: '#F59E0B',
     title: 'Flood Relief for Balochistan Families',
-    raised: 'PKR 89,000',
-    goal: '200,000',
-    pct: 45,
-    user: 'Relief Fund',
-    verified: true,
-    timeLeft: '3d left',
+    raised: 'PKR 89,000', goal: '200,000', pct: 45,
+    user: 'Relief Fund', verified: true, timeLeft: '3d left',
   },
 ];
 
 const FEATURED = [
-  {
-    id: '1',
-    imgBg: '#6B9E7A',
-    imgEmoji: '💧',
-    title: 'Clean Water for Village',
-    raised: 'PKR 910K',
-    time: '1M',
-    pct: 74,
-  },
-  {
-    id: '2',
-    imgBg: '#7B9BBF',
-    imgEmoji: '🏠',
-    title: 'Flood Relief Support',
-    raised: 'PKR 256K',
-    time: '1M',
-    pct: 38,
-  },
-  {
-    id: '3',
-    imgBg: '#C4956A',
-    imgEmoji: '🍲',
-    title: 'Food Drive for Orphanage',
-    raised: 'PKR 180K',
-    time: '2M',
-    pct: 55,
-  },
+  { id: '1', imgBg: '#4A7A5A', imgEmoji: '💧', title: 'Emergency Flood Relief 2024', raised: 'PKR 890K', goal: '1M',   org: 'By Relief PK', pct: 74 },
+  { id: '2', imgBg: '#3A6A8A', imgEmoji: '🏫', title: 'Build a Village School',        raised: 'PKR 450K', goal: '1.5M', org: 'By EduTrust',  pct: 38 },
+  { id: '3', imgBg: '#8A5A3A', imgEmoji: '🍲', title: 'Food Drive for Orphanage',      raised: 'PKR 180K', goal: '400K', org: 'By CareNow',   pct: 55 },
 ];
 
+// Mock user — replace with real auth context
+const CURRENT_USER = {
+  name:      'Ahmed Khan',
+  email:     'ahmed@gmail.com',
+  avatarUri: null, // set to URI string when available
+};
 
-const TopBar = () => (
-  <View style={topBar.wrap}>
-    <View style={topBar.left}>
-      <Image source={LogoImg} style={topBar.logoIcon} />
-      <Text style={topBar.brand}>FundMe</Text>
-    </View>
-    <TouchableOpacity style={topBar.bellWrap} activeOpacity={0.7}>
-      <View style={topBar.bellArc} />
-      <View style={topBar.bellBottom} />
-      <View style={topBar.dot} />
+// ════════════════════════════════════════════════════════════
+//  TopBar  — NayaPay style: avatar | search bar | scan | bell
+//  Single compact row, no greeting text, minimal vertical space
+// ════════════════════════════════════════════════════════════
+//  TopBar  — avatar + username + bell (no search bar)
+// ════════════════════════════════════════════════════════════
+const TopBar = memo(({ user, onAvatarPress, onBellPress }) => (
+  <View style={tbSt.wrap}>
+    {/* Left: avatar + name — both tappable to open profile */}
+    <TouchableOpacity
+      style={tbSt.left}
+      onPress={onAvatarPress}
+      activeOpacity={0.8}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+    >
+      {user?.avatarUri ? (
+        <Image source={{ uri: user.avatarUri }} style={tbSt.avatar} />
+      ) : (
+        <LinearGradient colors={[P.teal, P.tealDark]} style={tbSt.avatarGrad}>
+          <Text style={tbSt.avatarInitial}>
+            {(user?.name || 'U').charAt(0).toUpperCase()}
+          </Text>
+        </LinearGradient>
+      )}
+      <Text style={tbSt.userName} numberOfLines={1}>{user?.name}</Text>
+    </TouchableOpacity>
+
+    {/* Right: bell */}
+    <TouchableOpacity
+      style={tbSt.bellBtn}
+      onPress={onBellPress}
+      activeOpacity={0.7}
+    >
+      <Icons name="bell" size={sp(21)} color={P.gray} />
+      <View style={tbSt.bellDot} />
     </TouchableOpacity>
   </View>
-);
+));
 
-const topBar = StyleSheet.create({
+const tbSt = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: C.white,
-    paddingHorizontal: 22,
-    paddingTop: 40,
+    backgroundColor: P.white,
+    paddingHorizontal: sp(18),
+    paddingTop: sp(10) + STATUSBAR_H,
+    paddingBottom: sp(10),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: P.border,
   },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  logoIcon: { width: 22, height: 18, position: 'relative', color: C.teal },
-  hL: {
-    position: 'absolute',
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: C.teal,
-    top: 0,
-    left: 0,
-  },
-  hR: {
-    position: 'absolute',
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: C.teal,
-    top: 0,
-    right: 0,
-  },
-  hP: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderWidth: 2,
-    borderColor: C.teal,
-    bottom: -2,
-    left: 3,
-    transform: [{ rotate: '45deg' }],
-  },
-  brand: { fontSize: 19, fontWeight: '800', color: C.teal },
-  bellWrap: { position: 'relative', padding: 6, alignItems: 'center' },
-  bellArc: {
-    width: 16,
-    height: 14,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderWidth: 2,
-    borderColor: C.textGray,
-    borderBottomWidth: 0,
-  },
-  bellBottom: {
-    width: 20,
-    height: 4,
-    backgroundColor: C.textGray,
-    borderRadius: 2,
-    marginTop: -1,
-  },
-  dot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: C.red,
-    borderWidth: 1.5,
-    borderColor: C.white,
-  },
-});
-
-
-const SectionHeader = ({ title, linkText }) => (
-  <View style={sh.wrap}>
-    <Text style={sh.title}>{title}</Text>
-    {linkText && <Text style={sh.link}>{linkText}</Text>}
-  </View>
-);
-const sh = StyleSheet.create({
-  wrap: {
+  left: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 22,
-    marginBottom: 12,
+    gap: sp(10),
+    flex: 1,
   },
-  title: { fontSize: 15, fontWeight: '800', color: C.textDark },
-  link: { fontSize: 13, color: C.teal, fontWeight: '600' },
-});
-
-// Urgent card
-const UrgentCard = ({ item }) => (
-  <TouchableOpacity style={uc.wrap} activeOpacity={0.9}>
-    <View style={[uc.img, { backgroundColor: item.imgBg }]}>
-      <Text style={uc.imgEmoji}>{item.imgEmoji}</Text>
-      <View style={uc.urgentBadge}>
-        <Text style={uc.urgentTxt}>{item.badge}</Text>
-      </View>
-    </View>
-    <View style={uc.body}>
-      <View style={[uc.catChip, { backgroundColor: item.catColor + '18' }]}>
-        <Text style={[uc.catTxt, { color: item.catColor }]}>
-          {item.category}
-        </Text>
-      </View>
-      <Text style={uc.title} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <View style={uc.amtRow}>
-        <Text style={uc.raised}>{item.raised}</Text>
-        <Text style={uc.goal}> / {item.goal}</Text>
-      </View>
-      <View style={uc.pBg}>
-        <View style={[uc.pFill, { width: `${item.pct}%` }]} />
-      </View>
-      <View style={uc.userRow}>
-        <View style={uc.avatar}>
-          <Text style={uc.avatarTxt}>{item.user.charAt(0)}</Text>
-        </View>
-        <Text style={uc.userName} numberOfLines={1}>
-          {item.user}
-        </Text>
-        {item.verified && <Text style={uc.verified}>✓</Text>}
-        <Text style={uc.timeLeft}>⏱ {item.timeLeft}</Text>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
-const uc = StyleSheet.create({
-  wrap: {
-    width: URGENT_CARD_W,
-    backgroundColor: C.white,
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginRight: 14,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-  },
-  img: {
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  imgEmoji: { fontSize: 44 },
-  urgentBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: C.red,
-    borderRadius: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  urgentTxt: {
-    color: C.white,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  body: { padding: 11 },
-  catChip: {
-    alignSelf: 'flex-start',
-    borderRadius: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    marginBottom: 6,
-  },
-  catTxt: { fontSize: 10, fontWeight: '700' },
-  title: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.textDark,
-    lineHeight: 18,
-    marginBottom: 7,
-    minHeight: 36,
-  },
-  amtRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 5 },
-  raised: { fontSize: 13, fontWeight: '800', color: C.teal },
-  goal: { fontSize: 11, color: C.textLight },
-  pBg: {
-    height: 4,
-    backgroundColor: C.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  pFill: { height: 4, backgroundColor: C.teal, borderRadius: 2 },
-  userRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: C.teal,
+    width: sp(38),
+    height: sp(38),
+    borderRadius: sp(19),
+  },
+  avatarGrad: {
+    width: sp(38),
+    height: sp(38),
+    borderRadius: sp(19),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
   },
-  avatarTxt: { color: C.white, fontSize: 9, fontWeight: '800' },
-  userName: { flex: 1, fontSize: 10, color: C.textGray },
-  verified: { fontSize: 10, color: C.teal, fontWeight: '700', marginRight: 4 },
-  timeLeft: { fontSize: 10, color: C.textLight },
+  avatarInitial: {
+    fontSize: sp(15),
+    fontWeight: '800',
+    color: P.white,
+  },
+  userName: {
+    fontSize: sp(15),
+    fontWeight: '700',
+    color: P.dark,
+    flex: 1,
+  },
+  bellBtn: {
+    position: 'relative',
+    width: sp(38),
+    height: sp(38),
+    borderRadius: sp(19),
+    backgroundColor: P.searchBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  bellDot: {
+    position: 'absolute',
+    top: sp(7),
+    right: sp(7),
+    width: sp(7),
+    height: sp(7),
+    borderRadius: sp(4),
+    backgroundColor: P.red,
+    borderWidth: 1,
+    borderColor: P.white,
+  },
 });
 
-// Featured item
-const FeaturedItem = ({ item }) => (
-  <TouchableOpacity style={fi.wrap} activeOpacity={0.9}>
-    <View style={[fi.thumb, { backgroundColor: item.imgBg }]}>
-      <Text style={fi.emoji}>{item.imgEmoji}</Text>
-    </View>
-    <View style={fi.info}>
-      <Text style={fi.title} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <View style={fi.pBg}>
-        <View style={[fi.pFill, { width: `${item.pct}%` }]} />
-      </View>
-      <View style={fi.meta}>
-        <Text style={fi.raised}>{item.raised}</Text>
-        <Text style={fi.sep}> • </Text>
-        <Text style={fi.time}>{item.time}</Text>
-      </View>
-    </View>
-  </TouchableOpacity>
-);
-const fi = StyleSheet.create({
+// ════════════════════════════════════════════════════════════
+//  SearchBar
+// ════════════════════════════════════════════════════════════
+const SearchBar = memo(({ value, onChange }) => (
+  <View style={srSt.wrap}>
+    <Icons name="search" size={sp(15)} color={P.light} style={srSt.icon} />
+    <TextInput
+      style={srSt.input}
+      placeholder="Search campaigns..."
+      placeholderTextColor={P.light}
+      value={value}
+      onChangeText={onChange}
+      returnKeyType="search"
+    />
+  </View>
+));
+
+const srSt = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.white,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    backgroundColor: P.searchBg,
+    borderRadius: sp(10),
+    marginHorizontal: sp(16),
+    marginTop: sp(14),
+    marginBottom: sp(16),
+    paddingHorizontal: sp(13),
+    height: sp(44),
+    borderWidth: 1,
+    borderColor: P.border,
+  },
+  icon:  { marginRight: sp(8) },
+  input: { flex: 1, fontSize: sp(14), color: P.dark, paddingVertical: 0 },
+});
+
+// ════════════════════════════════════════════════════════════
+//  HeroBanner
+// ════════════════════════════════════════════════════════════
+const HeroBanner = memo(() => (
+  <LinearGradient
+    colors={[P.bannerFrom, P.bannerTo]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={bnSt.wrap}
+  >
+    <View style={bnSt.circle1} />
+    <View style={bnSt.circle2} />
+    <View style={bnSt.graphic}>
+      <Text style={bnSt.graphicIcon}>🤲</Text>
+    </View>
+    <Text style={bnSt.title}>{"Fund Someone's\nFuture Today"}</Text>
+    <Text style={bnSt.sub}>100% goes to those in need</Text>
+    <TouchableOpacity style={bnSt.exploreBtn} activeOpacity={0.8}>
+      <Text style={bnSt.exploreTxt}>Explore →</Text>
+    </TouchableOpacity>
+  </LinearGradient>
+));
+
+const bnSt = StyleSheet.create({
+  wrap: {
+    marginHorizontal: sp(16),
+    borderRadius: sp(16),
+    padding: sp(22),
+    paddingRight: sp(100),
+    overflow: 'hidden',
+    minHeight: sp(138),
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  circle1: {
+    position: 'absolute', width: sp(160), height: sp(160),
+    borderRadius: sp(80), borderWidth: sp(22),
+    borderColor: 'rgba(255,255,255,0.07)', right: sp(-30), top: sp(-30),
+  },
+  circle2: {
+    position: 'absolute', width: sp(100), height: sp(100),
+    borderRadius: sp(50), borderWidth: sp(16),
+    borderColor: 'rgba(255,255,255,0.05)', right: sp(20), bottom: sp(-30),
+  },
+  graphic: {
+    position: 'absolute', right: sp(18), top: 0, bottom: 0,
+    justifyContent: 'center',
+  },
+  graphicIcon: { fontSize: sp(52) },
+  title: {
+    fontSize: sp(20), fontWeight: '800', color: P.white,
+    lineHeight: sp(27), marginBottom: sp(5),
+  },
+  sub: { fontSize: sp(12), color: 'rgba(255,255,255,0.72)', marginBottom: sp(16) },
+  exploreBtn: {
+    alignSelf: 'flex-start',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)',
+    borderRadius: sp(20), paddingHorizontal: sp(16), paddingVertical: sp(6),
+  },
+  exploreTxt: { color: P.white, fontSize: sp(13), fontWeight: '600' },
+});
+
+// ════════════════════════════════════════════════════════════
+//  StatsRow
+// ════════════════════════════════════════════════════════════
+const StatsRow = memo(() => (
+  <View style={stSt.card}>
+    {[
+      { val: 'PKR 15M', lbl: 'Raised'    },
+      { val: '5.2K',    lbl: 'Donors'    },
+      { val: '320',     lbl: 'Campaigns' },
+    ].map((s, i) => (
+      <View key={i} style={[stSt.item, i < 2 && stSt.divider]}>
+        <Text style={stSt.val}>{s.val}</Text>
+        <Text style={stSt.lbl}>{s.lbl}</Text>
+      </View>
+    ))}
+  </View>
+));
+
+const stSt = StyleSheet.create({
+  card: {
+    flexDirection: 'row', backgroundColor: P.white,
+    marginHorizontal: sp(16), marginTop: sp(14),
+    borderRadius: sp(12), elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4,
+  },
+  item:    { flex: 1, alignItems: 'center', paddingVertical: sp(14) },
+  divider: { borderRightWidth: 1, borderRightColor: P.border },
+  val:     { fontSize: sp(15), fontWeight: '800', color: P.dark, marginBottom: sp(2) },
+  lbl:     { fontSize: sp(11), color: P.light },
+});
+
+// ════════════════════════════════════════════════════════════
+//  SectionHeader
+// ════════════════════════════════════════════════════════════
+const SectionHeader = memo(({ title, linkText, onPress }) => (
+  <View style={shSt.wrap}>
+    <Text style={shSt.title}>{title}</Text>
+    {linkText && (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        <Text style={shSt.link}>{linkText}</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+));
+
+const shSt = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: sp(16), marginTop: sp(22), marginBottom: sp(12),
+  },
+  title: { fontSize: sp(15), fontWeight: '800', color: P.dark },
+  link:  { fontSize: sp(13), color: P.teal, fontWeight: '600' },
+});
+
+// ════════════════════════════════════════════════════════════
+//  CategoryChips
+// ════════════════════════════════════════════════════════════
+const CategoryChips = memo(({ active, onChange }) => (
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    contentContainerStyle={ccSt.list}
+  >
+    {CATEGORIES.map(cat => {
+      const isActive = active === cat.id;
+      return (
+        <TouchableOpacity
+          key={cat.id}
+          style={[ccSt.chip, isActive && ccSt.chipActive]}
+          onPress={() => onChange(cat.id)}
+          activeOpacity={0.8}
+        >
+          <Text style={ccSt.icon}>{cat.icon}</Text>
+          <Text style={[ccSt.label, isActive && ccSt.labelActive]}>{cat.label}</Text>
+        </TouchableOpacity>
+      );
+    })}
+  </ScrollView>
+));
+
+const ccSt = StyleSheet.create({
+  list: { paddingHorizontal: sp(16), paddingBottom: sp(4) },
+  chip: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: sp(14), paddingVertical: sp(7),
+    borderRadius: sp(20), borderWidth: 1.5, borderColor: P.border,
+    backgroundColor: P.white, marginRight: sp(8), gap: sp(5),
+  },
+  chipActive:  { backgroundColor: P.teal, borderColor: P.teal },
+  icon:        { fontSize: sp(13) },
+  label:       { fontSize: sp(13), fontWeight: '600', color: P.gray },
+  labelActive: { color: P.white },
+});
+
+// ════════════════════════════════════════════════════════════
+//  ProgressBar
+// ════════════════════════════════════════════════════════════
+const ProgressBar = memo(({ pct, color = P.teal }) => (
+  <View style={pbSt.bg}>
+    <View style={[pbSt.fill, { width: `${pct}%`, backgroundColor: color }]} />
+  </View>
+));
+
+const pbSt = StyleSheet.create({
+  bg:   { height: 4, backgroundColor: P.border, borderRadius: 2, overflow: 'hidden' },
+  fill: { height: 4, borderRadius: 2 },
+});
+
+// ════════════════════════════════════════════════════════════
+//  UrgentCard
+// ════════════════════════════════════════════════════════════
+const UrgentCard = memo(({ item }) => (
+  <TouchableOpacity style={ucSt.wrap} activeOpacity={0.9}>
+    <View style={[ucSt.imgBox, { backgroundColor: item.imgBg }]}>
+      <Text style={ucSt.imgEmoji}>{item.imgEmoji}</Text>
+      <View style={ucSt.badge}>
+        <Text style={ucSt.badgeTxt}>{item.badge}</Text>
+      </View>
+      <TouchableOpacity style={ucSt.heartBtn} activeOpacity={0.8}>
+        <Icons name="heart" size={sp(14)} color={P.white} />
+      </TouchableOpacity>
+    </View>
+    <View style={ucSt.body}>
+      <View style={[ucSt.catChip, { backgroundColor: item.catColor + '18' }]}>
+        <Text style={[ucSt.catTxt, { color: item.catColor }]}>{item.category}</Text>
+      </View>
+      <Text style={ucSt.title} numberOfLines={2}>{item.title}</Text>
+      <View style={ucSt.amtRow}>
+        <Text style={ucSt.raised}>{item.raised}</Text>
+        <Text style={ucSt.goal}> / {item.goal}</Text>
+      </View>
+      <ProgressBar pct={item.pct} />
+      <View style={ucSt.userRow}>
+        <View style={ucSt.avatar}>
+          <Text style={ucSt.avatarTxt}>{item.user.charAt(0)}</Text>
+        </View>
+        <Text style={ucSt.userName} numberOfLines={1}>{item.user}</Text>
+        {item.verified && (
+          <View style={ucSt.verifiedBadge}>
+            <Icons name="check" size={sp(8)} color={P.white} />
+          </View>
+        )}
+        <View style={ucSt.timePill}>
+          <Icons name="clock" size={sp(9)} color={P.light} />
+          <Text style={ucSt.timeTxt}> {item.timeLeft}</Text>
+        </View>
+      </View>
+    </View>
+  </TouchableOpacity>
+));
+
+const ucSt = StyleSheet.create({
+  wrap: {
+    width: URGENT_W, backgroundColor: P.white, borderRadius: sp(14),
+    overflow: 'hidden', marginRight: sp(14), elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 6,
+  },
+  imgBox: {
+    height: sp(130), alignItems: 'center', justifyContent: 'center', position: 'relative',
+  },
+  imgEmoji: { fontSize: sp(48) },
+  badge: {
+    position: 'absolute', top: sp(10), left: sp(10),
+    backgroundColor: P.red, borderRadius: sp(5),
+    paddingHorizontal: sp(7), paddingVertical: sp(3),
+  },
+  badgeTxt: { color: P.white, fontSize: sp(9), fontWeight: '800', letterSpacing: 0.8 },
+  heartBtn: {
+    position: 'absolute', top: sp(10), right: sp(10),
+    width: sp(28), height: sp(28), borderRadius: sp(14),
+    backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center',
+  },
+  body:    { padding: sp(11) },
+  catChip: { alignSelf: 'flex-start', borderRadius: sp(5), paddingHorizontal: sp(7), paddingVertical: sp(2), marginBottom: sp(6) },
+  catTxt:  { fontSize: sp(10), fontWeight: '700' },
+  title: {
+    fontSize: sp(13), fontWeight: '700', color: P.dark,
+    lineHeight: sp(18), marginBottom: sp(7), minHeight: sp(36),
+  },
+  amtRow:  { flexDirection: 'row', alignItems: 'baseline', marginBottom: sp(6) },
+  raised:  { fontSize: sp(13), fontWeight: '800', color: P.teal },
+  goal:    { fontSize: sp(11), color: P.light },
+  userRow: { flexDirection: 'row', alignItems: 'center', marginTop: sp(8) },
+  avatar: {
+    width: sp(20), height: sp(20), borderRadius: sp(10),
+    backgroundColor: P.teal, alignItems: 'center', justifyContent: 'center', marginRight: sp(5),
+  },
+  avatarTxt: { color: P.white, fontSize: sp(9), fontWeight: '800' },
+  userName:  { flex: 1, fontSize: sp(11), color: P.gray },
+  verifiedBadge: {
+    width: sp(14), height: sp(14), borderRadius: sp(7),
+    backgroundColor: P.teal, alignItems: 'center', justifyContent: 'center', marginRight: sp(5),
+  },
+  timePill: { flexDirection: 'row', alignItems: 'center' },
+  timeTxt:  { fontSize: sp(10), color: P.light },
+});
+
+// ════════════════════════════════════════════════════════════
+//  FeaturedItem
+// ════════════════════════════════════════════════════════════
+const FeaturedItem = memo(({ item }) => (
+  <TouchableOpacity style={fiSt.wrap} activeOpacity={0.9}>
+    <View style={[fiSt.thumb, { backgroundColor: item.imgBg }]}>
+      <Text style={fiSt.emoji}>{item.imgEmoji}</Text>
+    </View>
+    <View style={fiSt.info}>
+      <Text style={fiSt.title} numberOfLines={1}>{item.title}</Text>
+      <ProgressBar pct={item.pct} />
+      <View style={fiSt.meta}>
+        <Text style={fiSt.raised}>{item.raised}</Text>
+        <Text style={fiSt.sep}> / </Text>
+        <Text style={fiSt.goal}>{item.goal}</Text>
+        <View style={{ flex: 1 }} />
+        <Text style={fiSt.org}>{item.org}</Text>
+      </View>
+    </View>
+  </TouchableOpacity>
+));
+
+const fiSt = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: P.white,
+    borderRadius: sp(12), padding: sp(12), marginBottom: sp(10),
+    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3,
   },
   thumb: {
-    width: 62,
-    height: 62,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    width: sp(64), height: sp(64), borderRadius: sp(10),
+    alignItems: 'center', justifyContent: 'center', marginRight: sp(12),
   },
-  emoji: { fontSize: 28 },
-  info: { flex: 1 },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: C.textDark,
-    marginBottom: 7,
-  },
-  pBg: {
-    height: 4,
-    backgroundColor: C.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  pFill: { height: 4, backgroundColor: C.teal, borderRadius: 2 },
-  meta: { flexDirection: 'row', alignItems: 'center' },
-  raised: { fontSize: 12, fontWeight: '700', color: C.teal },
-  sep: { fontSize: 12, color: C.textLight },
-  time: { fontSize: 12, color: C.textLight },
+  emoji: { fontSize: sp(28) },
+  info:  { flex: 1 },
+  title: { fontSize: sp(14), fontWeight: '700', color: P.dark, marginBottom: sp(8) },
+  meta:  { flexDirection: 'row', alignItems: 'center', marginTop: sp(6) },
+  raised:{ fontSize: sp(12), fontWeight: '700', color: P.teal },
+  sep:   { fontSize: sp(12), color: P.light },
+  goal:  { fontSize: sp(12), color: P.light },
+  org:   { fontSize: sp(11), color: P.light },
 });
 
-
-const BottomTabBar = ({ active, onPress }) => (
-  <View style={tb.bar}>
-    {[
-      { id: 'home', icon: '⌂', label: 'Home' },
-      { id: 'explore', icon: '⊙', label: 'Explore' },
-    ].map(t => (
-      <TouchableOpacity
-        key={t.id}
-        style={tb.tab}
-        onPress={() => onPress(t.id)}
-        activeOpacity={0.7}
-      >
-        <Text style={[tb.icon, active === t.id && tb.iconActive]}>
-          {t.icon}
-        </Text>
-        <Text style={[tb.label, active === t.id && tb.labelActive]}>
-          {t.label}
-        </Text>
-      </TouchableOpacity>
-    ))}
-
-    {/* FAB */}
-    <View style={tb.fabWrap}>
-      <TouchableOpacity onPress={() => onPress('add')} activeOpacity={0.85}>
-        <LinearGradient colors={[C.teal, C.tealDark]} style={tb.fab}>
-          <Text style={tb.fabIcon}>+</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-
-    {[
-      { id: 'saved', icon: '♡', label: 'Saved' },
-      { id: 'me', icon: '◎', label: 'Me' },
-    ].map(t => (
-      <TouchableOpacity
-        key={t.id}
-        style={tb.tab}
-        onPress={() => onPress(t.id)}
-        activeOpacity={0.7}
-      >
-        <Text style={[tb.icon, active === t.id && tb.iconActive]}>
-          {t.icon}
-        </Text>
-        <Text style={[tb.label, active === t.id && tb.labelActive]}>
-          {t.label}
-        </Text>
-      </TouchableOpacity>
-    ))}
-  </View>
-);
-const tb = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.white,
-    borderTopWidth: 1,
-    borderTopColor: '#EFEFEF',
-    paddingBottom: 8,
-    paddingTop: 6,
-    paddingHorizontal: 6,
-    elevation: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-  },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 2 },
-  icon: { fontSize: 20, color: C.tabInactive, marginBottom: 2 },
-  iconActive: { color: C.tabActive },
-  label: { fontSize: 10, color: C.tabInactive },
-  labelActive: { color: C.tabActive, fontWeight: '700' },
-  fabWrap: { flex: 1, alignItems: 'center', marginTop: -22 },
-  fab: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: C.teal,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-  },
-  fabIcon: { color: C.white, fontSize: 30, fontWeight: '300', lineHeight: 34 },
-});
-
-
+// ════════════════════════════════════════════════════════════
+//  HomeScreen — main
+// ════════════════════════════════════════════════════════════
 const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('home');
-  const [activeCat, setActiveCat] = useState('medical');
-  const [searchText, setSearchText] = useState('');
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [activeCat, setActiveCat] = useState('all');
+  const [search,    setSearch   ] = useState('');
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 350,
-      useNativeDriver: true,
-    }).start();
-  }, [fadeAnim]);
+  const handleTab = useCallback(id => setActiveTab(id), []);
+  const handleCat = useCallback(id => setActiveCat(id), []);
+
+  // Opens ProfileScreen as a full screen sliding from right
+  const openProfile = useCallback(() => {
+    navigation?.navigate?.('ProfileScreen');
+  }, [navigation]);
 
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
-      <Animated.View style={[s.flex, { opacity: fadeAnim }]}>
-        {/* Fixed top bar */}
-        <TopBar />
+    <SafeAreaView style={scSt.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={P.white} />
 
-        {/* Scrollable body */}
+      {/* ══ FIXED TOPBAR ════════════════════════════════════ */}
+      <TopBar
+        user={CURRENT_USER}
+        onAvatarPress={openProfile}
+        onBellPress={() => {}}
+      />
+
+      {/* ══ SCROLLABLE CONTENT ══════════════════════════════ */}
+      <ScrollView
+        style={scSt.scroll}
+        contentContainerStyle={scSt.content}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+      >
+        <SearchBar value={search} onChange={setSearch} />
+        <HeroBanner />
+        <StatsRow />
+
+        <SectionHeader title="Categories" linkText="See All" />
+        <CategoryChips active={activeCat} onChange={handleCat} />
+
+        <SectionHeader title="🔥 Urgent Campaigns" linkText="See All →" />
         <ScrollView
-          style={s.scroll}
-          contentContainerStyle={s.content}
-          showsVerticalScrollIndicator={false}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={scSt.hPad}
         >
-          {/* Search */}
-          <View style={s.searchWrap}>
-            <Text style={s.searchIcon}>🔍</Text>
-            <TextInput
-              style={s.searchInput}
-              placeholder="Search campaigns..."
-              placeholderTextColor={C.textLight}
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-          </View>
-
-          {/* Hero Banner */}
-          <LinearGradient
-            colors={[C.bannerTop, C.bannerBot]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.banner}
-          >
-            <View style={s.bannerCircle1} />
-            <View style={s.bannerCircle2} />
-            <Text style={s.bannerTitle}>{"Fund Someone's\nFuture Today"}</Text>
-            <Text style={s.bannerSub}>{'100% goes to those in need'}</Text>
-            <TouchableOpacity style={s.exploreBtn} activeOpacity={0.8}>
-              <Text style={s.exploreTxt}>Explore →</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-
-          {/* Stats */}
-          <View style={s.statsCard}>
-            {[
-              { val: 'PKR 15M', lbl: 'Raised' },
-              { val: '5.2K', lbl: 'Donors' },
-              { val: '320', lbl: 'Campaigns' },
-            ].map((st, i) => (
-              <View key={i} style={[s.statItem, i < 2 && s.statDiv]}>
-                <Text style={s.statVal}>{st.val}</Text>
-                <Text style={s.statLbl}>{st.lbl}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Categories */}
-          <SectionHeader title="Categories" linkText="See All" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.hScroll}
-          >
-            {CATEGORIES.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[s.catChip, activeCat === item.id && s.catChipActive]}
-                onPress={() => setActiveCat(item.id)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.catIcon}>{item.icon}</Text>
-                <Text
-                  style={[
-                    s.catLabel,
-                    activeCat === item.id && s.catLabelActive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Urgent Campaigns */}
-          <SectionHeader title="🔥 Urgent Campaigns" linkText="See All →" />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={s.hScroll}
-          >
-            {URGENT.map(item => (
-              <UrgentCard key={item.id} item={item} />
-            ))}
-          </ScrollView>
-
-          {/* Featured */}
-          <SectionHeader title="⭐ Featured" linkText="See All" />
-          <View style={s.featList}>
-            {FEATURED.map(item => (
-              <FeaturedItem key={item.id} item={item} />
-            ))}
-          </View>
-
-          <View style={{ height: 20 }} />
+          {URGENT.map(item => <UrgentCard key={item.id} item={item} />)}
         </ScrollView>
-      </Animated.View>
 
-      {/* Bottom tab bar */}
-      <BottomTabBar active={activeTab} onPress={setActiveTab} />
+        <SectionHeader title="⭐ Featured" linkText="See All" />
+        <View style={scSt.featList}>
+          {FEATURED.map(item => <FeaturedItem key={item.id} item={item} />)}
+        </View>
+
+        <View style={{ height: sp(20) }} />
+      </ScrollView>
+
+      {/* ══ SHARED BOTTOM TAB BAR ═══════════════════════════ */}
+      <BottomTabBar active={activeTab} onPress={handleTab} />
     </SafeAreaView>
   );
 };
 
 export default HomeScreen;
 
-// ── Screen styles ──────────────────────────────────────────
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.white },
-  flex: { flex: 1, backgroundColor: C.screenBg },
-  scroll: { flex: 1 },
-  content: { paddingBottom: 8 },
-
-  // Search
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.searchBg,
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 14,
-    paddingHorizontal: 13,
-    height: 42,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  searchIcon: { fontSize: 13, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: C.textDark, paddingVertical: 0 },
-
-  // Banner
-  banner: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 22,
-    paddingRight: 90,
-    overflow: 'hidden',
-    minHeight: 130,
-    position: 'relative',
-  },
-  bannerCircle1: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 20,
-    borderColor: 'rgba(255,255,255,0.08)',
-    right: -20,
-    top: -20,
-  },
-  bannerCircle2: {
-    position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 14,
-    borderColor: 'rgba(255,255,255,0.06)',
-    right: 30,
-    bottom: -20,
-  },
-  bannerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    lineHeight: 27,
-    marginBottom: 5,
-    zIndex: 2,
-  },
-  bannerSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.72)',
-    marginBottom: 16,
-    zIndex: 2,
-  },
-  exploreBtn: {
-    alignSelf: 'flex-start',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.55)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    zIndex: 2,
-  },
-  exploreTxt: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
-
-  // Stats
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: C.white,
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  statDiv: { borderRightWidth: 1, borderRightColor: C.border },
-  statVal: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: C.textDark,
-    marginBottom: 2,
-  },
-  statLbl: { fontSize: 11, color: C.textLight },
-
-  // Categories
-  hScroll: { paddingHorizontal: 16, paddingBottom: 4 },
-  catChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    backgroundColor: C.white,
-    marginRight: 8,
-    gap: 5,
-  },
-  catChipActive: { backgroundColor: C.teal, borderColor: C.teal },
-  catIcon: { fontSize: 13 },
-  catLabel: { fontSize: 13, fontWeight: '600', color: C.textGray },
-  catLabelActive: { color: '#FFFFFF' },
-
-  // Featured list
-  featList: { paddingHorizontal: 16 },
+// ── Screen styles ────────────────────────────────────────────
+const scSt = StyleSheet.create({
+  safe:     { flex: 1, backgroundColor: P.white },
+  scroll:   { flex: 1, backgroundColor: P.bg    },
+  content:  { paddingBottom: sp(8)               },
+  hPad:     { paddingHorizontal: sp(16), paddingBottom: sp(4) },
+  featList: { paddingHorizontal: sp(16) },
 });

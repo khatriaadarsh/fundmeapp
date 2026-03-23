@@ -1,0 +1,131 @@
+// src/components/BottomTabBar.jsx
+// ─────────────────────────────────────────────────────────────
+//  Shared BottomTabBar — used on every main screen
+//
+//  Usage:
+//    import BottomTabBar from '../components/BottomTabBar';
+//    <BottomTabBar active="home" onPress={(id) => ...} />
+//
+//  Tab IDs: 'home' | 'explore' | 'add' | 'saved' | 'me'
+// ─────────────────────────────────────────────────────────────
+
+import React, { memo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  Dimensions,
+  StatusBar,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icons from 'react-native-vector-icons/Feather';
+
+const { width: SW } = Dimensions.get('window');
+const sp = n => (SW / 375) * n;
+
+const TEAL      = '#00B4CC';
+const TEAL_DARK = '#0097AA';
+const INACTIVE  = '#9CA3AF';
+const WHITE     = '#FFFFFF';
+
+const TABS = [
+  { id: 'home',    label: 'Home',    icon: 'home'    },
+  { id: 'explore', label: 'Explore', icon: 'compass' },
+  { id: 'saved',   label: 'Saved',   icon: 'heart'   },
+  { id: 'me',      label: 'Me',      icon: 'user'    },
+];
+
+const BottomTabBar = memo(({ active = 'home', onPress }) => (
+  <View style={s.bar}>
+    {TABS.slice(0, 2).map(t => (
+      <TabItem key={t.id} t={t} active={active} onPress={onPress} />
+    ))}
+
+    {/* Centre FAB */}
+    <View style={s.fabSlot}>
+      <TouchableOpacity
+        onPress={() => onPress?.('add')}
+        activeOpacity={0.85}
+      >
+        <LinearGradient colors={[TEAL, TEAL_DARK]} style={s.fab}>
+          <Icons name="plus" size={sp(26)} color={WHITE} />
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+
+    {TABS.slice(2).map(t => (
+      <TabItem key={t.id} t={t} active={active} onPress={onPress} />
+    ))}
+  </View>
+));
+
+const TabItem = memo(({ t, active, onPress }) => {
+  const isActive = active === t.id;
+  return (
+    <TouchableOpacity
+      style={s.tab}
+      onPress={() => onPress?.(t.id)}
+      activeOpacity={0.7}
+    >
+      <Icons
+        name={t.icon}
+        size={sp(22)}
+        color={isActive ? TEAL : INACTIVE}
+      />
+      <Text style={[s.label, isActive && s.labelActive]}>{t.label}</Text>
+    </TouchableOpacity>
+  );
+});
+
+export default BottomTabBar;
+
+const s = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: WHITE,
+    borderTopWidth: 1,
+    borderTopColor: '#EFEFEF',
+    paddingTop: sp(6),
+    paddingBottom: Platform.OS === 'android' ? sp(10) : sp(6),
+    paddingHorizontal: sp(6),
+    elevation: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: sp(2),
+  },
+  label: {
+    fontSize: sp(10),
+    color: INACTIVE,
+    marginTop: sp(3),
+  },
+  labelActive: {
+    color: TEAL,
+    fontWeight: '700',
+  },
+  fabSlot: {
+    flex: 1,
+    alignItems: 'center',
+    marginTop: sp(-24),
+  },
+  fab: {
+    width: sp(56),
+    height: sp(56),
+    borderRadius: sp(28),
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: TEAL,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+});
