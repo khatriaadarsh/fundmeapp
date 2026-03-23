@@ -1,9 +1,3 @@
-// src/screens/home/HomeScreen.jsx
-// ─────────────────────────────────────────────────────────────
-//  Home Screen — FundMe App (React Native CLI)
-//  Rebuilt pixel-perfect from UI screenshot
-// ─────────────────────────────────────────────────────────────
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -24,7 +18,6 @@ import LinearGradient from 'react-native-linear-gradient';
 const { width } = Dimensions.get('window');
 const URGENT_CARD_W = width * 0.6;
 
-// ── Colour tokens (exact from screenshot) ─────────────────
 const C = {
   screenBg: '#F4F5F7',
   white: '#FFFFFF',
@@ -42,7 +35,7 @@ const C = {
   tabInactive: '#9CA3AF',
 };
 
-// ── Data ──────────────────────────────────────────────────
+
 const CATEGORIES = [
   { id: 'medical', label: 'Medical', icon: '🏥' },
   { id: 'education', label: 'Education', icon: '🎓' },
@@ -129,11 +122,7 @@ const FEATURED = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────
 
-// Top Bar
 const TopBar = () => (
   <View style={topBar.wrap}>
     <View style={topBar.left}>
@@ -220,7 +209,7 @@ const topBar = StyleSheet.create({
   },
 });
 
-// Section header
+
 const SectionHeader = ({ title, linkText }) => (
   <View style={sh.wrap}>
     <Text style={sh.title}>{title}</Text>
@@ -422,7 +411,7 @@ const fi = StyleSheet.create({
   time: { fontSize: 12, color: C.textLight },
 });
 
-// Bottom tab bar
+
 const BottomTabBar = ({ active, onPress }) => (
   <View style={tb.bar}>
     {[
@@ -510,9 +499,7 @@ const tb = StyleSheet.create({
   fabIcon: { color: C.white, fontSize: 30, fontWeight: '300', lineHeight: 34 },
 });
 
-// ─────────────────────────────────────────────────────────
-// Main Screen
-// ─────────────────────────────────────────────────────────
+
 const HomeScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [activeCat, setActiveCat] = useState('medical');

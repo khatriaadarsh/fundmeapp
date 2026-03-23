@@ -23,7 +23,7 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-
+import Icons from 'react-native-vector-icons/MaterialIcons';
 // ── Colours ────────────────────────────────────────────────
 const C = {
   bg: '#FFFFFF',
@@ -107,7 +107,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
             {/* Email input */}
             <View style={s.fieldWrap}>
               <View style={[s.inputRow, focused && s.inputFocused]}>
-                <Text style={s.inputIcon}>✉️</Text>
+                <Icons
+                  name="email"
+                  size={18}
+                  color={C.textLight}
+                  style={s.inputIcon}
+                />
                 <TextInput
                   style={s.input}
                   placeholder="name@example.com"
@@ -125,7 +130,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
             {/* Send Reset Code button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate('NewPasswordScreen')}
+              onPress={() => navigation.navigate('OTPVerificationScreen')}
               activeOpacity={0.85}
               style={{ width: '100%' }}
             >
@@ -209,10 +214,10 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: C.inputBg,
     paddingHorizontal: 14,
-    height: 50,
+    height: 55,
   },
   inputFocused: { borderColor: C.teal },
-  inputIcon: { fontSize: 15, marginRight: 10 },
+  inputIcon: { fontSize: 22, marginRight: 8 },
   input: { flex: 1, fontSize: 15, color: C.textDark, paddingVertical: 0 },
 
   // Button

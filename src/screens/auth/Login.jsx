@@ -32,8 +32,9 @@ const COLORS = {
   textPlaceholder: '#9CA3AF',
   inputBorder: '#D1D5DB',
   inputBg: '#FFFFFF',
-  iconColor: '#6B7280',
+  iconColor: '#bec3cd',
   white: '#FFFFFF',
+  light: '#9CA3AF',
 };
 
 // ── Main Screen ────────────────────────────────────────────
@@ -155,7 +156,7 @@ const Login = ({ navigation }) => {
               <Icon
                 name="email"
                 size={22}
-                color={COLORS.iconColor}
+                color={COLORS.light}
                 style={styles.fieldIcon}
               />
               <TextInput
@@ -177,7 +178,7 @@ const Login = ({ navigation }) => {
               <Icon
                 name="lock"
                 size={22}
-                color={COLORS.iconColor}
+                color={COLORS.light}
                 style={styles.fieldIcon}
               />
               <TextInput
@@ -322,8 +323,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 10,
     width: '100%',
+    height: 60,
   },
   fieldFocused: {
     borderColor: COLORS.tealPrimary,
