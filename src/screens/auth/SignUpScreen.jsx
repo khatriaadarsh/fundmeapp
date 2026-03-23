@@ -1,18 +1,26 @@
 // src/screens/auth/SignupForm.jsx
 // ─────────────────────────────────────────────────────────────
-//  Signup Form — Step 1 of 4
-//  FundMe App (React Native CLI)
+//  Signup Form — Step 1 of 4  |  FundMe App (React Native CLI)
 //
-//  Back arrow | Step 1 of 4 | teal progress bar
-//  Create Account headline + subtitle
-//  First Name, Last Name, Email, Phone (+92), Password,
-//  Confirm Password inputs
-//  "I want to:" — Donate | Create Campaigns toggles
-//  Continue → button | Already have account? Log In
+//  Layout model (identical to CNICUpload & ProfileComplete):
+//  ┌─ SafeAreaView ──────────────────────────────────────────┐
+//  │  [Header]  ←  ·  Step 1 of 4              (fixed)      │
+//  │  [Progress bar — teal 25%]                (fixed)      │
+//  │  ┌─ ScrollView ──────────────────────────────────────┐  │
+//  │  │  headline · fields · role toggles               │  │
+//  │  └───────────────────────────────────────────────────┘  │
+//  │  [Continue →]                             (fixed)      │
+//  └─────────────────────────────────────────────────────────┘
+//
+//  Key decisions (same across all 4 signup screens):
+//  • NO KeyboardAvoidingView — causes shiver on Android
+//  • Footer is position:absolute bottom:0 — keyboard can't push it
+//  • ScrollView paddingBottom = FOOTER_H + 16 — nothing hides behind footer
+//  • NO Animated wrapper on content — avoids layout thrash
+//  • SafeAreaView + manual STATUSBAR_H for Android status bar
 // ─────────────────────────────────────────────────────────────
-import Icons from 'react-native-vector-icons/Feather';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -20,32 +28,43 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Animated,
+  Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Icons from 'react-native-vector-icons/Feather';
 
-// ── Colour tokens ──────────────────────────────────────────
-const C = {
-  bg: '#F9FAFB',
-  white: '#FFFFFF',
-  teal: '#00B4CC',
-  tealDark: '#0097AA',
+// ── Responsive scale (base 375 pt) ─────────────────────────
+const { width: SW } = Dimensions.get('window');
+const sp = n => (SW / 375) * n;
+
+// Footer height — view height + scroll padding
+const FOOTER_H = Platform.OS === 'android' ? sp(82) : sp(70);
+
+// Android: SafeAreaView gives no top inset — add manually
+const STATUSBAR_H =
+  Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
+// ── Palette ─────────────────────────────────────────────────
+const P = {
+  bg:        '#F9FAFB',
+  white:     '#FFFFFF',
+  teal:      '#00B4CC',
+  tealDark:  '#0097AA',
   tealLight: 'rgba(0,180,204,0.12)',
-  green: '#22C55E',
-  textDark: '#111827',
-  textGray: '#6B7280',
-  textLight: '#9CA3AF',
-  border: '#E5E7EB',
-  borderFocus: '#00B4CC',
-  inputBg: '#FFFFFF',
-  progressBg: '#E5E7EB',
+  dark:      '#111827',
+  gray:      '#6B7280',
+  light:     '#9CA3AF',
+  labelGray: '#aeafb0',
+  border:    '#E5E7EB',
 };
 
-// ── Reusable labelled input ────────────────────────────────
-const Field = ({
+// ════════════════════════════════════════════════════════════
+//  Field — reusable labelled input
+// ════════════════════════════════════════════════════════════
+const Field = memo(({
   label,
   placeholder,
   value,
@@ -53,19 +72,19 @@ const Field = ({
   keyboardType = 'default',
   secureTextEntry = false,
   autoCapitalize = 'words',
-  rightIcon = null,
   leftContent = null,
+  rightContent = null,
 }) => {
   const [focused, setFocused] = useState(false);
   return (
-    <View style={field.wrap}>
-      <Text style={field.label}>{label}</Text>
-      <View style={[field.inputRow, focused && field.focused]}>
-        {leftContent && <View style={field.left}>{leftContent}</View>}
+    <View style={fSt.wrap}>
+      <Text style={fSt.label}>{label}</Text>
+      <View style={[fSt.row, focused && fSt.rowFocused]}>
+        {leftContent && <View style={fSt.left}>{leftContent}</View>}
         <TextInput
-          style={field.input}
+          style={fSt.input}
           placeholder={placeholder}
-          placeholderTextColor={C.textLight}
+          placeholderTextColor={P.light}
           value={value}
           onChangeText={onChangeText}
           keyboardType={keyboardType}
@@ -75,448 +94,363 @@ const Field = ({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
-        {rightIcon && <View style={field.right}>{rightIcon}</View>}
+        {rightContent && <View style={fSt.right}>{rightContent}</View>}
       </View>
     </View>
   );
-};
+});
 
-// ── Main screen ────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+//  Main Screen
+// ════════════════════════════════════════════════════════════
 const SignupForm = ({ navigation }) => {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
+  const [firstName,   setFirstName  ] = useState('');
+  const [lastName,    setLastName   ] = useState('');
+  const [email,       setEmail      ] = useState('');
+  const [phone,       setPhone      ] = useState('');
+  const [password,    setPassword   ] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
-  const [showPass, setShowPass] = useState(false);
+  const [showPass,    setShowPass   ] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [role, setRole] = useState('donate'); // 'donate' | 'campaign'
+  const [role,        setRole       ] = useState('donate');
+  const [phoneFocused, setPhoneFocused] = useState(false);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [fadeAnim, slideAnim]);
+  const togglePass    = useCallback(() => setShowPass(v => !v),    []);
+  const toggleConfirm = useCallback(() => setShowConfirm(v => !v), []);
 
   return (
-    <View style={s.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={s.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={scSt.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={P.bg} />
+
+      {/* ══ FIXED HEADER ════════════════════════════════════ */}
+      <View style={scSt.header}>
+        <TouchableOpacity
+          onPress={() => navigation?.goBack?.()}
+          style={scSt.backBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          {/* ── Header row ── */}
-          <View style={s.headerRow}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={s.backBtn}
-            >
-              <Text style={s.backArrow}>←</Text>
-            </TouchableOpacity>
-            <Text style={s.stepLabel}>Step 1 of 4</Text>
-          </View>
+          <Text style={scSt.backArrow}>←</Text>
+        </TouchableOpacity>
+        <Text style={scSt.stepLabel}>Step 1 of 4</Text>
+      </View>
 
-          {/* ── Progress bar ── */}
-          <View style={s.progressBg}>
-            <View style={[s.progressFill, { width: '25%' }]} />
-          </View>
+      {/* ══ FIXED PROGRESS BAR (teal 25%) ═══════════════════ */}
+      <View style={scSt.progressBg}>
+        <View style={scSt.progressFill} />
+      </View>
 
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            }}
-          >
-            {/* ── Headline ── */}
-            <Text style={s.headline}>Create Account</Text>
-            <Text style={s.subtitle}>
-              {'Join thousands making a difference'}
-            </Text>
+      {/* ══ SCROLLABLE CONTENT ══════════════════════════════ */}
+      <ScrollView
+        style={scSt.scroll}
+        contentContainerStyle={[
+          scSt.scrollContent,
+          { paddingBottom: FOOTER_H + sp(16) },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+        overScrollMode="never"
+      >
+        <Text style={scSt.headline}>Create Account</Text>
+        <Text style={scSt.subtitle}>Join thousands making a difference</Text>
 
-            {/* ── Fields ── */}
-            <Field
-              label="First Name"
-              placeholder="Enter your first name"
-              value={firstName}
-              onChangeText={setFirstName}
-              leftContent={
-                <Icons
-                  name="user"
-                  size={14}
-                  color={C.textLight}
-                  style={field.inputIcon}
-                />
-              }
-            />
-            <Field
-              label="Last Name"
-              placeholder="Enter your last name"
-              value={lastName}
-              onChangeText={setLastName}
-              leftContent={
-                <Icons
-                  name="user"
-                  size={14}
-                  color={C.textLight}
-                  style={field.inputIcon}
-                />
-              }
-              // leftContent={<Text style={s.fieldIcon}>👤</Text>}
-            />
-            <Field
-              label="Email"
-              placeholder="name@example.com"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+        {/* First Name */}
+        <Field
+          label="First Name"
+          placeholder="Enter your first name"
+          value={firstName}
+          onChangeText={setFirstName}
+          leftContent={<Icons name="user" size={sp(15)} color={P.light} />}
+        />
+
+        {/* Last Name */}
+        <Field
+          label="Last Name"
+          placeholder="Enter your last name"
+          value={lastName}
+          onChangeText={setLastName}
+          leftContent={<Icons name="user" size={sp(15)} color={P.light} />}
+        />
+
+        {/* Email */}
+        <Field
+          label="Email"
+          placeholder="name@example.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          leftContent={<Icons name="mail" size={sp(15)} color={P.light} />}
+        />
+
+        {/* Phone — custom prefix layout */}
+        <View style={fSt.wrap}>
+          <Text style={fSt.label}>Phone</Text>
+          <View style={[fSt.row, phoneFocused && fSt.rowFocused]}>
+            <View style={scSt.phonePrefix}>
+              <Icons name="phone" size={sp(14)} color={P.light} />
+              <Text style={scSt.prefixTxt}>+92</Text>
+              <View style={scSt.prefixDivider} />
+            </View>
+            <TextInput
+              style={[fSt.input, { flex: 1 }]}
+              placeholder="300 1234567"
+              placeholderTextColor={P.light}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
               autoCapitalize="none"
-              leftContent={
-                <Icons
-                  name="mail"
-                  size={14}
-                  color={C.textLight}
-                  style={field.inputIcon}
-                />
-              }
-              // leftContent={<Text style={s.fieldIcon}>✉️</Text>}
+              onFocus={() => setPhoneFocused(true)}
+              onBlur={() => setPhoneFocused(false)}
             />
+          </View>
+        </View>
 
-            {/* Phone with +92 prefix */}
-            <View style={field.wrap}>
-              <Text style={field.label}>Phone</Text>
-              <View style={[field.inputRow]}>
-                <View style={s.phonePrefix}>
-                  <Icons
-                    name="phone"
-                    color={C.textLight}
-                    style={field.inputIcon}
-                  />
-                  <Text style={s.prefixText}>+92</Text>
-                  <View style={s.prefixDivider} />
-                </View>
-                <TextInput
-                  style={[field.input, { flex: 1 }]}
-                  placeholder="300 1234567"
-                  placeholderTextColor={C.textLight}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-
-            {/* Password */}
-            <View style={field.wrap}>
-              <Text style={field.label}>Password</Text>
-              <View style={field.inputRow}>
-                <View style={field.left}>
-                  <Icons
-                    name="lock"
-                    color={C.textLight}
-                    style={field.inputIcon}
-                  />
-                </View>
-                <TextInput
-                  style={field.input}
-                  placeholder="Create a password"
-                  placeholderTextColor={C.textLight}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPass}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPass(p => !p)}
-                  style={field.right}
-                >
-                  <Text style={s.eyeIcon}>
-                    {showPass ? (
-                      <Icons
-                        name="eye"
-                        color={C.textLight}
-                        style={field.inputIcon}
-                      />
-                    ) : (
-                      <Icons
-                        name="eye-off"
-                        color={C.textLight}
-                        style={field.inputIcon}
-                      />
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Confirm password */}
-            <View style={field.wrap}>
-              <Text style={field.label}>Confirm Password</Text>
-              <View style={field.inputRow}>
-                <View style={field.left}>
-                  <Icons
-                    name="lock"
-                    color={C.textLight}
-                    style={field.inputIcon}
-                  />
-                </View>
-                <TextInput
-                  style={field.input}
-                  placeholder="Re-enter your password"
-                  placeholderTextColor={C.textLight}
-                  value={confirmPass}
-                  onChangeText={setConfirmPass}
-                  secureTextEntry={!showConfirm}
-                  autoCapitalize="none"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowConfirm(p => !p)}
-                  style={field.right}
-                >
-                  <Text style={s.eyeIcon}>
-                    {showConfirm ? (
-                      <Icons
-                        name="eye"
-                        color={C.textLight}
-                        style={field.inputIcon}
-                      />
-                    ) : (
-                      <Icons
-                        name="eye-off"
-                        color={C.textLight}
-                        style={field.inputIcon}
-                      />
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* ── I want to ── */}
-            <Text style={s.roleLabel}>I want to:</Text>
-            <View style={s.roleRow}>
-              <TouchableOpacity
-                style={[s.roleBtn, role === 'donate' && s.roleBtnActive]}
-                onPress={() => setRole('donate')}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    s.roleBtnText,
-                    role === 'donate' && s.roleBtnTextActive,
-                  ]}
-                >
-                  {'🤍  Donor'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[s.roleBtn, role === 'campaign' && s.roleBtnActive]}
-                onPress={() => setRole('campaign')}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    s.roleBtnText,
-                    role === 'campaign' && s.roleBtnTextActive,
-                  ]}
-                >
-                  {'📋  Creator '}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* ── Continue button ── */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('OTPVerificationScreen')}
-              activeOpacity={0.85}
-              style={{ marginTop: 45 }}
-            >
-              <LinearGradient
-                colors={[C.teal, C.tealDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.continueBtn}
-              >
-                <Text style={s.continueBtnText}>
-                  Continue{' '}
-                  <Icons
-                    name="arrow-right"
-                    color={C.white}
-                    style={s.continueBtnIcon}
-                  />
-                </Text>
-              </LinearGradient>
+        {/* Password */}
+        <Field
+          label="Password"
+          placeholder="Create a password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPass}
+          autoCapitalize="none"
+          leftContent={<Icons name="lock" size={sp(15)} color={P.light} />}
+          rightContent={
+            <TouchableOpacity onPress={togglePass} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icons name={showPass ? 'eye' : 'eye-off'} size={sp(16)} color={P.light} />
             </TouchableOpacity>
+          }
+        />
 
-            {/* ── Log In link ── */}
-            <View style={s.loginRow}>
-              <Text style={s.loginText}>{'Already have an account? '}</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Login')}
-                activeOpacity={0.7}
-              >
-                <Text style={s.loginLink}>Log In</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        {/* Confirm Password */}
+        <Field
+          label="Confirm Password"
+          placeholder="Re-enter your password"
+          value={confirmPass}
+          onChangeText={setConfirmPass}
+          secureTextEntry={!showConfirm}
+          autoCapitalize="none"
+          leftContent={<Icons name="lock" size={sp(15)} color={P.light} />}
+          rightContent={
+            <TouchableOpacity onPress={toggleConfirm} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Icons name={showConfirm ? 'eye' : 'eye-off'} size={sp(16)} color={P.light} />
+            </TouchableOpacity>
+          }
+        />
+
+        {/* I want to: role toggle */}
+        <Text style={scSt.roleLabel}>I want to:</Text>
+        <View style={scSt.roleRow}>
+          <TouchableOpacity
+            style={[scSt.roleBtn, role === 'donate' && scSt.roleBtnActive]}
+            onPress={() => setRole('donate')}
+            activeOpacity={0.8}
+          >
+            <Text style={[scSt.roleTxt, role === 'donate' && scSt.roleTxtActive]}>
+              🤍  Donor
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[scSt.roleBtn, role === 'campaign' && scSt.roleBtnActive]}
+            onPress={() => setRole('campaign')}
+            activeOpacity={0.8}
+          >
+            <Text style={[scSt.roleTxt, role === 'campaign' && scSt.roleTxtActive]}>
+              📋  Creator
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* ══ FIXED FOOTER — Continue button ══════════════════ */}
+      <View style={scSt.footer}>
+        <TouchableOpacity
+          onPress={() => navigation?.navigate?.('OTPVerificationScreen')}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={[P.teal, P.tealDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={scSt.continueBtn}
+          >
+            <Text style={scSt.continueTxt}>Continue  </Text>
+            <Icons name="arrow-right" size={sp(16)} color={P.white} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
 export default SignupForm;
 
-// ── Field component styles ─────────────────────────────────
-const field = StyleSheet.create({
-  wrap: { marginBottom: 14 },
-  label: { fontSize: 15, fontWeight: '600', color: '#aeafb0', marginBottom: 6 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: C.border,
-    borderRadius: 8,
-    backgroundColor: C.inputBg,
-    paddingHorizontal: 12,
-    height: 55,
-  },
-  focused: { borderColor: C.borderFocus },
-  left: { marginRight: 8 },
-  right: { marginLeft: 8 },
-  input: { flex: 1, fontSize: 15, color: C.textDark, paddingVertical: 0 },
-  inputIcon: { fontSize: 17, marginRight: 5 },
-});
+// ════════════════════════════════════════════════════════════
+//  STYLESHEETS
+// ════════════════════════════════════════════════════════════
 
-// ── Screen styles ──────────────────────────────────────────
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scroll: {
-    paddingHorizontal: 22,
-    paddingTop: 52,
-    paddingBottom: 36,
+// ── Screen ──────────────────────────────────────────────────
+const scSt = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: P.bg,
   },
 
-  // Header
-  headerRow: {
+  // Fixed header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    paddingHorizontal: sp(22),
+    paddingTop: sp(14) + STATUSBAR_H,
+    paddingBottom: sp(10),
+    backgroundColor: P.bg,
   },
-  backBtn: { padding: 4 },
-  backArrow: { fontSize: 20, color: C.textDark, fontWeight: '600' },
-  stepLabel: { fontSize: 13, color: C.textGray, fontWeight: '500' },
+  backBtn:   { padding: sp(4) },
+  backArrow: { fontSize: sp(20), color: P.dark, fontWeight: '700' },
+  stepLabel: { fontSize: sp(13), color: P.gray, fontWeight: '600' },
 
-  // Progress
+  // Fixed progress bar — teal 25% (Step 1)
   progressBg: {
     height: 4,
-    backgroundColor: C.progressBg,
+    marginHorizontal: sp(22),
+    backgroundColor: P.border,
     borderRadius: 2,
-    marginBottom: 24,
+    marginBottom: sp(22),
   },
-  progressFill: { height: 4, backgroundColor: C.teal, borderRadius: 2 },
+  progressFill: {
+    height: 4,
+    width: '25%',
+    backgroundColor: P.teal,
+    borderRadius: 2,
+  },
+
+  // Scroll
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: sp(22) },
 
   // Headline
   headline: {
-    fontSize: 24,
+    fontSize: sp(24),
     fontWeight: '800',
-    color: C.textDark,
-    marginBottom: 4,
+    color: P.dark,
+    marginBottom: sp(4),
   },
-  subtitle: { fontSize: 13, color: C.textGray, marginBottom: 22 },
-
-  // Icons inside inputs
-  fieldIcon: { fontSize: 14 },
-  eyeIcon: { fontSize: 16 },
+  subtitle: {
+    fontSize: sp(13),
+    color: P.gray,
+    marginBottom: sp(22),
+  },
 
   // Phone prefix
   phonePrefix: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: sp(8),
   },
-  prefixText: {
-    fontSize: 14,
-    color: '#a3a3a3',
+  prefixTxt: {
+    fontSize: sp(14),
+    color: P.light,
     fontWeight: '600',
-    marginLeft: 6,
-    marginRight: 4,
+    marginLeft: sp(6),
+    marginRight: sp(4),
   },
   prefixDivider: {
     width: 1,
-    height: 20,
-    backgroundColor: C.border,
-    marginLeft: 6,
+    height: sp(20),
+    backgroundColor: P.border,
+    marginLeft: sp(6),
   },
 
-  // Role buttons
+  // Role toggles
   roleLabel: {
-    fontSize: 13,
+    fontSize: sp(13),
     fontWeight: '600',
-    color: C.textLight,
-    marginBottom: 10,
+    color: P.light,
+    marginBottom: sp(10),
+    marginTop: sp(6),
   },
-  roleRow: { flexDirection: 'row', gap: 10 },
+  roleRow: {
+    flexDirection: 'row',
+    gap: sp(10),
+  },
   roleBtn: {
     flex: 1,
-    height: 60,
-    borderRadius: 8,
+    height: sp(54),
+    borderRadius: sp(8),
     borderWidth: 1.5,
-    borderColor: C.border,
-    backgroundColor: C.white,
+    borderColor: P.border,
+    backgroundColor: P.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   roleBtnActive: {
-    borderColor: C.teal,
-    backgroundColor: C.tealLight,
+    borderColor: P.teal,
+    backgroundColor: P.tealLight,
   },
-  roleBtnText: { fontSize: 13, color: C.textGray, fontWeight: '600' },
-  roleBtnTextActive: { color: C.teal },
+  roleTxt:       { fontSize: sp(13), color: P.gray, fontWeight: '600' },
+  roleTxtActive: { fontSize: sp(13), color: P.teal, fontWeight: '700' },
 
-  // Continue button
+  // Fixed footer
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: sp(22),
+    paddingTop: sp(12),
+    paddingBottom: Platform.OS === 'android' ? sp(22) : sp(12),
+    backgroundColor: P.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: P.border,
+  },
   continueBtn: {
     width: '100%',
-    paddingVertical: 18,
-    borderRadius: 10,
+    paddingVertical: sp(16),
+    borderRadius: sp(10),
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     elevation: 3,
-    shadowColor: C.teal,
+    shadowColor: P.teal,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
   },
-  continueBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  continueTxt: {
+    color: P.white,
+    fontSize: sp(16),
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  continueBtnIcon: { fontSize: 16, marginLeft: 6 },
+});
 
-  // Log in
-  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
-  loginText: { fontSize: 13, color: C.textGray },
-  loginLink: { fontSize: 13, color: C.teal, fontWeight: '700' },
+// ── Field ────────────────────────────────────────────────────
+const fSt = StyleSheet.create({
+  wrap:  { marginBottom: sp(14) },
+  label: {
+    fontSize: sp(13),
+    fontWeight: '600',
+    color: P.labelGray,
+    marginBottom: sp(6),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: P.border,
+    borderRadius: sp(8),
+    backgroundColor: P.white,
+    paddingHorizontal: sp(12),
+    height: sp(54),
+  },
+  rowFocused: { borderColor: P.teal },
+  left:  { marginRight: sp(8) },
+  right: { marginLeft:  sp(8) },
+  input: {
+    flex: 1,
+    fontSize: sp(14),
+    color: P.dark,
+    paddingVertical: 0,
+  },
 });
