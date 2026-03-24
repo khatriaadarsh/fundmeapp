@@ -39,26 +39,57 @@ const TABS = [
   { id: 'me',      label: 'Me',      icon: 'user'    },
 ];
 
-const BottomTabBar = memo(({ active = 'home', onPress }) => (
+// src/components/BottomTabBar.jsx  — add this helper map
+
+const TAB_ROUTES = {
+  home:    'HomeScreen',
+  explore: 'ExploreScreen',
+  saved:   'SavedScreen',
+  me:      'ProfileScreen',
+};
+
+// Update the component signature:
+const BottomTabBar = memo(({ active = 'home', onPress, navigation }) => (
   <View style={s.bar}>
     {TABS.slice(0, 2).map(t => (
-      <TabItem key={t.id} t={t} active={active} onPress={onPress} />
+      <TabItem
+        key={t.id}
+        t={t}
+        active={active}
+        onPress={id => {
+          onPress?.(id);                          // local state update in parent
+          if (id !== active) {
+            navigation?.navigate?.(TAB_ROUTES[id]);  // navigate to screen
+          }
+        }}
+      />
     ))}
-
-    {/* Centre FAB */}
+    {/* FAB */}
     <View style={s.fabSlot}>
       <TouchableOpacity
-        onPress={() => onPress?.('add')}
+        onPress={() => {
+          onPress?.('add');
+          navigation?.navigate?.('CreateCampaignScreen');
+        }}
         activeOpacity={0.85}
       >
-        <LinearGradient colors={[OCEAN_BLUE,OCEAN_BLUE]} style={s.fab}>
-          <Icons name="plus" size={sp(26)} color={WHITE} />
+        <LinearGradient colors={[OCEAN_BLUE, OCEAN_BLUE]} style={s.fab}>
+          <Icons name="plus" size={sp(24)} color={WHITE} />
         </LinearGradient>
       </TouchableOpacity>
     </View>
-
     {TABS.slice(2).map(t => (
-      <TabItem key={t.id} t={t} active={active} onPress={onPress} />
+      <TabItem
+        key={t.id}
+        t={t}
+        active={active}
+        onPress={id => {
+          onPress?.(id);
+          if (id !== active) {
+            navigation?.navigate?.(TAB_ROUTES[id]);
+          }
+        }}
+      />
     ))}
   </View>
 ));
@@ -80,6 +111,7 @@ const TabItem = memo(({ t, active, onPress }) => {
     </TouchableOpacity>
   );
 });
+
 
 export default BottomTabBar;
 
