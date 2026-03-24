@@ -1,14 +1,4 @@
 // src/screens/auth/NewPassword.jsx
-// ─────────────────────────────────────────────────────────────
-//  New Password — FundMe App (React Native CLI)
-//
-//  Back arrow
-//  Teal lock icon in light circle
-//  "New Password" headline + subtitle
-//  Password input + eye + green strength bar ("Strong")
-//  Confirm password + eye + "✓ Passwords match" green text
-//  "Reset Password" teal button
-// ─────────────────────────────────────────────────────────────
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -23,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Icons from 'react-native-vector-icons/Feather';
 
 // ── Colours ────────────────────────────────────────────────
 const C = {
@@ -47,6 +38,7 @@ const getStrength = pass => {
   if (/[A-Z]/.test(pass)) score++;
   if (/[0-9]/.test(pass)) score++;
   if (/[^A-Za-z0-9]/.test(pass)) score++;
+
   const map = [
     { label: '', color: C.border },
     { label: 'Weak', color: C.red },
@@ -61,6 +53,7 @@ const getStrength = pass => {
 const StrengthBar = ({ password }) => {
   const { score, label, color } = getStrength(password);
   if (!password) return null;
+
   return (
     <View style={sb.wrap}>
       <View style={sb.track}>
@@ -121,44 +114,35 @@ const NewPasswordScreen = ({ navigation }) => {
   return (
     <View style={s.container}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={s.inner}>
-          {/* Back button */}
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={s.backBtn}
-          >
-            <Text style={s.backArrow}>←</Text>
-          </TouchableOpacity>
-
           <Animated.View
             style={[
               s.content,
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
-            {/* Teal lock icon */}
+            {/* Icon */}
             <Animated.View
               style={[s.iconCircle, { transform: [{ scale: iconScale }] }]}
             >
-              <Text style={s.lockEmoji}>🔒</Text>
+              <Icons name="lock" size={28} color={C.teal} />
             </Animated.View>
 
             {/* Headline */}
             <Text style={s.headline}>New Password</Text>
             <Text style={s.subtitle}>
-              {
-                'Your new password must be different from previous used passwords.'
-              }
+              Your new password must be different from previous used passwords.
             </Text>
 
-            {/* Password input */}
+            {/* Password */}
             <View style={s.fieldWrap}>
               <View style={[s.inputRow, passFocused && s.inputFocused]}>
-                <Text style={s.inputIcon}>🔒</Text>
+                <Icons name="lock" size={16} color={C.textGray} />
                 <TextInput
                   style={s.input}
                   placeholder="••••••••••••"
@@ -170,19 +154,19 @@ const NewPasswordScreen = ({ navigation }) => {
                   onFocus={() => setPassFocused(true)}
                   onBlur={() => setPassFocused(false)}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPass(p => !p)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={s.eyeIcon}>{showPass ? '🙈' : '👁️'}</Text>
+                <TouchableOpacity onPress={() => setShowPass(!showPass)}>
+                  <Icons
+                    name={showPass ? 'eye-off' : 'eye'}
+                    size={18}
+                    color={C.textGray}
+                  />
                 </TouchableOpacity>
               </View>
 
-              {/* Strength bar */}
               <StrengthBar password={password} />
             </View>
 
-            {/* Confirm password */}
+            {/* Confirm Password */}
             <View style={s.fieldWrap}>
               <View
                 style={[
@@ -191,7 +175,7 @@ const NewPasswordScreen = ({ navigation }) => {
                   passwordMismatch && s.inputError,
                 ]}
               >
-                <Text style={s.inputIcon}>🔒</Text>
+                <Icons name="lock" size={16} color={C.textGray} />
                 <TextInput
                   style={s.input}
                   placeholder="••••••••••••"
@@ -203,15 +187,15 @@ const NewPasswordScreen = ({ navigation }) => {
                   onFocus={() => setConfFocused(true)}
                   onBlur={() => setConfFocused(false)}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowConfirm(p => !p)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={s.eyeIcon}>{showConfirm ? '🙈' : '👁️'}</Text>
+                <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+                  <Icons
+                    name={showConfirm ? 'eye-off' : 'eye'}
+                    size={18}
+                    color={C.textGray}
+                  />
                 </TouchableOpacity>
               </View>
 
-              {/* Match / mismatch feedback */}
               {passwordsMatch && (
                 <Text style={s.matchText}>✓ Passwords match</Text>
               )}
@@ -220,18 +204,13 @@ const NewPasswordScreen = ({ navigation }) => {
               )}
             </View>
 
-            {/* Reset Password button */}
+            {/* Button */}
             <TouchableOpacity
               onPress={() => navigation.navigate('Login')}
               activeOpacity={0.85}
               style={{ width: '100%' }}
             >
-              <LinearGradient
-                colors={[C.teal, C.tealDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={s.resetBtn}
-              >
+              <LinearGradient colors={[C.teal, C.tealDark]} style={s.resetBtn}>
                 <Text style={s.resetBtnText}>Reset Password</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -246,32 +225,34 @@ export default NewPasswordScreen;
 
 // ── Strength bar styles ────────────────────────────────────
 const sb = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 8 },
+  wrap: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   track: { flex: 1, flexDirection: 'row', gap: 4 },
-  segment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
-  label: { fontSize: 12, fontWeight: '700', minWidth: 44, textAlign: 'right' },
+  segment: { flex: 1, height: 4, borderRadius: 2 },
+  label: { fontSize: 12, fontWeight: '700', minWidth: 50, textAlign: 'right' },
 });
 
 // ── Screen styles ──────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  inner: {
+  container: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 52,
-    paddingBottom: 36,
+    backgroundColor: C.bg,
   },
 
-  backBtn: { marginBottom: 40 },
-  backArrow: { fontSize: 22, color: C.textDark, fontWeight: '600' },
+  inner: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    paddingTop: 20,
+  },
 
-  content: { alignItems: 'center', width: '100%' },
+  content: {
+    width: '100%',
+    maxWidth: 420, // ✅ responsive magic
+    alignItems: 'center',
+  },
 
-  // Lock icon
   iconCircle: {
     width: 76,
     height: 76,
@@ -281,9 +262,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 22,
   },
-  lockEmoji: { fontSize: 32 },
 
-  // Text
   headline: {
     fontSize: 24,
     fontWeight: '800',
@@ -291,6 +270,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
+
   subtitle: {
     fontSize: 14,
     color: C.textGray,
@@ -300,8 +280,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
   },
 
-  // Input
   fieldWrap: { width: '100%', marginBottom: 16 },
+
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -312,28 +292,42 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
   },
+
   inputFocused: { borderColor: C.teal },
   inputError: { borderColor: C.red },
-  inputIcon: { fontSize: 14, marginRight: 10 },
-  eyeIcon: { fontSize: 16 },
-  input: { flex: 1, fontSize: 15, color: C.textDark, paddingVertical: 0 },
 
-  // Feedback
-  matchText: { marginTop: 6, fontSize: 12, color: C.green, fontWeight: '600' },
-  mismatchText: { marginTop: 6, fontSize: 12, color: C.red, fontWeight: '600' },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: C.textDark,
+    marginLeft: 10,
+  },
 
-  // Button
+  matchText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: C.green,
+    fontWeight: '600',
+  },
+
+  mismatchText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: C.red,
+    fontWeight: '600',
+  },
+
   resetBtn: {
     width: '100%',
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
-    marginTop: 8,
-    elevation: 3,
-    shadowColor: C.teal,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    marginTop: 12,
   },
-  resetBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+
+  resetBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

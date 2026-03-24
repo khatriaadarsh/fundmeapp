@@ -130,7 +130,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
             {/* Send Reset Code button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate('OTPVerificationScreen')}
+              onPress={() => navigation.navigate('SendResetCode')}
               activeOpacity={0.85}
               style={{ width: '100%' }}
             >
