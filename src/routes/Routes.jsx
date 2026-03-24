@@ -15,6 +15,7 @@ import ProfileCompletionScreen from '../screens/auth/ProfileCompletionScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import NewPasswordScreen from '../screens/auth/NewPasswordScreen';
 import HomeScreen from '../screens/home/HomeScreen';
+import ProfileScreen from '../components/ProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +53,7 @@ const StackNavigator = () => {
 
       {/* ── Main App ── */}
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
+      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
     </Stack.Navigator>
   );
 };

@@ -1,23 +1,3 @@
-// src/screens/home/HomeScreen.jsx
-// ─────────────────────────────────────────────────────────────
-//  Home Screen  |  FundMe App (React Native CLI)
-//
-//  Layout:
-//  ┌─ SafeAreaView ──────────────────────────────────────────┐
-//  │  [TopBar — avatar + username + bell]         (fixed)   │
-//  │  ┌─ ScrollView ──────────────────────────────────────┐  │
-//  │  │  Search · Banner · Stats · Categories ·          │  │
-//  │  │  Urgent (horizontal) · Featured (list)           │  │
-//  │  └───────────────────────────────────────────────────┘  │
-//  │  [BottomTabBar — shared component]           (fixed)   │
-//  └─────────────────────────────────────────────────────────┘
-//  [ProfileDrawer — slides in from left on avatar tap]
-//
-//  Imports:
-//    BottomTabBar  from '../../components/BottomTabBar'
-//    ProfileDrawer from '../../components/ProfileDrawer'
-// ─────────────────────────────────────────────────────────────
-
 import React, { useState, memo, useCallback } from 'react';
 import {
   View,
@@ -37,6 +17,7 @@ import Icons from 'react-native-vector-icons/Feather';
 
 // Shared components
 import BottomTabBar from '../../components/BottomTabBar';
+import ProfileScreen from '../../components/ProfileScreen';
 
 // ── Responsive scale (base 375 pt) ─────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -64,6 +45,7 @@ const P = {
   border:     '#E5E7EB',
   searchBg:   '#F3F4F6',
   red:        '#EF4444',
+  darkOcean: '#0A3D62',
 };
 
 // ── Static data ─────────────────────────────────────────────
@@ -403,7 +385,7 @@ const ccSt = StyleSheet.create({
     borderRadius: sp(20), borderWidth: 1.5, borderColor: P.border,
     backgroundColor: P.white, marginRight: sp(8), gap: sp(5),
   },
-  chipActive:  { backgroundColor: P.teal, borderColor: P.teal },
+  chipActive:  { backgroundColor: P.darkOcean, borderColor: P.darkOcean },
   icon:        { fontSize: sp(13) },
   label:       { fontSize: sp(13), fontWeight: '600', color: P.gray },
   labelActive: { color: P.white },

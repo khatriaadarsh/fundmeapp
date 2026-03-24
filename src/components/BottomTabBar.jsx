@@ -29,6 +29,8 @@ const TEAL      = '#00B4CC';
 const TEAL_DARK = '#0097AA';
 const INACTIVE  = '#9CA3AF';
 const WHITE     = '#FFFFFF';
+const OCEAN_BLUE = '#0A3D62';
+const RED='#e74c3c';
 
 const TABS = [
   { id: 'home',    label: 'Home',    icon: 'home'    },
@@ -49,7 +51,7 @@ const BottomTabBar = memo(({ active = 'home', onPress }) => (
         onPress={() => onPress?.('add')}
         activeOpacity={0.85}
       >
-        <LinearGradient colors={[TEAL, TEAL_DARK]} style={s.fab}>
+        <LinearGradient colors={[OCEAN_BLUE,OCEAN_BLUE]} style={s.fab}>
           <Icons name="plus" size={sp(26)} color={WHITE} />
         </LinearGradient>
       </TouchableOpacity>
@@ -72,7 +74,7 @@ const TabItem = memo(({ t, active, onPress }) => {
       <Icons
         name={t.icon}
         size={sp(22)}
-        color={isActive ? TEAL : INACTIVE}
+        color={isActive ? RED : INACTIVE}
       />
       <Text style={[s.label, isActive && s.labelActive]}>{t.label}</Text>
     </TouchableOpacity>
@@ -108,7 +110,7 @@ const s = StyleSheet.create({
     marginTop: sp(3),
   },
   labelActive: {
-    color: TEAL,
+    color: RED,
     fontWeight: '700',
   },
   fabSlot: {

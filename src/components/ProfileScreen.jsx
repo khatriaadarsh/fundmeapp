@@ -38,7 +38,8 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
-import BottomTabBar from '../../components/BottomTabBar';
+// import BottomTabBar from '../../components/BottomTabBar';
+import BottomTabBar from './BottomTabBar';
 
 // ── Responsive scale ────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
