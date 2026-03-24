@@ -151,7 +151,7 @@ const ProfileScreen = ({ navigation }) => {
     // Wire to actual screens when ready
     // e.g. navigation.navigate('EditProfile')
     console.log('Menu:', id);
-  }, [navigation]);
+  }, []);
 
   const handleLogout = useCallback(() => {
     navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });

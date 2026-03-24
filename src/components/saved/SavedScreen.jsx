@@ -373,7 +373,7 @@ const SavedScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [mountAnim, slideAnim]);
 
   // ── Unsave a campaign ─────────────────────────────────────
   // Replace with API call / dispatch in real app

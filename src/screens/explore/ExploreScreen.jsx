@@ -385,7 +385,7 @@ const ExploreScreen = ({ navigation }) => {
     ]).start();
     // ⚠️  NO auto-focus here — keyboard must NOT open automatically.
     //     User taps the input → onFocus fires → keyboard appears naturally.
-  }, []);
+  }, [mountAnim, slideAnim]);
 
   // ── Filter logic — replace body with API call ──────────
   const runSearch = useCallback((text, cat) => {
