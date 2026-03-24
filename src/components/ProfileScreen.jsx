@@ -1,28 +1,3 @@
-// src/screens/profile/ProfileScreen.jsx
-// ─────────────────────────────────────────────────────────────
-//  Profile Screen  |  FundMe App (React Native CLI)
-//
-//  Opens as a full navigation screen (slides in from right).
-//  Register in your navigator like:
-//
-//    <Stack.Screen
-//      name="ProfileScreen"
-//      component={ProfileScreen}
-//      options={{ animation: 'slide_from_right', headerShown: false }}
-//    />
-//
-//  Layout:
-//  ┌─ SafeAreaView ──────────────────────────────────────────┐
-//  │  [Teal gradient header — back + avatar + name + badge]  │
-//  │  [Stats card — PKR donated · donations count]           │
-//  │  ┌─ ScrollView ──────────────────────────────────────┐  │
-//  │  │  Menu items list                                 │  │
-//  │  │  Log Out button                                  │  │
-//  │  └───────────────────────────────────────────────────┘  │
-//  │  [BottomTabBar]                                         │
-//  └─────────────────────────────────────────────────────────┘
-// ─────────────────────────────────────────────────────────────
-
 import React, { useCallback, memo } from 'react';
 import {
   View,
@@ -39,7 +14,8 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 // import BottomTabBar from '../../components/BottomTabBar';
-import BottomTabBar from './BottomTabBar';
+import BottomTabBar from '../components/BottomTabBar';
+// import BottomTabBar from './Maintabnavigator';
 
 // ── Responsive scale ────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -187,7 +163,8 @@ const ProfileScreen = ({ navigation }) => {
 
       {/* ══ TEAL GRADIENT HEADER ════════════════════════════ */}
       <LinearGradient
-        colors={[P.headerFrom, P.headerTo]}
+        // colors={['#0A3D62', '#0F6C85', '#15AABF']}
+        colors={['#0A3D62', '#15AABF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.header}

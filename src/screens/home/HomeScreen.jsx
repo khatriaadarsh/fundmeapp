@@ -17,7 +17,6 @@ import Icons from 'react-native-vector-icons/Feather';
 
 // Shared components
 import BottomTabBar from '../../components/BottomTabBar';
-import ProfileScreen from '../../components/ProfileScreen';
 
 // ── Responsive scale (base 375 pt) ─────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -37,8 +36,8 @@ const P = {
   teal:       '#00B4CC',
   tealDark:   '#0097AA',
   tealLight:  'rgba(0,180,204,0.10)',
-  bannerFrom: '#0B5E6B',
-  bannerTo:   '#0D8FA0',
+  bannerFrom: '#0A3D62',
+  bannerTo:   '#15AABF',
   dark:       '#111827',
   gray:       '#6B7280',
   light:      '#9CA3AF',
@@ -94,6 +93,8 @@ const CURRENT_USER = {
   email:     'ahmed@gmail.com',
   avatarUri: null, // set to URI string when available
 };
+
+
 
 // ════════════════════════════════════════════════════════════
 //  TopBar  — NayaPay style: avatar | search bar | scan | bell
@@ -241,7 +242,7 @@ const HeroBanner = memo(() => (
   <LinearGradient
     colors={[P.bannerFrom, P.bannerTo]}
     start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
+    end={{ x: 1, y: 0 }}   // 👈 important change
     style={bnSt.wrap}
   >
     <View style={bnSt.circle1} />
@@ -553,6 +554,7 @@ const HomeScreen = ({ navigation }) => {
   const openProfile = useCallback(() => {
     navigation?.navigate?.('ProfileScreen');
   }, [navigation]);
+  //  const [activeTab, setActiveTab] = React.useState('home');
 
   return (
     <SafeAreaView style={scSt.safe}>
@@ -564,6 +566,11 @@ const HomeScreen = ({ navigation }) => {
         onAvatarPress={openProfile}
         onBellPress={() => {}}
       />
+      {/* <BottomTabBar
+        active={activeTab}           // current tab
+        navigation={navigation}       // 👈 pass navigation here
+        onPress={id => setActiveTab(id)} // optional state update
+      /> */}
 
       {/* ══ SCROLLABLE CONTENT ══════════════════════════════ */}
       <ScrollView
@@ -598,10 +605,17 @@ const HomeScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* ══ SHARED BOTTOM TAB BAR ═══════════════════════════ */}
-      <BottomTabBar active={activeTab} onPress={handleTab} />
+      {/* ══ SHARED BOTTOM TAB BAR ═══════════════════════════ */}
+      <BottomTabBar
+        active={activeTab}
+        navigation={navigation}
+        onPress={handleTab}
+      />
     </SafeAreaView>
   );
 };
+
+
 
 export default HomeScreen;
 
