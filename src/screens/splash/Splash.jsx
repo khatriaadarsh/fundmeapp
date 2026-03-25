@@ -78,7 +78,7 @@ const Splash = ({ navigation }) => {
 
     // Auto-navigate to Onboarding after 2.5s
     const timer = setTimeout(() => {
-      navigation.navigate('OnboardingScreen1');
+      navigation.navigate('OnboardingScreen');
     }, 5000);
 
     return () => clearTimeout(timer);

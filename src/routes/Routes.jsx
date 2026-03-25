@@ -14,9 +14,10 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
 import Splash from '../screens/splash/Splash';
-import OnboardingScreen1 from '../screens/onboarding/OnboardingScreen1';
-import OnboardingScreen2 from '../screens/onboarding/OnboardingScreen2';
-import OnboardingScreen3 from '../screens/onboarding/OnboardingScreen3';
+// import OnboardingScreen1 from '../screens/onboarding/OnboardingScreen1';
+// import OnboardingScreen2 from '../screens/onboarding/OnboardingScreen2';
+// import OnboardingScreen3 from '../screens/onboarding/OnboardingScreen3';
+import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import Login from '../screens/auth/Login';
 import SignUpScreen from '../screens/auth/SignUpScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
@@ -34,6 +35,7 @@ import ProfileScreen from '../components/ProfileScreen';
 import CampaignDetails from '../screens/campaigncreation/CampaignDetails';
 import PhotosDocuments from '../screens/campaigncreation/PhotosDocuments';
 import ReviewSubmit from '../screens/campaigncreation/ReviewSubmit';
+import EditProfile from '../screens/Profile/EditProfile';
 // ── Responsive ─────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -202,9 +204,10 @@ const StackNavigator = () => {
       <Stack.Screen name="Splash" component={Splash} />
 
       {/* ── Onboarding ── */}
-      <Stack.Screen name="OnboardingScreen1" component={OnboardingScreen1} />
+      {/* <Stack.Screen name="OnboardingScreen1" component={OnboardingScreen1} />
       <Stack.Screen name="OnboardingScreen2" component={OnboardingScreen2} />
-      <Stack.Screen name="OnboardingScreen3" component={OnboardingScreen3} />
+      <Stack.Screen name="OnboardingScreen3" component={OnboardingScreen3} /> */}
+      <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
 
       {/* ── Auth ── */}
       <Stack.Screen name="Login" component={Login} />
@@ -234,6 +237,7 @@ const StackNavigator = () => {
       <Stack.Screen name="CampaignDetails" component={CampaignDetails} />
       <Stack.Screen name="PhotosDocuments" component={PhotosDocuments} />
       <Stack.Screen name="ReviewSubmit" component={ReviewSubmit} />
+      <Stack.Screen name="EditProfile" component={EditProfile} />
     </Stack.Navigator>
   );
 };

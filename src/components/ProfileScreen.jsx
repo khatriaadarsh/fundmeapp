@@ -174,9 +174,18 @@ const ProfileScreen = ({ navigation }) => {
     navigation?.goBack?.();
   }, [navigation]);
 
+  // const handleMenu = useCallback(id => {
+  //   console.log('Menu:', id);
+  // }, []);
+
   const handleMenu = useCallback(id => {
-    console.log('Menu:', id);
-  }, []);
+  if (id === 'edit') {
+    navigation.navigate('EditProfile'); // or whatever your screen name is in navigator
+    return;
+  }
+  // Handle other menu items...
+  console.log('Menu:', id);
+}, [navigation]);
 
   const handleLogout = useCallback(() => {
     navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });
