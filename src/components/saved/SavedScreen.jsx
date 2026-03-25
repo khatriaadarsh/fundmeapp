@@ -1,28 +1,4 @@
 // src/screens/saved/SavedScreen.jsx
-// ─────────────────────────────────────────────────────────────
-//  Saved Campaigns Screen  |  FundMe App (React Native CLI)
-//
-//  Layout:
-//  ┌─ SafeAreaView ──────────────────────────────────────────┐
-//  │  [Header — "Saved" title + count badge]     (fixed)    │
-//  │  ┌─ FlatList ─────────────────────────────────────── ┐ │
-//  │  │  SavedCampaignCard × N                          │ │
-//  │  └─────────────────────────────────────────────────── ┘ │
-//  │  [BottomTabBar]                             (fixed)    │
-//  └─────────────────────────────────────────────────────────┘
-//
-//  Design notes:
-//  • Cards use a large top image + category chip + title + raised/goal
-//    row — matches the Saved screen screenshot exactly.
-//  • Heart icon (filled red) in top-right of each card for unsave action.
-//  • Same palette, sp() scale, and BottomTabBar as the rest of the app.
-//
-//  Integration notes:
-//  • Replace MOCK_SAVED with API/store data (e.g. Redux savedIds slice)
-//  • onUnsave(id) → dispatch unsaveAction / call API
-//  • Card press → navigation.navigate('CampaignDetail', { id })
-// ─────────────────────────────────────────────────────────────
-
 import React, {
   useState,
   useCallback,
@@ -37,107 +13,98 @@ import {
   TouchableOpacity,
   FlatList,
   StatusBar,
-  Platform,
   Dimensions,
   Image,
-  SafeAreaView,
   Animated,
 } from 'react-native';
 import Icons from 'react-native-vector-icons/Feather';
-import BottomTabBar from '../Maintabnavigator';
 
-// ── Responsive scale (base 375 pt) ─────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
-const STATUSBAR_H =
-  Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
-
-// ── Shared palette (same across all screens) ─────────────────
 const P = {
-  bg:        '#F4F5F7',
-  white:     '#FFFFFF',
-  dark:      '#111827',
-  gray:      '#6B7280',
-  light:     '#9CA3AF',
-  border:    '#E5E7EB',
-  red:       '#e74c3c',
-  green:     '#22C55E',
+  bg: '#F4F5F7',
+  white: '#FFFFFF',
+  dark: '#111827',
+  gray: '#6B7280',
+  light: '#9CA3AF',
+  border: '#E5E7EB',
+  red: '#e74c3c',
+  green: '#22C55E',
   darkOcean: '#0a3d62',
-
-  // Category chip colours — extend as needed
   categoryColors: {
-    medical:   { bg: '#EFF6FF', text: '#3B82F6' },
+    medical: { bg: '#EFF6FF', text: '#3B82F6' },
     education: { bg: '#F0FDF4', text: '#16A34A' },
     emergency: { bg: '#FFF7ED', text: '#EA580C' },
-    food:      { bg: '#FEF9C3', text: '#CA8A04' },
-    shelter:   { bg: '#F5F3FF', text: '#7C3AED' },
-    default:   { bg: '#F3F4F6', text: '#6B7280' },
+    food: { bg: '#FEF9C3', text: '#CA8A04' },
+    shelter: { bg: '#F5F3FF', text: '#7C3AED' },
+    default: { bg: '#F3F4F6', text: '#6B7280' },
   },
 };
 
-// ── Mock saved campaigns — replace with store / API ─────────
 const MOCK_SAVED = [
   {
     id: '1',
-    title:    'Help Fatima\'s Heart Surgery',
-    imageUri: 'https://images.unsplash.com/photo-1530026186672-2cd00ffc50fe?w=600',
-    raised:   'PKR 325,000',
-    goal:     '500,000',
-    pct:      65,
-    user:     'Ali Hassan',
+    title: "Help Fatima's Heart Surgery",
+    imageUri:
+      'https://images.unsplash.com/photo-1530026186672-2cd00ffc50fe?w=600',
+    raised: 'PKR 325,000',
+    goal: '500,000',
+    pct: 65,
+    user: 'Ali Hassan',
     verified: true,
     category: 'medical',
   },
   {
     id: '6',
-    title:    'Build a Primary School in Rural Sindh',
-    imageUri: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600',
-    raised:   'PKR 800,000',
-    goal:     '2,000,000',
-    pct:      40,
-    user:     'Sarah Ahmed',
+    title: 'Build a Primary School in Rural Sindh',
+    imageUri:
+      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600',
+    raised: 'PKR 800,000',
+    goal: '2,000,000',
+    pct: 40,
+    user: 'Sarah Ahmed',
     verified: true,
     category: 'education',
   },
   {
     id: '7',
-    title:    'Flood Relief for Balochistan Families',
-    imageUri: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=600',
-    raised:   'PKR 1,250,000',
-    goal:     '1,500,000',
-    pct:      83,
-    user:     'Community Hope',
+    title: 'Flood Relief for Balochistan Families',
+    imageUri:
+      'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=600',
+    raised: 'PKR 1,250,000',
+    goal: '1,500,000',
+    pct: 83,
+    user: 'Community Hope',
     verified: true,
     category: 'emergency',
   },
   {
     id: '3',
-    title:    'Support Open Heart Surgery Fund',
-    imageUri: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=600',
-    raised:   'PKR 890K',
-    goal:     '1M',
-    pct:      89,
-    user:     'Hope NGO',
+    title: 'Support Open Heart Surgery Fund',
+    imageUri:
+      'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=600',
+    raised: 'PKR 890K',
+    goal: '1M',
+    pct: 89,
+    user: 'Hope NGO',
     verified: true,
     category: 'medical',
   },
   {
     id: '8',
-    title:    'Winter Food Drive for Orphanage',
-    imageUri: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600',
-    raised:   'PKR 90K',
-    goal:     '150K',
-    pct:      60,
-    user:     'CareNow',
+    title: 'Winter Food Drive for Orphanage',
+    imageUri:
+      'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600',
+    raised: 'PKR 90K',
+    goal: '150K',
+    pct: 60,
+    user: 'CareNow',
     verified: false,
     category: 'food',
   },
 ];
 
-// ════════════════════════════════════════════════════════════
-//  ProgressBar — reusable (same as ExploreScreen)
-// ════════════════════════════════════════════════════════════
 const ProgressBar = memo(({ pct }) => (
   <View style={pbSt.bg}>
     <View style={[pbSt.fill, { width: `${Math.min(pct, 100)}%` }]} />
@@ -145,16 +112,22 @@ const ProgressBar = memo(({ pct }) => (
 ));
 
 const pbSt = StyleSheet.create({
-  bg:   { height: sp(4), backgroundColor: P.border, borderRadius: sp(2), overflow: 'hidden' },
-  fill: { height: sp(4), backgroundColor: P.green,  borderRadius: sp(2) },
+  bg: {
+    height: sp(4),
+    backgroundColor: P.border,
+    borderRadius: sp(2),
+    overflow: 'hidden',
+  },
+  fill: {
+    height: sp(4),
+    backgroundColor: P.green,
+    borderRadius: sp(2),
+  },
 });
 
-// ════════════════════════════════════════════════════════════
-//  CategoryBadge — small pill on card image
-// ════════════════════════════════════════════════════════════
 const CategoryBadge = memo(({ category }) => {
   const colour = P.categoryColors[category] ?? P.categoryColors.default;
-  const label  = category
+  const label = category
     ? category.charAt(0).toUpperCase() + category.slice(1)
     : 'General';
   return (
@@ -175,56 +148,49 @@ const badgeSt = StyleSheet.create({
   text: { fontSize: sp(11), fontWeight: '700' },
 });
 
-// ════════════════════════════════════════════════════════════
-//  SavedCampaignCard — vertical card with large hero image
-// ════════════════════════════════════════════════════════════
+
 const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => (
   <TouchableOpacity
     style={cardSt.card}
     onPress={() => onPress?.(item)}
     activeOpacity={0.88}
   >
-    {/* ── Hero Image ────────────────────────────────────── */}
     <View style={cardSt.imgWrap}>
       <Image
         source={{ uri: item.imageUri }}
         style={cardSt.img}
         resizeMode="cover"
-        // defaultSource={require('../../assets/placeholder.png')}
       />
-
-      {/* Heart / unsave button — top-right */}
       <TouchableOpacity
         style={cardSt.heartBtn}
         onPress={() => onUnsave?.(item.id)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.7}
       >
-        {/* Filled heart = saved */}
         <Icons name="heart" size={sp(18)} color={P.red} />
       </TouchableOpacity>
     </View>
 
-    {/* ── Card Body ─────────────────────────────────────── */}
     <View style={cardSt.body}>
       <CategoryBadge category={item.category} />
-
-      <Text style={cardSt.title} numberOfLines={2}>{item.title}</Text>
-
+      <Text style={cardSt.title} numberOfLines={2}>
+        {item.title}
+      </Text>
       <ProgressBar pct={item.pct} />
-
-      {/* Raised / Goal row */}
       <View style={cardSt.metaRow}>
-        <Text style={cardSt.raised}>PKR {item.raised.replace('PKR ', '')}</Text>
+        <Text style={cardSt.raised}>
+          PKR {item.raised.replace('PKR ', '')}
+        </Text>
         <Text style={cardSt.sep}> / </Text>
         <Text style={cardSt.goal}>{item.goal}</Text>
-        <View style={{ flex: 1 }} />
-        {/* User avatar placeholder + name */}
+        <View style={styles.fill} />
         <View style={cardSt.userRow}>
           <View style={cardSt.avatar}>
             <Icons name="user" size={sp(10)} color={P.white} />
           </View>
-          <Text style={cardSt.userName} numberOfLines={1}>{item.user}</Text>
+          <Text style={cardSt.userName} numberOfLines={1}>
+            {item.user}
+          </Text>
           {item.verified && (
             <View style={cardSt.verifiedDot}>
               <Icons name="check" size={sp(7)} color={P.white} />
@@ -235,6 +201,12 @@ const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => (
     </View>
   </TouchableOpacity>
 ));
+
+const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
+});
 
 const cardSt = StyleSheet.create({
   card: {
@@ -287,8 +259,8 @@ const cardSt = StyleSheet.create({
     marginTop: sp(8),
   },
   raised: { fontSize: sp(13), fontWeight: '700', color: P.green },
-  sep:    { fontSize: sp(13), color: P.light },
-  goal:   { fontSize: sp(13), color: P.light },
+  sep: { fontSize: sp(13), color: P.light },
+  goal: { fontSize: sp(13), color: P.light },
   userRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -302,7 +274,7 @@ const cardSt = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  userName:    { fontSize: sp(11), color: P.gray, maxWidth: sp(80) },
+  userName: { fontSize: sp(11), color: P.gray, maxWidth: sp(80) },
   verifiedDot: {
     width: sp(14),
     height: sp(14),
@@ -313,9 +285,7 @@ const cardSt = StyleSheet.create({
   },
 });
 
-// ════════════════════════════════════════════════════════════
-//  EmptyState — when no saved campaigns
-// ════════════════════════════════════════════════════════════
+
 const EmptyState = memo(() => (
   <View style={emSt.wrap}>
     <Icons name="heart" size={sp(52)} color={P.border} />
@@ -327,7 +297,7 @@ const EmptyState = memo(() => (
 ));
 
 const emSt = StyleSheet.create({
-  wrap:  {
+  wrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -349,14 +319,10 @@ const emSt = StyleSheet.create({
   },
 });
 
-// ════════════════════════════════════════════════════════════
-//  SavedScreen — main
-// ════════════════════════════════════════════════════════════
 const SavedScreen = ({ navigation }) => {
-  const [saved,     setSaved    ] = useState(MOCK_SAVED);
-  const [activeTab, setActiveTab] = useState('saved');
+  const [saved, setSaved] = useState(MOCK_SAVED);
 
-  // ── Smooth mount transition (same as ExploreScreen) ──────
+
   const mountAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(sp(16))).current;
 
@@ -375,54 +341,34 @@ const SavedScreen = ({ navigation }) => {
     ]).start();
   }, [mountAnim, slideAnim]);
 
-  // ── Unsave a campaign ─────────────────────────────────────
-  // Replace with API call / dispatch in real app
   const handleUnsave = useCallback(id => {
     setSaved(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  // ── Card press → CampaignDetail ──────────────────────────
-  const handleCardPress = useCallback(item => {
-    navigation?.navigate?.('CampaignDetail', { id: item.id });
-  }, [navigation]);
-
-  // ── Tab routing ──────────────────────────────────────────
-  const handleTabPress = useCallback(id => {
-    setActiveTab(id);
-    const routes = {
-      home:    'HomeScreen',
-      explore: 'ExploreScreen',
-      saved:   'SavedScreen',
-      me:      'ProfileScreen',
-    };
-    if (id !== 'saved' && routes[id]) {
-      navigation?.navigate?.(routes[id]);
-    }
-  }, [navigation]);
-
-  // ── Header component ─────────────────────────────────────
-  const ListHeader = useCallback(() => (
-    <View style={scSt.header}>
-      <Text style={scSt.headerTitle}>Saved</Text>
-      {/* Count badge */}
-      <View style={scSt.countBadge}>
-        <Icons name="heart" size={sp(12)} color={P.red} />
-        <Text style={scSt.countText}>
-          {saved.length} saved
-        </Text>
-      </View>
-    </View>
-  ), [saved.length]);
+  const handleCardPress = useCallback(
+    item => {
+      navigation?.navigate?.('CampaignDetail', { id: item.id });
+    },
+    [navigation],
+  );
 
   return (
-    <SafeAreaView style={scSt.safe}>
+    <View style={scSt.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
+
+      <View style={scSt.header}>
+        <Text style={scSt.headerTitle}>Saved</Text>
+        <View style={scSt.countBadge}>
+          <Icons name="heart" size={sp(12)} color={P.red} />
+          <Text style={scSt.countText}>{saved.length} saved</Text>
+        </View>
+      </View>
 
       <Animated.View
         style={[
           scSt.animatedWrapper,
           {
-            opacity:   mountAnim,
+            opacity: mountAnim,
             transform: [{ translateY: slideAnim }],
           },
         ]}
@@ -437,7 +383,6 @@ const SavedScreen = ({ navigation }) => {
               onUnsave={handleUnsave}
             />
           )}
-          ListHeaderComponent={ListHeader}
           ListEmptyComponent={<EmptyState />}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={scSt.listContent}
@@ -445,43 +390,32 @@ const SavedScreen = ({ navigation }) => {
           bounces={false}
           overScrollMode="never"
         />
-
-        <BottomTabBar
-          active={activeTab}
-          navigation={navigation}
-          onPress={handleTabPress}
-        />
       </Animated.View>
-    </SafeAreaView>
+
+    </View>
   );
 };
 
 export default SavedScreen;
 
-// ════════════════════════════════════════════════════════════
-//  Screen styles
-// ════════════════════════════════════════════════════════════
+
 const scSt = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: P.bg,
   },
-  animatedWrapper: {
-    flex: 1,
-  },
 
-  // Header
+ 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: P.white,
     paddingHorizontal: sp(16),
-    paddingTop: sp(14) + STATUSBAR_H,
-    paddingBottom: sp(14),
+    paddingTop: sp(10),
+    paddingBottom: sp(12),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: P.border,
-    marginBottom: sp(8),
   },
   headerTitle: {
     fontSize: sp(22),
@@ -504,7 +438,10 @@ const scSt = StyleSheet.create({
     color: P.red,
   },
 
-  // FlatList
-  list:        { flex: 1 },
-  listContent: { paddingBottom: sp(16) },
+  animatedWrapper: {
+    flex: 1,
+  },
+
+  list: { flex: 1 },
+  listContent: { paddingTop: sp(8), paddingBottom: sp(16) },
 });

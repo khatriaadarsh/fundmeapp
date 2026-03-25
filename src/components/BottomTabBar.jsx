@@ -1,14 +1,3 @@
-// src/components/BottomTabBar.jsx
-// ─────────────────────────────────────────────────────────────
-//  Shared BottomTabBar — used on every main screen
-//
-//  Usage:
-//    import BottomTabBar from '../components/BottomTabBar';
-//    <BottomTabBar active="home" onPress={(id) => ...} />
-//
-//  Tab IDs: 'home' | 'explore' | 'add' | 'saved' | 'me'
-// ─────────────────────────────────────────────────────────────
-
 import React, { memo } from 'react';
 import {
   View,
@@ -17,7 +6,6 @@ import {
   StyleSheet,
   Platform,
   Dimensions,
-  StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
@@ -25,74 +13,33 @@ import Icons from 'react-native-vector-icons/Feather';
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
-const TEAL      = '#00B4CC';
-const TEAL_DARK = '#0097AA';
-const INACTIVE  = '#9CA3AF';
-const WHITE     = '#FFFFFF';
+const TEAL = '#00B4CC';
+// const TEAL_DARK = '#0097AA';
+const INACTIVE = '#9CA3AF';
+const WHITE = '#FFFFFF';
 const OCEAN_BLUE = '#0A3D62';
-const RED='#e74c3c';
+const RED = '#e74c3c';
 
 const TABS = [
-  { id: 'home',    label: 'Home',    icon: 'home'    },
+  { id: 'home', label: 'Home', icon: 'home' },
   { id: 'explore', label: 'Explore', icon: 'compass' },
-  { id: 'saved',   label: 'Saved',   icon: 'heart'   },
-  { id: 'me',      label: 'Me',      icon: 'user'    },
+  { id: 'saved', label: 'Saved', icon: 'heart' },
+  { id: 'me', label: 'Me', icon: 'user' },
 ];
 
-// src/components/BottomTabBar.jsx  — add this helper map
-
 const TAB_ROUTES = {
-  home:    'HomeScreen',
+  home: 'HomeScreen',
   explore: 'ExploreScreen',
-  saved:   'SavedScreen',
-  me:      'ProfileScreen',
+  saved: 'SavedScreen',
+  me: 'ProfileScreen',
 };
 
-// Update the component signature:
-const BottomTabBar = memo(({ active = 'home', onPress, navigation }) => (
-  <View style={s.bar}>
-    {TABS.slice(0, 2).map(t => (
-      <TabItem
-        key={t.id}
-        t={t}
-        active={active}
-        onPress={id => {
-          onPress?.(id);                          // local state update in parent
-          if (id !== active) {
-            navigation?.navigate?.(TAB_ROUTES[id]);  // navigate to screen
-          }
-        }}
-      />
-    ))}
-    {/* FAB */}
-    <View style={s.fabSlot}>
-      <TouchableOpacity
-        onPress={() => {
-          onPress?.('add');
-          navigation?.navigate?.('CreateCampaignScreen');
-        }}
-        activeOpacity={0.85}
-      >
-        <LinearGradient colors={[OCEAN_BLUE, OCEAN_BLUE]} style={s.fab}>
-          <Icons name="plus" size={sp(24)} color={WHITE} />
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-    {TABS.slice(2).map(t => (
-      <TabItem
-        key={t.id}
-        t={t}
-        active={active}
-        onPress={id => {
-          onPress?.(id);
-          if (id !== active) {
-            navigation?.navigate?.(TAB_ROUTES[id]);
-          }
-        }}
-      />
-    ))}
-  </View>
-));
+const ROUTE_TO_TAB = {
+  HomeScreen: 'home',
+  ExploreScreen: 'explore',
+  SavedScreen: 'saved',
+  ProfileScreen: 'me',
+};
 
 const TabItem = memo(({ t, active, onPress }) => {
   const isActive = active === t.id;
@@ -112,7 +59,52 @@ const TabItem = memo(({ t, active, onPress }) => {
   );
 });
 
+const BottomTabBar = memo(({ active = 'home', navigation }) => {
+  const handleTabPress = (id) => {
+    if (id !== active) {
+      navigation?.reset?.({
+        index: 0,
+        routes: [{ name: TAB_ROUTES[id] }],
+      });
+    }
+  };
 
+  const handleFabPress = () => {
+    navigation?.navigate?.('CreateCampaignScreen');
+  };
+
+  return (
+    <View style={s.bar}>
+      {TABS.slice(0, 2).map(t => (
+        <TabItem
+          key={t.id}
+          t={t}
+          active={active}
+          onPress={handleTabPress}
+        />
+      ))}
+
+      <View style={s.fabSlot}>
+        <TouchableOpacity onPress={handleFabPress} activeOpacity={0.85}>
+          <LinearGradient colors={[OCEAN_BLUE, OCEAN_BLUE]} style={s.fab}>
+            <Icons name="plus" size={sp(24)} color={WHITE} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {TABS.slice(2).map(t => (
+        <TabItem
+          key={t.id}
+          t={t}
+          active={active}
+          onPress={handleTabPress}
+        />
+      ))}
+    </View>
+  );
+});
+
+export { ROUTE_TO_TAB };
 export default BottomTabBar;
 
 const s = StyleSheet.create({

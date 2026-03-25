@@ -9,7 +9,7 @@ import {
   Image,
   TouchableOpacity,
   Animated,
-  Dimensions,
+  // Dimensions,
   StatusBar,
   KeyboardAvoidingView,
   Platform,
@@ -19,9 +19,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import LogoImg from '../../assets/logo.png';
 
-const { width } = Dimensions.get('window');
+// const { width } = Dimensions.get('window');
 
-// ── Colour tokens ──────────────────────────────────────────
 const COLORS = {
   bgTop: '#D6F0F4',
   bgBot: '#FFFFFF',
@@ -37,7 +36,6 @@ const COLORS = {
   light: '#9CA3AF',
 };
 
-// ── Main Screen ────────────────────────────────────────────
 const Login = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -99,7 +97,12 @@ const Login = ({ navigation }) => {
   const handlePressOut = () =>
     Animated.spring(btnScale, { toValue: 1, useNativeDriver: true }).start();
 
-  const handleLogin = () => navigation.navigate('HomeScreen');
+  const handleLogin = () => {
+  navigation.reset({
+    index: 0,
+    routes: [{ name: 'MainTabs' }],
+  });
+};
   const handleForgotPassword = () =>
     navigation.navigate('ForgotPasswordScreen');
   const handleSignUp = () => navigation.navigate('SignUpScreen');
@@ -121,7 +124,7 @@ const Login = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Logo ── */}
+         
           <Animated.View
             style={[
               styles.logoWrap,
@@ -130,8 +133,6 @@ const Login = ({ navigation }) => {
           >
             <Image source={LogoImg} style={styles.logo} />
           </Animated.View>
-
-          {/* ── Headline ── */}
           <Animated.View
             style={[
               styles.headlineWrap,
@@ -142,14 +143,14 @@ const Login = ({ navigation }) => {
             <Text style={styles.subtitle}>{'Log in to your account'}</Text>
           </Animated.View>
 
-          {/* ── Input fields ── */}
+         
           <Animated.View
             style={[
               styles.fieldsWrap,
               { opacity: formAnim, transform: [{ translateY: formSlide }] },
             ]}
           >
-            {/* Email */}
+          
             <View
               style={[styles.fieldRow, emailFocused && styles.fieldFocused]}
             >
@@ -172,8 +173,6 @@ const Login = ({ navigation }) => {
                 onBlur={() => setEmailFocused(false)}
               />
             </View>
-
-            {/* Password */}
             <View style={[styles.fieldRow, passFocused && styles.fieldFocused]}>
               <Icon
                 name="lock"
@@ -193,7 +192,7 @@ const Login = ({ navigation }) => {
                 onFocus={() => setPassFocused(true)}
                 onBlur={() => setPassFocused(false)}
               />
-              {/* ✅ Eye toggle added */}
+             
               <TouchableOpacity
                 onPress={() => setShowPassword(prev => !prev)}
                 style={styles.eyeBtn}
@@ -207,8 +206,6 @@ const Login = ({ navigation }) => {
               </TouchableOpacity>
             </View>
           </Animated.View>
-
-          {/* ── Forgot Password ── */}
           <TouchableOpacity
             onPress={handleForgotPassword}
             style={styles.forgotWrap}
@@ -216,8 +213,6 @@ const Login = ({ navigation }) => {
           >
             <Text style={styles.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
-
-          {/* ── Log In button ── */}
           <Animated.View
             style={[styles.btnWrap, { transform: [{ scale: btnScale }] }]}
           >
@@ -238,15 +233,11 @@ const Login = ({ navigation }) => {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* ── Divider ── */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
-
-          {/* ── Sign Up link ── */}
-          {/* ✅ Fixed: onPress only on TouchableOpacity, removed from Text */}
           <View style={styles.signUpRow}>
             <Text style={styles.signUpText}>
               {'Don\u2019t have an account? '}
@@ -263,24 +254,20 @@ const Login = ({ navigation }) => {
 
 export default Login;
 
-// ── Styles ─────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  // ✅ Root uses LinearGradient flex:1 — fills screen naturally
   gradient: { flex: 1 },
   kav: { flex: 1 },
 
-  // ✅ ScrollView centres content — works on all screen heights
   scroll: {
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center', // vertically centres on tall screens
+    justifyContent: 'center', 
     paddingHorizontal: 28,
     paddingTop: 48,
     paddingBottom: 36,
     gap: 8,
   },
 
-  // Logo
   logoWrap: {
     alignItems: 'center',
     marginBottom: 24,
@@ -291,7 +278,6 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
 
-  // Headline
   headlineWrap: {
     alignItems: 'center',
     marginBottom: 32,
@@ -309,7 +295,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  // ✅ Fields use width:'100%' — stretches to parent padding, not 340px
   fieldsWrap: {
     width: '100%',
     gap: 14,
@@ -343,7 +328,6 @@ const styles = StyleSheet.create({
   },
   eyeBtn: { padding: 4 },
 
-  // ✅ Forgot — alignSelf flex-end, no hardcoded left/top
   forgotWrap: {
     alignSelf: 'flex-end',
     marginTop: 4,
@@ -355,7 +339,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ✅ Button — width:'100%', no hardcoded top
   btnWrap: {
     width: '100%',
     marginBottom: 24,
@@ -378,7 +361,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // ✅ Divider — no hardcoded top
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,7 +378,6 @@ const styles = StyleSheet.create({
     color: COLORS.textGray,
   },
 
-  // ✅ Sign Up row — no hardcoded top
   signUpRow: {
     flexDirection: 'row',
     alignItems: 'center',

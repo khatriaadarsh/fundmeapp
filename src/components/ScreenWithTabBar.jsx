@@ -1,60 +1,79 @@
-import React, { memo, useCallback } from 'react';
-import { SafeAreaView, StyleSheet, View } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  StatusBar,
+  Dimensions,
+  Platform,
+} from 'react-native';
+import Icons from 'react-native-vector-icons/Feather';
 import BottomTabBar from './BottomTabBar';
-import { useRoute } from '@react-navigation/native';
 
-// map route name → tab id that BottomTabBar expects
-const ROUTE_TO_TAB = {
-  HomeScreen:    'home',
-  ExploreScreen: 'explore',
-  SavedScreen:   'saved',
-  ProfileScreen: 'me',
+const { width: SW } = Dimensions.get('window');
+const sp = n => (SW / 375) * n;
+
+const STATUSBAR_H =
+  Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
+const P = {
+  white: '#FFFFFF',
+  dark: '#111827',
+  gray: '#6B7280',
+  teal: '#00B4CC',
+  bg: '#F4F5F7',
+  border: '#E5E7EB',
 };
 
-const ScreenWithTabBar = memo(
-  ({
-    navigation,
-    children,          // UI of the concrete screen (Home, Explore …)
-    style = {},        // optional extra style for the SafeAreaView
-  }) => {
-    const route = useRoute();
-    const active = ROUTE_TO_TAB[route.name] ?? 'home';
+/**
+ * ScreenWithBottomBar
+ *
+ * Wraps any screen content with:
+ *  - SafeAreaView
+ *  - StatusBar
+ *  - Fixed BottomTabBar at bottom
+ *
+ * Props:
+ *  - activeTab: 'home' | 'explore' | 'saved' | 'me'
+ *  - navigation: navigation object
+ *  - children: screen content
+ *  - statusBarStyle: 'dark-content' | 'light-content'
+ *  - statusBarBg: background color for status bar
+ */
+const ScreenWithBottomBar = ({
+  activeTab,
+  navigation,
+  children,
+  statusBarStyle = 'dark-content',
+  statusBarBg = P.white,
+}) => {
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBg} />
 
-    // single handler used by the bar – just navigate, no need for local state
-    const handlePress = useCallback(
-      (id: string) => {
-        const dest = ROUTE_TO_TAB[id];
-        if (dest && dest !== active) {
-          navigation.navigate(dest);
-        }
-      },
-      [navigation, active],
-    );
+      {/* Screen content takes all available space */}
+      <View style={styles.content}>
+        {children}
+      </View>
 
-    return (
-      <SafeAreaView style={[styles.safe, style]}>
-        {/* ── screen content ───────────────────────────────────── */}
-        <View style={styles.content}>{children}</View>
+      {/* Fixed bottom tab bar — always visible */}
+      <BottomTabBar
+        active={activeTab}
+        navigation={navigation}
+      />
+    </SafeAreaView>
+  );
+};
 
-        {/* ── shared fixed bottom bar ───────────────────────────── */}
-        <BottomTabBar
-          active={active}
-          navigation={navigation}
-          onPress={handlePress}
-        />
-      </SafeAreaView>
-    );
-  },
-);
-
-export default ScreenWithTabBar;
+export default ScreenWithBottomBar;
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // keep the same background you used before
+    backgroundColor: P.white,
   },
   content: {
-    flex: 1, // expands to fill the space above the tab bar
+    flex: 1,
   },
 });
