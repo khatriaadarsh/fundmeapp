@@ -1,11 +1,5 @@
 // src/screens/saved/SavedScreen.jsx
-import React, {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  memo,
-} from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +11,7 @@ import {
   Image,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 const { width: SW } = Dimensions.get('window');
@@ -70,8 +65,7 @@ const MOCK_SAVED = [
   {
     id: '7',
     title: 'Flood Relief for Balochistan Families',
-    imageUri:
-      'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=600',
+    imageUri: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=600',
     raised: 'PKR 1,250,000',
     goal: '1,500,000',
     pct: 83,
@@ -82,8 +76,7 @@ const MOCK_SAVED = [
   {
     id: '3',
     title: 'Support Open Heart Surgery Fund',
-    imageUri:
-      'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=600',
+    imageUri: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=600',
     raised: 'PKR 890K',
     goal: '1M',
     pct: 89,
@@ -148,7 +141,6 @@ const badgeSt = StyleSheet.create({
   text: { fontSize: sp(11), fontWeight: '700' },
 });
 
-
 const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => (
   <TouchableOpacity
     style={cardSt.card}
@@ -178,9 +170,7 @@ const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => (
       </Text>
       <ProgressBar pct={item.pct} />
       <View style={cardSt.metaRow}>
-        <Text style={cardSt.raised}>
-          PKR {item.raised.replace('PKR ', '')}
-        </Text>
+        <Text style={cardSt.raised}>PKR {item.raised.replace('PKR ', '')}</Text>
         <Text style={cardSt.sep}> / </Text>
         <Text style={cardSt.goal}>{item.goal}</Text>
         <View style={styles.fill} />
@@ -285,7 +275,6 @@ const cardSt = StyleSheet.create({
   },
 });
 
-
 const EmptyState = memo(() => (
   <View style={emSt.wrap}>
     <Icons name="heart" size={sp(52)} color={P.border} />
@@ -322,7 +311,6 @@ const emSt = StyleSheet.create({
 const SavedScreen = ({ navigation }) => {
   const [saved, setSaved] = useState(MOCK_SAVED);
 
-
   const mountAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(sp(16))).current;
 
@@ -353,7 +341,7 @@ const SavedScreen = ({ navigation }) => {
   );
 
   return (
-    <View style={scSt.safe}>
+    <SafeAreaView style={scSt.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
 
       <View style={scSt.header}>
@@ -391,13 +379,11 @@ const SavedScreen = ({ navigation }) => {
           overScrollMode="never"
         />
       </Animated.View>
-
-    </View>
+    </SafeAreaView>
   );
 };
 
 export default SavedScreen;
-
 
 const scSt = StyleSheet.create({
   safe: {
@@ -405,7 +391,6 @@ const scSt = StyleSheet.create({
     backgroundColor: P.bg,
   },
 
- 
   header: {
     flexDirection: 'row',
     alignItems: 'center',

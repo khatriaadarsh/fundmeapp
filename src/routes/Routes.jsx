@@ -28,20 +28,21 @@ import SendResetCode from '../screens/auth/SendResetCode';
 import HomeScreen from '../screens/home/HomeScreen';
 import ExploreScreen from '../screens/explore/ExploreScreen';
 import SavedScreen from '../components/saved/SavedScreen';
+
+import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 import ProfileScreen from '../components/ProfileScreen';
-
-
+import CampaignDetails from '../screens/campaigncreation/CampaignDetails';
+import PhotosDocuments from '../screens/campaigncreation/PhotosDocuments';
+import ReviewSubmit from '../screens/campaigncreation/ReviewSubmit';
 // ── Responsive ─────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
-
 
 const INACTIVE = '#9CA3AF';
 const WHITE = '#FFFFFF';
 const OCEAN_BLUE = '#0A3D62';
 const RED = '#e74c3c';
 const TEAL = '#00B4CC';
-
 
 const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
@@ -54,7 +55,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           return (
             <View key={route.key} style={tabStyles.fabSlot}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('CreateCampaignScreen')}
+                onPress={() => navigation.navigate('CreateCampaign')}
                 activeOpacity={0.85}
               >
                 <LinearGradient
@@ -99,12 +100,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
               size={sp(22)}
               color={isFocused ? RED : INACTIVE}
             />
-            <Text
-              style={[
-                tabStyles.label,
-                isFocused && tabStyles.labelActive,
-              ]}
-            >
+            <Text style={[tabStyles.label, isFocused && tabStyles.labelActive]}>
               {config.label}
             </Text>
           </TouchableOpacity>
@@ -163,7 +159,6 @@ const tabStyles = StyleSheet.create({
   },
 });
 
-
 const DummyScreen = () => null;
 
 const Tab = createBottomTabNavigator();
@@ -185,7 +180,7 @@ const MainTabNavigator = () => {
         listeners={({ navigation }) => ({
           tabPress: e => {
             e.preventDefault();
-            navigation.navigate('CreateCampaignScreen');
+            navigation.navigate('CreateCampaign');
           },
         })}
       />
@@ -230,6 +225,15 @@ const StackNavigator = () => {
         component={ProfileCompletionScreen}
       />
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+
+      {/* ── Main App ── */}
+      <Stack.Screen name="HomeScreen" component={HomeScreen} />
+      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+
+      <Stack.Screen name="CreateCampaign" component={CreateCampaign} />
+      <Stack.Screen name="CampaignDetails" component={CampaignDetails} />
+      <Stack.Screen name="PhotosDocuments" component={PhotosDocuments} />
+      <Stack.Screen name="ReviewSubmit" component={ReviewSubmit} />
     </Stack.Navigator>
   );
 };

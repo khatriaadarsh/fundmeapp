@@ -10,10 +10,9 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
-
-
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -47,15 +46,57 @@ const USER = {
 };
 
 const MENU_ITEMS = [
-  { id: 'edit', label: 'Edit Profile', icon: 'user', color: P.teal, bg: 'rgba(0,180,204,0.10)' },
-  { id: 'donate', label: 'My Donations', icon: 'heart', color: P.green, bg: P.greenLight },
-  { id: 'camp', label: 'My Campaigns', icon: 'target', color: P.teal, bg: 'rgba(0,180,204,0.10)' },
-  { id: 'with', label: 'Withdrawals', icon: 'refresh-cw', color: P.orange, bg: P.orangeLight },
-  { id: 'notif', label: 'Notifications', icon: 'bell', color: P.teal, bg: 'rgba(0,180,204,0.10)', badge: 3 },
-  { id: 'faq', label: 'FAQ', icon: 'help-circle', color: P.gray, bg: 'rgba(107,114,128,0.10)' },
-  { id: 'terms', label: 'Terms & Conditions', icon: 'file-text', color: P.gray, bg: 'rgba(107,114,128,0.10)' },
+  {
+    id: 'edit',
+    label: 'Edit Profile',
+    icon: 'user',
+    color: P.teal,
+    bg: 'rgba(0,180,204,0.10)',
+  },
+  {
+    id: 'donate',
+    label: 'My Donations',
+    icon: 'heart',
+    color: P.green,
+    bg: P.greenLight,
+  },
+  {
+    id: 'camp',
+    label: 'My Campaigns',
+    icon: 'target',
+    color: P.teal,
+    bg: 'rgba(0,180,204,0.10)',
+  },
+  {
+    id: 'with',
+    label: 'Withdrawals',
+    icon: 'refresh-cw',
+    color: P.orange,
+    bg: P.orangeLight,
+  },
+  {
+    id: 'notif',
+    label: 'Notifications',
+    icon: 'bell',
+    color: P.teal,
+    bg: 'rgba(0,180,204,0.10)',
+    badge: 3,
+  },
+  {
+    id: 'faq',
+    label: 'FAQ',
+    icon: 'help-circle',
+    color: P.gray,
+    bg: 'rgba(107,114,128,0.10)',
+  },
+  {
+    id: 'terms',
+    label: 'Terms & Conditions',
+    icon: 'file-text',
+    color: P.gray,
+    bg: 'rgba(107,114,128,0.10)',
+  },
 ];
-
 
 const MenuItem = memo(({ item, onPress, isLast }) => (
   <TouchableOpacity
@@ -128,7 +169,6 @@ const miSt = StyleSheet.create({
   },
 });
 
-
 const ProfileScreen = ({ navigation }) => {
   const handleBack = useCallback(() => {
     navigation?.goBack?.();
@@ -143,17 +183,15 @@ const ProfileScreen = ({ navigation }) => {
   }, [navigation]);
 
   return (
-    <View style={s.safe}>
+    <SafeAreaView style={s.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0A3D62" />
 
-      
       <LinearGradient
         colors={['#0A3D62', '#15AABF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={s.header}
       >
-       
         <TouchableOpacity
           style={s.backBtn}
           onPress={handleBack}
@@ -163,7 +201,6 @@ const ProfileScreen = ({ navigation }) => {
           <Icons name="arrow-left" size={sp(20)} color={P.white} />
         </TouchableOpacity>
 
-        
         <TouchableOpacity
           style={s.settingsBtn}
           onPress={() => handleMenu('settings')}
@@ -173,7 +210,6 @@ const ProfileScreen = ({ navigation }) => {
           <Icons name="settings" size={sp(20)} color={P.white} />
         </TouchableOpacity>
 
-       
         <View style={s.avatarRing}>
           {USER.avatarUri ? (
             <Image source={{ uri: USER.avatarUri }} style={s.avatar} />
@@ -186,11 +222,9 @@ const ProfileScreen = ({ navigation }) => {
           )}
         </View>
 
-       
         <Text style={s.userName}>{USER.name}</Text>
         <Text style={s.userEmail}>{USER.email}</Text>
 
-       
         {USER.verified && (
           <View style={s.verifiedBadge}>
             <Icons name="check-circle" size={sp(11)} color={P.teal} />
@@ -203,7 +237,12 @@ const ProfileScreen = ({ navigation }) => {
         <View style={s.statItem}>
           <View style={s.statTopRow}>
             <Text style={s.statVal}>{USER.donated}</Text>
-            <Icons name="copy" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+            <Icons
+              name="copy"
+              size={sp(13)}
+              color={P.light}
+              style={{ marginLeft: sp(4) }}
+            />
           </View>
           <Text style={s.statLbl}>Donated</Text>
         </View>
@@ -213,13 +252,17 @@ const ProfileScreen = ({ navigation }) => {
         <View style={s.statItem}>
           <View style={s.statTopRow}>
             <Text style={s.statVal}>{USER.donations}</Text>
-            <Icons name="heart" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+            <Icons
+              name="heart"
+              size={sp(13)}
+              color={P.light}
+              style={{ marginLeft: sp(4) }}
+            />
           </View>
           <Text style={s.statLbl}>Donations</Text>
         </View>
       </View>
 
-    
       <ScrollView
         style={s.scroll}
         contentContainerStyle={s.scrollContent}
@@ -249,8 +292,7 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={{ height: sp(24) }} />
       </ScrollView>
-
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -262,18 +304,16 @@ const s = StyleSheet.create({
     backgroundColor: P.bg,
   },
 
-
   header: {
-    paddingTop: sp(16),       
+    paddingTop: sp(16),
     paddingBottom: sp(26),
     paddingHorizontal: sp(22),
     alignItems: 'center',
   },
 
-  
   backBtn: {
     position: 'absolute',
-    top: sp(14),             
+    top: sp(14),
     left: sp(16),
     width: sp(36),
     height: sp(36),
@@ -284,7 +324,7 @@ const s = StyleSheet.create({
   },
   settingsBtn: {
     position: 'absolute',
-    top: sp(14),              
+    top: sp(14),
     right: sp(16),
     width: sp(36),
     height: sp(36),
@@ -294,7 +334,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  
   avatarRing: {
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.35)',
@@ -389,7 +428,6 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: sp(16) },
 
-  
   menuCard: {
     backgroundColor: P.white,
     borderRadius: sp(14),
@@ -402,7 +440,6 @@ const s = StyleSheet.create({
     marginBottom: sp(16),
   },
 
- 
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',

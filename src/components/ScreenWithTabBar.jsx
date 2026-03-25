@@ -3,19 +3,19 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   Dimensions,
   Platform,
 } from 'react-native';
 import Icons from 'react-native-vector-icons/Feather';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomTabBar from './BottomTabBar';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
 const STATUSBAR_H =
-  Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+  Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0;
 
 const P = {
   white: '#FFFFFF',
@@ -53,15 +53,10 @@ const ScreenWithBottomBar = ({
       <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarBg} />
 
       {/* Screen content takes all available space */}
-      <View style={styles.content}>
-        {children}
-      </View>
+      <View style={styles.content}>{children}</View>
 
       {/* Fixed bottom tab bar — always visible */}
-      <BottomTabBar
-        active={activeTab}
-        navigation={navigation}
-      />
+      <BottomTabBar active={activeTab} navigation={navigation} />
     </SafeAreaView>
   );
 };

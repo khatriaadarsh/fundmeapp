@@ -1,11 +1,5 @@
 // src/screens/explore/ExploreScreen.jsx
-import React, {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  memo,
-} from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +12,7 @@ import {
   Image,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 const { width: SW } = Dimensions.get('window');
@@ -64,8 +59,7 @@ const MOCK_CAMPAIGNS = [
   {
     id: '2',
     title: 'Emergency Bypass for Father of 3',
-    imageUri:
-      'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=200',
+    imageUri: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=200',
     raised: 'PKR 210K',
     goal: '500K',
     pct: 42,
@@ -76,8 +70,7 @@ const MOCK_CAMPAIGNS = [
   {
     id: '3',
     title: 'Support Open Heart Surgery Fund',
-    imageUri:
-      'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=200',
+    imageUri: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=200',
     raised: 'PKR 890K',
     goal: '1M',
     pct: 89,
@@ -88,8 +81,7 @@ const MOCK_CAMPAIGNS = [
   {
     id: '4',
     title: "Save Baby Ahmed's Heart",
-    imageUri:
-      'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=200',
+    imageUri: 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=200',
     raised: 'PKR 45K',
     goal: '300K',
     pct: 15,
@@ -124,8 +116,7 @@ const MOCK_CAMPAIGNS = [
   {
     id: '7',
     title: 'Flood Relief for Balochistan Families',
-    imageUri:
-      'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=200',
+    imageUri: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=200',
     raised: 'PKR 550K',
     goal: '1M',
     pct: 55,
@@ -378,8 +369,7 @@ const ExploreScreen = ({ navigation }) => {
     if (q) {
       res = res.filter(
         c =>
-          c.title.toLowerCase().includes(q) ||
-          c.user.toLowerCase().includes(q),
+          c.title.toLowerCase().includes(q) || c.user.toLowerCase().includes(q),
       );
     }
     setResults(res);
@@ -429,7 +419,7 @@ const ExploreScreen = ({ navigation }) => {
   );
 
   return (
-    <View style={scSt.safe}>
+    <SafeAreaView style={scSt.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
 
       <Animated.View
@@ -443,9 +433,7 @@ const ExploreScreen = ({ navigation }) => {
       >
         {/* ══ FIXED SEARCH BAR ROW — ✅ removed STATUSBAR_H ═ */}
         <View style={scSt.searchRow}>
-          <View
-            style={[scSt.inputWrap, isFocused && scSt.inputWrapFocused]}
-          >
+          <View style={[scSt.inputWrap, isFocused && scSt.inputWrapFocused]}>
             <Icons
               name="search"
               size={sp(16)}
@@ -506,7 +494,7 @@ const ExploreScreen = ({ navigation }) => {
           overScrollMode="never"
         />
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 };
 

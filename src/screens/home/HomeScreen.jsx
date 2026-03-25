@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 const { width: SW } = Dimensions.get('window');
@@ -144,10 +145,7 @@ const TopBar = memo(({ user, onAvatarPress, onBellPress }) => (
       {user?.avatarUri ? (
         <Image source={{ uri: user.avatarUri }} style={tbSt.avatar} />
       ) : (
-        <LinearGradient
-          colors={[P.teal, P.tealDark]}
-          style={tbSt.avatarGrad}
-        >
+        <LinearGradient colors={[P.teal, P.tealDark]} style={tbSt.avatarGrad}>
           <Text style={tbSt.avatarInitial}>
             {(user?.name || 'U').charAt(0).toUpperCase()}
           </Text>
@@ -272,7 +270,6 @@ const srSt = StyleSheet.create({
   },
 });
 
-
 const HeroBanner = memo(() => (
   <LinearGradient
     colors={[P.bannerFrom, P.bannerTo]}
@@ -359,7 +356,6 @@ const bnSt = StyleSheet.create({
   },
 });
 
-
 const StatsRow = memo(() => (
   <View style={stSt.card}>
     {[
@@ -399,7 +395,6 @@ const stSt = StyleSheet.create({
   lbl: { fontSize: sp(11), color: P.light },
 });
 
-
 const SectionHeader = memo(({ title, linkText, onPress }) => (
   <View style={shSt.wrap}>
     <Text style={shSt.title}>{title}</Text>
@@ -423,7 +418,6 @@ const shSt = StyleSheet.create({
   title: { fontSize: sp(15), fontWeight: '800', color: P.dark },
   link: { fontSize: sp(13), color: P.teal, fontWeight: '600' },
 });
-
 
 const CategoryChips = memo(({ active, onChange }) => (
   <ScrollView
@@ -473,12 +467,9 @@ const ccSt = StyleSheet.create({
   labelActive: { color: P.white },
 });
 
-
 const ProgressBar = memo(({ pct, color = P.teal }) => (
   <View style={pbSt.bg}>
-    <View
-      style={[pbSt.fill, { width: `${pct}%`, backgroundColor: color }]}
-    />
+    <View style={[pbSt.fill, { width: `${pct}%`, backgroundColor: color }]} />
   </View>
 ));
 
@@ -492,7 +483,6 @@ const pbSt = StyleSheet.create({
   fill: { height: 4, borderRadius: 2 },
 });
 
-
 const UrgentCard = memo(({ item }) => (
   <TouchableOpacity style={ucSt.wrap} activeOpacity={0.9}>
     <View style={[ucSt.imgBox, { backgroundColor: item.imgBg }]}>
@@ -505,9 +495,7 @@ const UrgentCard = memo(({ item }) => (
       </TouchableOpacity>
     </View>
     <View style={ucSt.body}>
-      <View
-        style={[ucSt.catChip, { backgroundColor: item.catColor + '18' }]}
-      >
+      <View style={[ucSt.catChip, { backgroundColor: item.catColor + '18' }]}>
         <Text style={[ucSt.catTxt, { color: item.catColor }]}>
           {item.category}
         </Text>
@@ -709,7 +697,6 @@ const fiSt = StyleSheet.create({
   org: { fontSize: sp(11), color: P.light },
 });
 
-
 const HomeScreen = ({ navigation }) => {
   const [activeCat, setActiveCat] = useState('all');
   const [search, setSearch] = useState('');
@@ -721,7 +708,7 @@ const HomeScreen = ({ navigation }) => {
   }, [navigation]);
 
   return (
-    <View style={scSt.safe}>
+    <SafeAreaView style={scSt.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
       <TopBar
         user={CURRENT_USER}
@@ -762,7 +749,7 @@ const HomeScreen = ({ navigation }) => {
 
         <View style={{ height: sp(20) }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
