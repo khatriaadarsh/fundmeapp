@@ -13,6 +13,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 const { width: SW, height: SH } = Dimensions.get('window');
@@ -50,7 +51,7 @@ const CreateCampaign = ({ navigation }) => {
   const [charCount, setCharCount] = useState(0);
   const maxChars = 100;
 
-  const handleTitleChange = (text) => {
+  const handleTitleChange = text => {
     if (text.length <= maxChars) {
       setFormData({ ...formData, title: text });
       setCharCount(text.length);
@@ -63,19 +64,19 @@ const CreateCampaign = ({ navigation }) => {
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      
+
       {/* Fixed Header */}
       <View style={s.header}>
-        <TouchableOpacity 
-          style={s.closeBtn} 
+        <TouchableOpacity
+          style={s.closeBtn}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Icons name="x" size={scale(24)} color={C.textDark} />
         </TouchableOpacity>
-        
+
         <Text style={s.headerTitle}>Create Campaign</Text>
-        
+
         <View style={s.stepIndicator}>
           <Text style={s.stepText}>
             <Text style={s.stepActive}>{CURRENT_STEP}</Text>
@@ -92,12 +93,12 @@ const CreateCampaign = ({ navigation }) => {
       </View>
 
       {/* Main Content with Keyboard Handling */}
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={s.container}
         keyboardVerticalOffset={Platform.OS === 'ios' ? vscale(90) : 0}
       >
-        <ScrollView 
+        <ScrollView
           style={s.scrollView}
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -109,7 +110,9 @@ const CreateCampaign = ({ navigation }) => {
           <View style={s.fieldContainer}>
             <View style={s.labelRow}>
               <Text style={s.label}>Campaign Title</Text>
-              <Text style={s.charCounter}>{charCount}/{maxChars}</Text>
+              <Text style={s.charCounter}>
+                {charCount}/{maxChars}
+              </Text>
             </View>
             <View style={s.inputWrapper}>
               <TextInput
@@ -127,10 +130,12 @@ const CreateCampaign = ({ navigation }) => {
           <View style={s.fieldContainer}>
             <Text style={s.label}>Category</Text>
             <TouchableOpacity style={s.dropdown} activeOpacity={0.7}>
-              <Text style={[
-                s.dropdownText, 
-                !formData.category && { color: C.textLight }
-              ]}>
+              <Text
+                style={[
+                  s.dropdownText,
+                  !formData.category && { color: C.textLight },
+                ]}
+              >
                 {formData.category || 'Select Category'}
               </Text>
               <Icons name="chevron-down" size={scale(20)} color={C.textGray} />
@@ -151,7 +156,9 @@ const CreateCampaign = ({ navigation }) => {
                 placeholderTextColor={C.textLight}
                 keyboardType="numeric"
                 value={formData.fundingGoal}
-                onChangeText={(text) => setFormData({ ...formData, fundingGoal: text })}
+                onChangeText={text =>
+                  setFormData({ ...formData, fundingGoal: text })
+                }
               />
             </View>
           </View>
@@ -160,10 +167,12 @@ const CreateCampaign = ({ navigation }) => {
           <View style={s.fieldContainer}>
             <Text style={s.label}>End Date</Text>
             <TouchableOpacity style={s.datePicker} activeOpacity={0.7}>
-              <Text style={[
-                s.dateText, 
-                !formData.endDate && { color: C.textLight }
-              ]}>
+              <Text
+                style={[
+                  s.dateText,
+                  !formData.endDate && { color: C.textLight },
+                ]}
+              >
                 {formData.endDate || 'Select date'}
               </Text>
               <Icons name="calendar" size={scale(20)} color={C.textGray} />
@@ -171,9 +180,11 @@ const CreateCampaign = ({ navigation }) => {
           </View>
 
           {/* Urgent Checkbox */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={s.urgentContainer}
-            onPress={() => setFormData({ ...formData, isUrgent: !formData.isUrgent })}
+            onPress={() =>
+              setFormData({ ...formData, isUrgent: !formData.isUrgent })
+            }
             activeOpacity={0.7}
           >
             <View style={[s.checkbox, formData.isUrgent && s.checkboxActive]}>
@@ -191,7 +202,8 @@ const CreateCampaign = ({ navigation }) => {
               <Icons name="info" size={scale(16)} color={C.infoText} />
             </View>
             <Text style={s.infoText}>
-              Urgent campaigns get priority visibility on the home feed to help you raise funds faster.
+              Urgent campaigns get priority visibility on the home feed to help
+              you raise funds faster.
             </Text>
           </View>
 
@@ -201,13 +213,18 @@ const CreateCampaign = ({ navigation }) => {
 
         {/* Fixed Bottom Button - Now inside KeyboardAvoidingView but not absolute */}
         <View style={s.footer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={s.nextButton}
-            onPress={() => navigation.navigate('CampaignPhotos')}
+            onPress={() => navigation.navigate('CampaignDetails')}
             activeOpacity={0.85}
           >
             <Text style={s.nextButtonText}>Next</Text>
-            <Icons name="arrow-right" size={scale(18)} color={C.white} style={s.nextIcon} />
+            <Icons
+              name="arrow-right"
+              size={scale(18)}
+              color={C.white}
+              style={s.nextIcon}
+            />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
