@@ -118,7 +118,7 @@ const Splash = ({ navigation }) => {
           }}
         >
           <Text style={styles.appName}>FundMe</Text>
-          <Text style={styles.tagline}>"Fund Someone's Future"</Text>
+          <Text style={styles.tagline}>Fund Someone&apos;s Future</Text>
         </Animated.View>
       </View>
 

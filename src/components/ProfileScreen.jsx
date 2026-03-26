@@ -178,33 +178,36 @@ const ProfileScreen = ({ navigation }) => {
   //   console.log('Menu:', id);
   // }, []);
 
-  const handleMenu = useCallback(id => {
-  if (id === 'edit') {
-    navigation.navigate('EditProfile'); // or whatever your screen name is in navigator
-    return;
-  }
-  if(id==='donate'){
-    navigation.navigate('MyDonationScreen');
-    return;
-  }
+  const handleMenu = useCallback(
+    id => {
+      if (id === 'edit') {
+        navigation.navigate('EditProfile'); // or whatever your screen name is in navigator
+        return;
+      }
+      if (id === 'donate') {
+        navigation.navigate('MyDonationScreen');
+        return;
+      }
 
-   if(id==='camp'){
-    navigation.navigate('MyCampaignsScreen');
-    return;
-  }
+      if (id === 'camp') {
+        navigation.navigate('MyCampaignsScreen');
+        return;
+      }
 
-  if(id==='with'){
-    navigation.navigate('RequestWithdrawalScreen');
-    return;
-  }
-  if(id==='notif'){
-    navigation.navigate('NotificationsScreen');
-    return;
-  }
-  
-  // Handle other menu items...
-  console.log('Menu:', id);
-}, [navigation]);
+      if (id === 'with') {
+        navigation.navigate('RequestWithdrawalScreen');
+        return;
+      }
+      if (id === 'notif') {
+        navigation.navigate('NotificationsScreen');
+        return;
+      }
+
+      // Handle other menu items...
+      console.log('Menu:', id);
+    },
+    [navigation],
+  );
 
   const handleLogout = useCallback(() => {
     navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });
@@ -212,7 +215,7 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A3D62" />
+      <StatusBar barStyle="dark-content" backgroundColor="#0A3D62" />
 
       <LinearGradient
         colors={['#0A3D62', '#15AABF']}

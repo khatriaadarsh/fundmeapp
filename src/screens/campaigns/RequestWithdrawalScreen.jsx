@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   KeyboardAvoidingView,
@@ -16,55 +15,56 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 // ═══════════════════════════════════════════════════════════
 // Responsive Scale
 // ═══════════════════════════════════════════════════════════
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale  = size => (SW / 375) * size;
+const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
 
 // ═══════════════════════════════════════════════════════════
 // Design Tokens
 // ═══════════════════════════════════════════════════════════
 const C = {
-  pageBg:        '#F4F6F9',
-  white:         '#FFFFFF',
-  primary:       '#0A3D62',
-  teal:          '#15AABF',
-  textDark:      '#111827',
-  textGray:      '#6B7280',
-  textLight:     '#9CA3AF',
-  border:        '#E5E7EB',
-  success:       '#16A34A',
-  warning:       '#D97706',
-  warningBg:     '#FEF3C7',
+  pageBg: '#F4F6F9',
+  white: '#FFFFFF',
+  primary: '#0A3D62',
+  teal: '#15AABF',
+  textDark: '#111827',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E5E7EB',
+  success: '#16A34A',
+  warning: '#D97706',
+  warningBg: '#FEF3C7',
   warningBorder: '#FDE68A',
-  selectedBg:    '#EFF6FF',
-  selectedBorder:'#0A3D62',
+  selectedBg: '#EFF6FF',
+  selectedBorder: '#0A3D62',
 };
 
 // ═══════════════════════════════════════════════════════════
 // Static Data
 // ═══════════════════════════════════════════════════════════
 const CAMPAIGN = {
-  title:     "Help Fatima's Heart Surgery",
-  raised:    325000,
+  title: "Help Fatima's Heart Surgery",
+  raised: 325000,
   withdrawn: 100000,
   available: 225000,
 };
 
 const PAYMENT_METHODS = [
-  { id: 'easypaisa', label: 'EasyPaisa',     placeholder: '03XX XXXXXXX'         },
-  { id: 'jazzcash',  label: 'JazzCash',      placeholder: '03XX XXXXXXX'         },
-  { id: 'bank',      label: 'Bank Transfer', placeholder: 'IBAN / Account Number' },
+  { id: 'easypaisa', label: 'EasyPaisa', placeholder: '03XX XXXXXXX' },
+  { id: 'jazzcash', label: 'JazzCash', placeholder: '03XX XXXXXXX' },
+  { id: 'bank', label: 'Bank Transfer', placeholder: 'IBAN / Account Number' },
 ];
 
 const formatPKR = n => n.toLocaleString('en-PK');
 
-const BUTTON_HEIGHT  = vscale(54);
-const FULL_WIDTH     = SW - scale(32);
+const BUTTON_HEIGHT = vscale(54);
+const FULL_WIDTH = SW - scale(32);
 
 // ═══════════════════════════════════════════════════════════
 // ✅ ANIMATED SUBMIT BUTTON
@@ -73,43 +73,42 @@ const FULL_WIDTH     = SW - scale(32);
 // auto navigate after 1.8s
 // ═══════════════════════════════════════════════════════════
 const AnimatedSubmitButton = ({ state, onPress }) => {
-
   // Width: 0 = circle, 1 = full
-  const widthAnim    = useRef(new Animated.Value(1)).current;
-  const radiusAnim   = useRef(new Animated.Value(scale(12))).current;
+  const widthAnim = useRef(new Animated.Value(1)).current;
+  const radiusAnim = useRef(new Animated.Value(scale(12))).current;
 
   // Colors
-  const bgAnim       = useRef(new Animated.Value(0)).current; // 0=primary,1=success
+  const bgAnim = useRef(new Animated.Value(0)).current; // 0=primary,1=success
 
   // Idle text
-  const idleOpacity  = useRef(new Animated.Value(1)).current;
+  const idleOpacity = useRef(new Animated.Value(1)).current;
 
   // Spinner
-  const spinAnim     = useRef(new Animated.Value(0)).current;
-  const spinOpacity  = useRef(new Animated.Value(0)).current;
-  const spinPulse    = useRef(new Animated.Value(1)).current;
-  const spinLoop     = useRef(null);
-  const pulseLoop    = useRef(null);
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const spinOpacity = useRef(new Animated.Value(0)).current;
+  const spinPulse = useRef(new Animated.Value(1)).current;
+  const spinLoop = useRef(null);
+  const pulseLoop = useRef(null);
 
   // Ripples (3 layers)
-  const ripple1      = useRef(new Animated.Value(0)).current;
-  const ripple2      = useRef(new Animated.Value(0)).current;
-  const ripple3      = useRef(new Animated.Value(0)).current;
-  const ripple1Op    = useRef(new Animated.Value(0)).current;
-  const ripple2Op    = useRef(new Animated.Value(0)).current;
-  const ripple3Op    = useRef(new Animated.Value(0)).current;
+  const ripple1 = useRef(new Animated.Value(0)).current;
+  const ripple2 = useRef(new Animated.Value(0)).current;
+  const ripple3 = useRef(new Animated.Value(0)).current;
+  const ripple1Op = useRef(new Animated.Value(0)).current;
+  const ripple2Op = useRef(new Animated.Value(0)).current;
+  const ripple3Op = useRef(new Animated.Value(0)).current;
 
   // Check icon
-  const checkScale   = useRef(new Animated.Value(0)).current;
+  const checkScale = useRef(new Animated.Value(0)).current;
   const checkOpacity = useRef(new Animated.Value(0)).current;
-  const checkRotate  = useRef(new Animated.Value(-45)).current;
+  const checkRotate = useRef(new Animated.Value(-45)).current;
 
   // Success text
-  const textOpacity  = useRef(new Animated.Value(0)).current;
-  const textTranslate= useRef(new Animated.Value(14)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslate = useRef(new Animated.Value(14)).current;
 
   // Shine sweep
-  const shineX       = useRef(new Animated.Value(-1)).current;
+  const shineX = useRef(new Animated.Value(-1)).current;
   const shineOpacity = useRef(new Animated.Value(0)).current;
 
   // ── Stop all loops cleanly ───────────────────────────────
@@ -120,31 +119,39 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
 
   useEffect(() => {
     if (state === 'loading') {
-
       // 1. Fade out idle text
       Animated.timing(idleOpacity, {
-        toValue: 0, duration: 160, useNativeDriver: true,
+        toValue: 0,
+        duration: 160,
+        useNativeDriver: true,
       }).start();
 
       // 2. Morph to circle
       Animated.parallel([
         Animated.spring(widthAnim, {
-          toValue: 0, tension: 70, friction: 11, useNativeDriver: false,
+          toValue: 0,
+          tension: 70,
+          friction: 11,
+          useNativeDriver: false,
         }),
         Animated.spring(radiusAnim, {
           toValue: BUTTON_HEIGHT / 2,
-          tension: 70, friction: 11, useNativeDriver: false,
+          tension: 70,
+          friction: 11,
+          useNativeDriver: false,
         }),
       ]).start(() => {
-
         // 3. Show spinner + start loops
         Animated.timing(spinOpacity, {
-          toValue: 1, duration: 220, useNativeDriver: true,
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
         }).start();
 
         spinLoop.current = Animated.loop(
           Animated.timing(spinAnim, {
-            toValue: 1, duration: 750,
+            toValue: 1,
+            duration: 750,
             easing: Easing.linear,
             useNativeDriver: true,
           }),
@@ -155,12 +162,14 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
         pulseLoop.current = Animated.loop(
           Animated.sequence([
             Animated.timing(spinPulse, {
-              toValue: 1.08, duration: 550,
+              toValue: 1.08,
+              duration: 550,
               easing: Easing.inOut(Easing.ease),
               useNativeDriver: false,
             }),
             Animated.timing(spinPulse, {
-              toValue: 1, duration: 550,
+              toValue: 1,
+              duration: 550,
               easing: Easing.inOut(Easing.ease),
               useNativeDriver: false,
             }),
@@ -175,43 +184,84 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
       spinAnim.setValue(0);
 
       Animated.sequence([
-
         // Step 1 — hide spinner instantly
         Animated.timing(spinOpacity, {
-          toValue: 0, duration: 120, useNativeDriver: true,
+          toValue: 0,
+          duration: 120,
+          useNativeDriver: true,
         }),
 
         // Step 2 — triple ripple burst + color change simultaneously
         Animated.parallel([
           // Ripple 1 — fastest
           Animated.sequence([
-            Animated.timing(ripple1Op, { toValue:0.8, duration:80, useNativeDriver:true }),
+            Animated.timing(ripple1Op, {
+              toValue: 0.8,
+              duration: 80,
+              useNativeDriver: true,
+            }),
             Animated.parallel([
-              Animated.timing(ripple1, { toValue:1, duration:400, easing: Easing.out(Easing.cubic), useNativeDriver:true }),
-              Animated.timing(ripple1Op, { toValue:0, duration:400, useNativeDriver:true }),
+              Animated.timing(ripple1, {
+                toValue: 1,
+                duration: 400,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+              Animated.timing(ripple1Op, {
+                toValue: 0,
+                duration: 400,
+                useNativeDriver: true,
+              }),
             ]),
           ]),
           // Ripple 2 — medium delay
           Animated.sequence([
             Animated.delay(80),
-            Animated.timing(ripple2Op, { toValue:0.6, duration:80, useNativeDriver:true }),
+            Animated.timing(ripple2Op, {
+              toValue: 0.6,
+              duration: 80,
+              useNativeDriver: true,
+            }),
             Animated.parallel([
-              Animated.timing(ripple2, { toValue:1, duration:450, easing: Easing.out(Easing.cubic), useNativeDriver:true }),
-              Animated.timing(ripple2Op, { toValue:0, duration:450, useNativeDriver:true }),
+              Animated.timing(ripple2, {
+                toValue: 1,
+                duration: 450,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+              Animated.timing(ripple2Op, {
+                toValue: 0,
+                duration: 450,
+                useNativeDriver: true,
+              }),
             ]),
           ]),
           // Ripple 3 — slowest
           Animated.sequence([
             Animated.delay(160),
-            Animated.timing(ripple3Op, { toValue:0.4, duration:80, useNativeDriver:true }),
+            Animated.timing(ripple3Op, {
+              toValue: 0.4,
+              duration: 80,
+              useNativeDriver: true,
+            }),
             Animated.parallel([
-              Animated.timing(ripple3, { toValue:1, duration:500, easing: Easing.out(Easing.cubic), useNativeDriver:true }),
-              Animated.timing(ripple3Op, { toValue:0, duration:500, useNativeDriver:true }),
+              Animated.timing(ripple3, {
+                toValue: 1,
+                duration: 500,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+              }),
+              Animated.timing(ripple3Op, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+              }),
             ]),
           ]),
           // Color flip to green
           Animated.timing(bgAnim, {
-            toValue: 1, duration: 380,
+            toValue: 1,
+            duration: 380,
             easing: Easing.out(Easing.ease),
             useNativeDriver: false,
           }),
@@ -220,36 +270,56 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
         // Step 3 — check icon pops in with rotation + bounce
         Animated.parallel([
           Animated.spring(checkScale, {
-            toValue: 1, tension: 220, friction: 5, useNativeDriver: true,
+            toValue: 1,
+            tension: 220,
+            friction: 5,
+            useNativeDriver: true,
           }),
           Animated.timing(checkOpacity, {
-            toValue: 1, duration: 180, useNativeDriver: true,
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
           }),
           Animated.spring(checkRotate, {
-            toValue: 0, tension: 180, friction: 6, useNativeDriver: true,
+            toValue: 0,
+            tension: 180,
+            friction: 6,
+            useNativeDriver: true,
           }),
         ]),
 
         // Step 4 — expand back to full width with spring overshoot
         Animated.parallel([
           Animated.spring(widthAnim, {
-            toValue: 1, tension: 55, friction: 7, useNativeDriver: false,
+            toValue: 1,
+            tension: 55,
+            friction: 7,
+            useNativeDriver: false,
           }),
           Animated.spring(radiusAnim, {
-            toValue: scale(12), tension: 55, friction: 7, useNativeDriver: false,
+            toValue: scale(12),
+            tension: 55,
+            friction: 7,
+            useNativeDriver: false,
           }),
           Animated.spring(spinPulse, {
-            toValue: 1, tension: 80, friction: 8, useNativeDriver: false,
+            toValue: 1,
+            tension: 80,
+            friction: 8,
+            useNativeDriver: false,
           }),
         ]),
 
         // Step 5 — shine sweep across button
         Animated.parallel([
           Animated.timing(shineOpacity, {
-            toValue: 1, duration: 100, useNativeDriver: true,
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
           }),
           Animated.timing(shineX, {
-            toValue: 2, duration: 600,
+            toValue: 2,
+            duration: 600,
             easing: Easing.out(Easing.ease),
             useNativeDriver: true,
           }),
@@ -258,13 +328,17 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
         // Step 6 — success text slides up
         Animated.parallel([
           Animated.timing(textOpacity, {
-            toValue: 1, duration: 280, useNativeDriver: true,
+            toValue: 1,
+            duration: 280,
+            useNativeDriver: true,
           }),
           Animated.spring(textTranslate, {
-            toValue: 0, tension: 65, friction: 9, useNativeDriver: true,
+            toValue: 0,
+            tension: 65,
+            friction: 9,
+            useNativeDriver: true,
           }),
         ]),
-
       ]).start();
     }
 
@@ -283,16 +357,20 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
   });
 
   const spinRotate = spinAnim.interpolate({
-    inputRange: [0, 1], outputRange: ['0deg', '360deg'],
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
   });
 
   const checkDeg = checkRotate.interpolate({
-    inputRange: [-45, 0], outputRange: ['-45deg', '0deg'],
+    inputRange: [-45, 0],
+    outputRange: ['-45deg', '0deg'],
   });
 
-  const makeRippleSize = anim => anim.interpolate({
-    inputRange: [0, 1], outputRange: [0, BUTTON_HEIGHT * 2.8],
-  });
+  const makeRippleSize = anim =>
+    anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, BUTTON_HEIGHT * 2.8],
+    });
 
   const shineTranslate = shineX.interpolate({
     inputRange: [-1, 2],
@@ -351,9 +429,7 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
         />
 
         {/* ── IDLE TEXT ────────────────────────────────── */}
-        <Animated.Text
-          style={[s.btnText, { opacity: idleOpacity }]}
-        >
+        <Animated.Text style={[s.btnText, { opacity: idleOpacity }]}>
           Submit Request
         </Animated.Text>
 
@@ -389,18 +465,16 @@ const AnimatedSubmitButton = ({ state, onPress }) => {
           ]}
           pointerEvents="none"
         >
-          <Animated.View style={{
-            transform: [
-              { scale: checkScale },
-              { rotate: checkDeg },
-            ],
-            opacity: checkOpacity,
-          }}>
+          <Animated.View
+            style={{
+              transform: [{ scale: checkScale }, { rotate: checkDeg }],
+              opacity: checkOpacity,
+            }}
+          >
             <Icons name="check-circle" size={scale(22)} color={C.white} />
           </Animated.View>
           <Text style={s.successText}>Submitted Successfully!</Text>
         </Animated.View>
-
       </TouchableOpacity>
     </Animated.View>
   );
@@ -444,7 +518,7 @@ const ss = StyleSheet.create({
     backgroundColor: C.white,
     marginTop: -scale(1),
     shadowColor: C.white,
-    shadowOffset: { width:0, height:0 },
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 4,
     elevation: 4,
@@ -459,7 +533,7 @@ const Header = ({ onBack }) => (
     <TouchableOpacity
       onPress={onBack}
       style={s.headerBack}
-      hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
@@ -477,13 +551,10 @@ const CampaignCard = ({ campaign }) => (
       {campaign.title}
     </Text>
     <Text style={s.balanceLabel}>Available Balance</Text>
-    <Text style={s.balanceAmount}>
-      PKR {formatPKR(campaign.available)}
-    </Text>
+    <Text style={s.balanceAmount}>PKR {formatPKR(campaign.available)}</Text>
     <View style={s.statsRow}>
       <Text style={s.statItem}>
-        Raised:{' '}
-        <Text style={s.statValue}>{formatPKR(campaign.raised)}</Text>
+        Raised: <Text style={s.statValue}>{formatPKR(campaign.raised)}</Text>
       </Text>
       <Text style={s.statItem}>
         Withdrawn:{' '}
@@ -496,9 +567,7 @@ const CampaignCard = ({ campaign }) => (
 // ═══════════════════════════════════════════════════════════
 // SECTION LABEL
 // ═══════════════════════════════════════════════════════════
-const SectionLabel = ({ label }) => (
-  <Text style={s.sectionLabel}>{label}</Text>
-);
+const SectionLabel = ({ label }) => <Text style={s.sectionLabel}>{label}</Text>;
 
 // ═══════════════════════════════════════════════════════════
 // AMOUNT INPUT
@@ -544,8 +613,11 @@ const MethodRow = ({ method, selected, onSelect }) => {
 // INPUT FIELD
 // ═══════════════════════════════════════════════════════════
 const InputField = ({
-  label, value, onChange,
-  placeholder, keyboardType = 'default',
+  label,
+  value,
+  onChange,
+  placeholder,
+  keyboardType = 'default',
 }) => (
   <View style={s.fieldWrap}>
     <SectionLabel label={label} />
@@ -576,15 +648,13 @@ const ReviewNotice = () => (
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════
 const RequestWithdrawalScreen = ({ navigation }) => {
-  const [amount,         setAmount]         = useState(String(CAMPAIGN.available));
+  const [amount, setAmount] = useState(String(CAMPAIGN.available));
   const [selectedMethod, setSelectedMethod] = useState('easypaisa');
-  const [accountNumber,  setAccountNumber]  = useState('');
-  const [accountTitle,   setAccountTitle]   = useState('');
-  const [btnState,       setBtnState]       = useState('idle');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountTitle, setAccountTitle] = useState('');
+  const [btnState, setBtnState] = useState('idle');
 
-  const selectedMethodData = PAYMENT_METHODS.find(
-    m => m.id === selectedMethod,
-  );
+  const selectedMethodData = PAYMENT_METHODS.find(m => m.id === selectedMethod);
 
   const handleSubmit = useCallback(() => {
     if (!amount || Number(amount) <= 0) {
@@ -673,10 +743,7 @@ const RequestWithdrawalScreen = ({ navigation }) => {
         </ScrollView>
 
         <View style={s.footer}>
-          <AnimatedSubmitButton
-            state={btnState}
-            onPress={handleSubmit}
-          />
+          <AnimatedSubmitButton state={btnState} onPress={handleSubmit} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -687,16 +754,15 @@ const RequestWithdrawalScreen = ({ navigation }) => {
 // STYLES
 // ═══════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
-  safe: { flex:1, backgroundColor: C.pageBg },
-  flex: { flex:1 },
+  safe: { flex: 1, backgroundColor: C.pageBg },
+  flex: { flex: 1 },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scale(16),
-    paddingVertical: vscale(14),
+    // paddingVertical: vscale(14),
     backgroundColor: C.pageBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
@@ -726,7 +792,7 @@ const s = StyleSheet.create({
     marginBottom: vscale(20),
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:1 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.07,
     shadowRadius: 4,
   },
@@ -789,7 +855,7 @@ const s = StyleSheet.create({
     paddingHorizontal: scale(16),
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:1 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
@@ -830,7 +896,7 @@ const s = StyleSheet.create({
     gap: scale(14),
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:1 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
@@ -881,7 +947,7 @@ const s = StyleSheet.create({
     textAlignVertical: 'center',
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:1 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
   },
@@ -923,7 +989,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     elevation: 5,
     shadowColor: C.primary,
-    shadowOffset: { width:0, height:6 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32,
     shadowRadius: 12,
   },

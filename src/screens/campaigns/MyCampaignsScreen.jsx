@@ -6,49 +6,50 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   FlatList,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Icons from 'react-native-vector-icons/Feather';
 
 // ═══════════════════════════════════════════════════════════
 // Responsive Scale
 // ═══════════════════════════════════════════════════════════
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale  = size => (SW / 375) * size;
+const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
 
 // ═══════════════════════════════════════════════════════════
 // Design Tokens
 // ═══════════════════════════════════════════════════════════
 const C = {
-  pageBg:      '#F4F6F9',
-  white:       '#FFFFFF',
-  primary:     '#0A3D62',
-  teal:        '#15AABF',
-  textDark:    '#111827',
-  textGray:    '#6B7280',
-  textLight:   '#9CA3AF',
-  border:      '#E5E7EB',
-  cardBg:      '#FFFFFF',
-  active:      '#16A34A',
-  activeBg:    '#DCFCE7',
-  activeBorder:'#BBF7D0',
-  pending:     '#D97706',
-  pendingBg:   '#FEF3C7',
-  pendingBorder:'#FDE68A',
-  draft:       '#6B7280',
-  draftBg:     '#F3F4F6',
+  pageBg: '#F4F6F9',
+  white: '#FFFFFF',
+  primary: '#0A3D62',
+  teal: '#15AABF',
+  textDark: '#111827',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E5E7EB',
+  cardBg: '#FFFFFF',
+  active: '#16A34A',
+  activeBg: '#DCFCE7',
+  activeBorder: '#BBF7D0',
+  pending: '#D97706',
+  pendingBg: '#FEF3C7',
+  pendingBorder: '#FDE68A',
+  draft: '#6B7280',
+  draftBg: '#F3F4F6',
   draftBorder: '#E5E7EB',
-  rejected:    '#DC2626',
-  rejectedBg:  '#FEE2E2',
-  rejectedBorder:'#FECACA',
-  progressBg:  '#E5E7EB',
-  progressFill:'#16A34A',
+  rejected: '#DC2626',
+  rejectedBg: '#FEE2E2',
+  rejectedBorder: '#FECACA',
+  progressBg: '#E5E7EB',
+  progressFill: '#16A34A',
   linkPrimary: '#0A3D62',
-  linkDanger:  '#DC2626',
+  linkDanger: '#DC2626',
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -57,37 +58,37 @@ const C = {
 const ALL_CAMPAIGNS = [
   {
     id: '1',
-    title:    "Help Fatima's Heart Surgery",
-    status:   'Active',
-    image:    'https://picsum.photos/id/237/200',
-    raised:   325000,
-    goal:     500000,
+    title: "Help Fatima's Heart Surgery",
+    status: 'Active',
+    image: 'https://picsum.photos/id/237/200',
+    raised: 325000,
+    goal: 500000,
     daysLeft: 12,
-    actions:  ['View', 'Update', 'Withdraw'],
+    actions: ['View', 'Update', 'Withdraw'],
   },
   {
     id: '2',
-    title:       'Emergency Flood Relief for Dadu',
-    status:      'Pending',
-    image:       'https://picsum.photos/id/1016/200',
+    title: 'Emergency Flood Relief for Dadu',
+    status: 'Pending',
+    image: 'https://picsum.photos/id/1016/200',
     submittedOn: 'Jan 14, 2025',
-    note:        'Under review.',
-    actions:     [],
+    note: 'Under review.',
+    actions: [],
   },
   {
     id: '3',
-    title:      'Education Fund for...',
-    status:     'Draft',
-    image:      'https://picsum.photos/id/1011/200',
+    title: 'Education Fund for...',
+    status: 'Draft',
+    image: 'https://picsum.photos/id/1011/200',
     lastEdited: '2 days ago',
-    actions:    ['Edit', 'Delete'],
+    actions: ['Edit', 'Delete'],
   },
   {
     id: '4',
-    title:   'Medical Supplies Support',
-    status:  'Rejected',
-    image:   'https://picsum.photos/id/1059/200',
-    reason:  '"Missing valid medical verification documents."',
+    title: 'Medical Supplies Support',
+    status: 'Rejected',
+    image: 'https://picsum.photos/id/1059/200',
+    reason: '"Missing valid medical verification documents."',
     actions: ['Edit & Resubmit'],
   },
 ];
@@ -95,10 +96,25 @@ const ALL_CAMPAIGNS = [
 const TABS = ['All', 'Active', 'Pending', 'Draft'];
 
 const STATUS_MAP = {
-  Active:   { label: 'ACTIVE',   color: '#16A34A', bg: '#DCFCE7', border: '#BBF7D0' },
-  Pending:  { label: 'PENDING',  color: '#D97706', bg: '#FEF3C7', border: '#FDE68A' },
-  Draft:    { label: 'DRAFT',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  Rejected: { label: 'REJECTED', color: '#DC2626', bg: '#FEE2E2', border: '#FECACA' },
+  Active: {
+    label: 'ACTIVE',
+    color: '#16A34A',
+    bg: '#DCFCE7',
+    border: '#BBF7D0',
+  },
+  Pending: {
+    label: 'PENDING',
+    color: '#D97706',
+    bg: '#FEF3C7',
+    border: '#FDE68A',
+  },
+  Draft: { label: 'DRAFT', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  Rejected: {
+    label: 'REJECTED',
+    color: '#DC2626',
+    bg: '#FEE2E2',
+    border: '#FECACA',
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -106,7 +122,7 @@ const STATUS_MAP = {
 // ═══════════════════════════════════════════════════════════
 const formatPKR = n => {
   if (n >= 1000000) return `PKR ${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000)    return `PKR ${Math.round(n / 1000)}K`;
+  if (n >= 1000) return `PKR ${Math.round(n / 1000)}K`;
   return `PKR ${n}`;
 };
 
@@ -123,7 +139,7 @@ const Header = ({ onBack, onNew }) => (
     <TouchableOpacity
       onPress={onBack}
       style={s.headerBack}
-      hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
@@ -149,10 +165,12 @@ const TabBar = ({ active, onChange }) => (
           // ✅ flex:1 makes every tab equal width
           style={[s.tabBtn, isActive && s.tabBtnActive]}
         >
-          <Text style={[
-            s.tabLabel,
-            isActive ? s.tabLabelActive : s.tabLabelInactive,
-          ]}>
+          <Text
+            style={[
+              s.tabLabel,
+              isActive ? s.tabLabelActive : s.tabLabelInactive,
+            ]}
+          >
             {tab}
           </Text>
         </TouchableOpacity>
@@ -167,13 +185,10 @@ const TabBar = ({ active, onChange }) => (
 const StatusBadge = ({ status }) => {
   const cfg = STATUS_MAP[status] ?? STATUS_MAP.Draft;
   return (
-    <View style={[
-      s.badge,
-      { backgroundColor: cfg.bg, borderColor: cfg.border },
-    ]}>
-      <Text style={[s.badgeText, { color: cfg.color }]}>
-        {cfg.label}
-      </Text>
+    <View
+      style={[s.badge, { backgroundColor: cfg.bg, borderColor: cfg.border }]}
+    >
+      <Text style={[s.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
     </View>
   );
 };
@@ -218,16 +233,15 @@ const ActionLinks = ({ actions, onAction }) => {
 // CAMPAIGN CARD
 // ═══════════════════════════════════════════════════════════
 const CampaignCard = ({ item, onAction }) => {
-  const isActive   = item.status === 'Active';
-  const isPending  = item.status === 'Pending';
-  const isDraft    = item.status === 'Draft';
+  const isActive = item.status === 'Active';
+  const isPending = item.status === 'Pending';
+  const isDraft = item.status === 'Draft';
   const isRejected = item.status === 'Rejected';
   const hasActions = item.actions?.length > 0;
 
   return (
     <View style={s.card}>
       <View style={s.cardInner}>
-
         {/* Thumbnail */}
         <View style={s.thumbWrap}>
           {item.image ? (
@@ -245,7 +259,6 @@ const CampaignCard = ({ item, onAction }) => {
 
         {/* Right column */}
         <View style={s.cardRight}>
-
           {/* Title + badge */}
           <View style={s.titleRow}>
             <Text style={s.cardTitle} numberOfLines={2}>
@@ -277,9 +290,7 @@ const CampaignCard = ({ item, onAction }) => {
 
           {/* DRAFT */}
           {isDraft && (
-            <Text style={s.subNote}>
-              Last edited {item.lastEdited}
-            </Text>
+            <Text style={s.subNote}>Last edited {item.lastEdited}</Text>
           )}
 
           {/* REJECTED */}
@@ -295,10 +306,7 @@ const CampaignCard = ({ item, onAction }) => {
       {hasActions && (
         <>
           <View style={s.cardDivider} />
-          <ActionLinks
-            actions={item.actions}
-            onAction={onAction}
-          />
+          <ActionLinks actions={item.actions} onAction={onAction} />
         </>
       )}
     </View>
@@ -361,9 +369,7 @@ const MyCampaignsScreen = ({ navigation }) => {
             onAction={action => handleAction(action, item)}
           />
         )}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: vscale(10) }} />
-        )}
+        ItemSeparatorComponent={() => <View style={{ height: vscale(10) }} />}
       />
     </SafeAreaView>
   );
@@ -373,7 +379,6 @@ const MyCampaignsScreen = ({ navigation }) => {
 // STYLES
 // ═══════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
   safe: {
     flex: 1,
     backgroundColor: C.pageBg,
@@ -385,7 +390,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scale(16),
-    paddingVertical: vscale(14),
+    // paddingVertical: vscale(14),
     backgroundColor: C.pageBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
@@ -465,7 +470,7 @@ const s = StyleSheet.create({
     fontWeight: '600',
     includeFontPadding: false,
   },
-  tabLabelActive:   { color: C.white },
+  tabLabelActive: { color: C.white },
   tabLabelInactive: { color: C.textGray },
 
   // ── Card ─────────────────────────────────────────────────

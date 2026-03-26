@@ -6,48 +6,48 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   SectionList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 // ═══════════════════════════════════════════════════════════
 // Responsive Scale — reused across all screens
 // ═══════════════════════════════════════════════════════════
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale  = size => (SW / 375) * size;
+const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
 
 // ═══════════════════════════════════════════════════════════
 // Design Tokens — same theme
 // ═══════════════════════════════════════════════════════════
 const C = {
-  pageBg:      '#F4F6F9',
-  white:       '#FFFFFF',
-  primary:     '#0A3D62',
-  teal:        '#15AABF',
-  textDark:    '#111827',
-  textGray:    '#6B7280',
-  textLight:   '#9CA3AF',
-  border:      '#E5E7EB',
+  pageBg: '#F4F6F9',
+  white: '#FFFFFF',
+  primary: '#0A3D62',
+  teal: '#15AABF',
+  textDark: '#111827',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E5E7EB',
 
   // Notification type colors
-  donation:    '#15AABF',  // teal — donation received
-  donationBg:  '#EEF9FC',
-  approved:    '#16A34A',  // green — campaign approved
-  approvedBg:  '#F0FDF4',
-  cnic:        '#6B7280',  // gray — cnic verified
-  cnicBg:      '#F9FAFB',
+  donation: '#15AABF', // teal — donation received
+  donationBg: '#EEF9FC',
+  approved: '#16A34A', // green — campaign approved
+  approvedBg: '#F0FDF4',
+  cnic: '#6B7280', // gray — cnic verified
+  cnicBg: '#F9FAFB',
 
   // Unread left border accent
-  unreadBar:   '#15AABF',
+  unreadBar: '#15AABF',
 
   // Mark all
-  markAll:     '#15AABF',
+  markAll: '#15AABF',
 
   // Section header
-  sectionLabel:'#9CA3AF',
+  sectionLabel: '#9CA3AF',
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -55,21 +55,21 @@ const C = {
 // ═══════════════════════════════════════════════════════════
 const TYPE_CONFIG = {
   donation: {
-    icon:     'link-2',
-    color:    C.donation,
-    bg:       C.donationBg,
+    icon: 'link-2',
+    color: C.donation,
+    bg: C.donationBg,
     barColor: C.donation,
   },
   approved: {
-    icon:     'check',
-    color:    C.approved,
-    bg:       C.approvedBg,
+    icon: 'check',
+    color: C.approved,
+    bg: C.approvedBg,
     barColor: C.approved,
   },
   cnic: {
-    icon:     'shield',
-    color:    C.cnic,
-    bg:       C.cnicBg,
+    icon: 'shield',
+    color: C.cnic,
+    bg: C.cnicBg,
     barColor: C.border,
   },
 };
@@ -83,19 +83,19 @@ const INITIAL_DATA = [
     data: [
       {
         id: '1',
-        type:    'donation',
-        title:   'Donation Received 🎉',
-        body:    'Ahmed donated PKR 5,000 to your campaign',
-        time:    '2h ago',
-        unread:  true,
+        type: 'donation',
+        title: 'Donation Received 🎉',
+        body: 'Ahmed donated PKR 5,000 to your campaign',
+        time: '2h ago',
+        unread: true,
       },
       {
         id: '2',
-        type:    'approved',
-        title:   'Campaign Approved ✅',
-        body:    'Your campaign "Help Fatima\'s Heart Surgery" is now live and visible to donors.',
-        time:    '5h ago',
-        unread:  true,
+        type: 'approved',
+        title: 'Campaign Approved ✅',
+        body: 'Your campaign "Help Fatima\'s Heart Surgery" is now live and visible to donors.',
+        time: '5h ago',
+        unread: true,
       },
     ],
   },
@@ -104,11 +104,11 @@ const INITIAL_DATA = [
     data: [
       {
         id: '3',
-        type:    'cnic',
-        title:   'CNIC Verified',
-        body:    'Your identity verification has been successfully completed. You can now withdraw funds.',
-        time:    'Yesterday',
-        unread:  false,
+        type: 'cnic',
+        title: 'CNIC Verified',
+        body: 'Your identity verification has been successfully completed. You can now withdraw funds.',
+        time: 'Yesterday',
+        unread: false,
       },
     ],
   },
@@ -122,7 +122,7 @@ const Header = ({ onBack, onMarkAll }) => (
     <TouchableOpacity
       onPress={onBack}
       style={s.headerBack}
-      hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
@@ -164,10 +164,7 @@ const NotifCard = ({ item, onPress }) => {
 
   return (
     <TouchableOpacity
-      style={[
-        s.card,
-        item.unread && s.cardUnread,
-      ]}
+      style={[s.card, item.unread && s.cardUnread]}
       onPress={() => onPress(item)}
       activeOpacity={0.75}
     >
@@ -203,9 +200,7 @@ const EmptyState = () => (
       <Icons name="bell-off" size={scale(32)} color={C.textLight} />
     </View>
     <Text style={s.emptyTitle}>No Notifications</Text>
-    <Text style={s.emptySub}>
-      You're all caught up! Check back later.
-    </Text>
+    <Text style={s.emptySub}>You're all caught up! Check back later.</Text>
   </View>
 );
 
@@ -243,10 +238,7 @@ const NotificationsScreen = ({ navigation }) => {
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
 
-      <Header
-        onBack={() => navigation.goBack()}
-        onMarkAll={handleMarkAll}
-      />
+      <Header onBack={() => navigation.goBack()} onMarkAll={handleMarkAll} />
 
       <SectionList
         sections={sections}
@@ -263,12 +255,8 @@ const NotificationsScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <NotifCard item={item} onPress={handleNotifPress} />
         )}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: vscale(8) }} />
-        )}
-        SectionSeparatorComponent={() => (
-          <View style={{ height: vscale(4) }} />
-        )}
+        ItemSeparatorComponent={() => <View style={{ height: vscale(8) }} />}
+        SectionSeparatorComponent={() => <View style={{ height: vscale(4) }} />}
         ListEmptyComponent={<EmptyState />}
       />
     </SafeAreaView>
@@ -279,7 +267,6 @@ const NotificationsScreen = ({ navigation }) => {
 // STYLES
 // ═══════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
   safe: {
     flex: 1,
     backgroundColor: C.pageBg,
@@ -291,7 +278,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scale(16),
-    paddingVertical: vscale(14),
+    // paddingVertical: vscale(14),
     backgroundColor: C.pageBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
@@ -343,7 +330,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:1 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
   },

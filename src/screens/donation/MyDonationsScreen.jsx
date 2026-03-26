@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   FlatList,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
@@ -18,30 +18,30 @@ import Icons from 'react-native-vector-icons/Feather';
 // Responsive Scale
 // ═══════════════════════════════════════════════════════════
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale  = size => (SW / 375) * size;
+const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
 
 // ═══════════════════════════════════════════════════════════
 // Design Tokens
 // ═══════════════════════════════════════════════════════════
 const C = {
-  pageBg:       '#F4F6F9',
-  white:        '#FFFFFF',
-  primary:      '#0A3D62',
-  teal:         '#15AABF',
-  textDark:     '#111827',
-  textMid:      '#374151',
-  textGray:     '#6B7280',
-  textLight:    '#9CA3AF',
-  border:       '#E5E7EB',
-  cardBg:       '#FFFFFF',
-  success:      '#16A34A',
-  successBg:    '#DCFCE7',
-  pending:      '#D97706',
-  pendingBg:    '#FEF3C7',
-  methodBg:     '#F1F5F9',
+  pageBg: '#F4F6F9',
+  white: '#FFFFFF',
+  primary: '#0A3D62',
+  teal: '#15AABF',
+  textDark: '#111827',
+  textMid: '#374151',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E5E7EB',
+  cardBg: '#FFFFFF',
+  success: '#16A34A',
+  successBg: '#DCFCE7',
+  pending: '#D97706',
+  pendingBg: '#FEF3C7',
+  methodBg: '#F1F5F9',
   methodBorder: '#E2E8F0',
-  tabTrack:     '#E9EEF4',
+  tabTrack: '#E9EEF4',
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -50,74 +50,73 @@ const C = {
 const ALL_DONATIONS = [
   {
     id: '1',
-    title:   "Help Fatima's Heart Surgery",
-    amount:  5000,
-    status:  'Completed',
-    method:  'EasyPaisa',
+    title: "Help Fatima's Heart Surgery",
+    amount: 5000,
+    status: 'Completed',
+    method: 'EasyPaisa',
     message: 'Get well soon little angel, praying for you.',
-    date:    'Jan 15, 2025 · 2:30 PM',
-    image:   'https://picsum.photos/id/237/120',
+    date: 'Jan 15, 2025 · 2:30 PM',
+    image: 'https://picsum.photos/id/237/120',
   },
   {
     id: '2',
-    title:   'Education Fund for Street Children',
-    amount:  2500,
-    status:  'Completed',
-    method:  'Visa ••42',
+    title: 'Education Fund for Street Children',
+    amount: 2500,
+    status: 'Completed',
+    method: 'Visa ••42',
     message: 'Education is the right of every child.',
-    date:    'Jan 10, 2025 · 10:15 AM',
-    image:   'https://picsum.photos/id/1011/120',
+    date: 'Jan 10, 2025 · 10:15 AM',
+    image: 'https://picsum.photos/id/1011/120',
   },
   {
     id: '3',
-    title:   'Emergency Flood Relief',
-    amount:  10000,
-    status:  'Completed',
-    method:  'JazzCash',
+    title: 'Emergency Flood Relief',
+    amount: 10000,
+    status: 'Completed',
+    method: 'JazzCash',
     message: '',
-    date:    'Dec 28, 2024 · 9:45 PM',
-    image:   'https://picsum.photos/id/1016/120',
+    date: 'Dec 28, 2024 · 9:45 PM',
+    image: 'https://picsum.photos/id/1016/120',
   },
   {
     id: '4',
-    title:   'Winter Blankets Drive',
-    amount:  1000,
-    status:  'Completed',
-    method:  'EasyPaisa',
+    title: 'Winter Blankets Drive',
+    amount: 1000,
+    status: 'Completed',
+    method: 'EasyPaisa',
     message: '',
-    date:    'Dec 15, 2024 · 4:20 PM',
-    image:   'https://picsum.photos/id/1059/120',
+    date: 'Dec 15, 2024 · 4:20 PM',
+    image: 'https://picsum.photos/id/1059/120',
   },
   {
     id: '5',
-    title:   'Clean Water for Villages',
-    amount:  3000,
-    status:  'Pending',
-    method:  'JazzCash',
+    title: 'Clean Water for Villages',
+    amount: 3000,
+    status: 'Pending',
+    method: 'JazzCash',
     message: 'Clean water is a basic right.',
-    date:    'Jan 18, 2025 · 11:00 AM',
-    image:   'https://picsum.photos/id/1015/120',
+    date: 'Jan 18, 2025 · 11:00 AM',
+    image: 'https://picsum.photos/id/1015/120',
   },
   {
     id: '6',
-    title:   'Food Packages for Orphans',
-    amount:  2000,
-    status:  'Pending',
-    method:  'EasyPaisa',
+    title: 'Food Packages for Orphans',
+    amount: 2000,
+    status: 'Pending',
+    method: 'EasyPaisa',
     message: 'No child should sleep hungry.',
-    date:    'Jan 17, 2025 · 3:00 PM',
-    image:   'https://picsum.photos/id/1060/120',
+    date: 'Jan 17, 2025 · 3:00 PM',
+    image: 'https://picsum.photos/id/1060/120',
   },
 ];
 
 const TABS = ['All', 'Completed', 'Pending'];
 
-const TOTAL_DONATED = ALL_DONATIONS
-  .filter(d => d.status === 'Completed')
-  .reduce((s, d) => s + d.amount, 0);
+const TOTAL_DONATED = ALL_DONATIONS.filter(
+  d => d.status === 'Completed',
+).reduce((s, d) => s + d.amount, 0);
 
-const TOTAL_COUNT = ALL_DONATIONS
-  .filter(d => d.status === 'Completed').length;
+const TOTAL_COUNT = ALL_DONATIONS.filter(d => d.status === 'Completed').length;
 
 // ═══════════════════════════════════════════════════════════
 // HEADER
@@ -127,7 +126,7 @@ const Header = ({ onBack }) => (
     <TouchableOpacity
       onPress={onBack}
       style={s.headerBtn}
-      hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
@@ -156,12 +155,8 @@ const SummaryBanner = () => (
       PKR {TOTAL_DONATED.toLocaleString('en-PK')}
     </Text>
     <View style={s.bannerRow}>
-      <Icons
-        name="heart"
-        size={scale(12)}
-        color="rgba(255,255,255,0.75)"
-      />
-      <Text style={s.bannerSub}>  {TOTAL_COUNT} donations</Text>
+      <Icons name="heart" size={scale(12)} color="rgba(255,255,255,0.75)" />
+      <Text style={s.bannerSub}> {TOTAL_COUNT} donations</Text>
     </View>
   </LinearGradient>
 );
@@ -180,9 +175,7 @@ const TabBar = ({ active, onChange }) => (
           onPress={() => onChange(tab)}
           activeOpacity={0.75}
         >
-          <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>
-            {tab}
-          </Text>
+          <Text style={[s.tabLabel, isActive && s.tabLabelActive]}>{tab}</Text>
         </TouchableOpacity>
       );
     })}
@@ -217,24 +210,21 @@ const MethodChip = ({ label }) => (
 // ═══════════════════════════════════════════════════════════
 const DonationCard = ({ item }) => (
   <View style={s.card}>
-
     {/* ── Row 1: thumb + title + amount ─────────────────── */}
     <View style={s.cardRow}>
       {/* Thumbnail */}
       <View style={s.thumbWrap}>
-        {item.image
-          ? (
-            <Image
-              source={{ uri: item.image }}
-              style={s.thumb}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[s.thumb, s.thumbFallback]}>
-              <Icons name="image" size={scale(18)} color={C.textLight} />
-            </View>
-          )
-        }
+        {item.image ? (
+          <Image
+            source={{ uri: item.image }}
+            style={s.thumb}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[s.thumb, s.thumbFallback]}>
+            <Icons name="image" size={scale(18)} color={C.textLight} />
+          </View>
+        )}
       </View>
 
       {/* Title — flex:1 so it compresses between thumb and amount */}
@@ -245,22 +235,18 @@ const DonationCard = ({ item }) => (
       {/* Amount — right-aligned, never wraps */}
       <View style={s.amountWrap}>
         <Text style={s.amountLabel}>PKR</Text>
-        <Text style={s.amountValue}>
-          {item.amount.toLocaleString('en-PK')}
-        </Text>
+        <Text style={s.amountValue}>{item.amount.toLocaleString('en-PK')}</Text>
       </View>
     </View>
 
     {/* ── Row 2: badge + method ─────────────────────────── */}
     <View style={s.badgeRow}>
       <StatusBadge status={item.status} />
-      <MethodChip   label={item.method} />
+      <MethodChip label={item.method} />
     </View>
 
     {/* ── Divider ───────────────────────────────────────── */}
-    {(item.message || true) && (
-      <View style={s.divider} />
-    )}
+    {(item.message || true) && <View style={s.divider} />}
 
     {/* ── Message ───────────────────────────────────────── */}
     {item.message ? (
@@ -339,7 +325,6 @@ const MyDonationsScreen = ({ navigation }) => {
 // STYLES — pixel-perfect Figma match
 // ═══════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
   safe: {
     flex: 1,
     backgroundColor: C.pageBg,
@@ -351,7 +336,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scale(16),
-    paddingVertical: vscale(14),
+    // paddingVertical: vscale(14),
     backgroundColor: C.pageBg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
@@ -453,7 +438,7 @@ const s = StyleSheet.create({
     elevation: 2,
     shadowColor: C.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.20,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   tabLabel: {

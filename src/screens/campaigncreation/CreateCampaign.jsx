@@ -1,488 +1,439 @@
-// src/screens/campaigncreation/CreateCampaign.jsx
-import React, { useState } from 'react';
+// src/screens/campaign/CreateCampaign.jsx
+// ─────────────────────────────────────────────────────────────
+//  Basic Information — Step 1 of 4
+//  FundMe App  ·  React Native CLI  ·  100% responsive
+//
+//  ✅ Real calendar date picker via @react-native-community/datetimepicker
+//
+//  Install:
+//    npm install @react-native-community/datetimepicker
+//    cd ios && pod install
+// ─────────────────────────────────────────────────────────────
+
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
-  SafeAreaView,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   StatusBar,
+  Animated,
+  Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icons from 'react-native-vector-icons/Feather';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { C, StepHeader, Dropdown, FieldLabel } from './Shared';
 
-const { width: SW, height: SH } = Dimensions.get('window');
-const scale = size => (SW / 375) * size;
-const vscale = size => (SH / 812) * size;
+const CATEGORIES = [
+  'Medical',
+  'Education',
+  'Emergency',
+  'Food',
+  'Shelter',
+  'Water',
+  'Environment',
+  'Other',
+];
 
-const C = {
-  bg: '#FFFFFF',
-  primary: '#0A3D62',
-  primaryLight: '#15AABF',
-  textDark: '#1A1A2E',
-  textGray: '#6B7280',
-  textLight: '#9CA3AF',
-  border: '#E5E7EB',
-  inputBg: '#F9FAFB',
-  infoBg: '#E0F2FE',
-  infoText: '#0369A1',
-  white: '#FFFFFF',
-  urgent: '#0A3D62',
-  progressBg: '#E5E7EB',
+// ── Format date as "DD MMM YYYY" ──────────────────────────
+const formatDate = date => {
+  if (!date) return '';
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const d = date.getDate().toString().padStart(2, '0');
+  const m = months[date.getMonth()];
+  const y = date.getFullYear();
+  return `${d} ${m} ${y}`;
 };
 
-const TOTAL_STEPS = 4;
-const CURRENT_STEP = 1;
-
+// ── Main Screen ────────────────────────────────────────────
 const CreateCampaign = ({ navigation }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    category: '', // Empty by default
-    fundingGoal: '',
-    endDate: '',
-    isUrgent: false, // Unchecked by default
-  });
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('Medical');
+  const [goal, setGoal] = useState('');
+  const [selectedDate, setSelectedDate] = useState(null); // Date object | null
+  const [tempDate, setTempDate] = useState(new Date());
+  const [showPicker, setShowPicker] = useState(false); // Android: native picker
+  const [showIOSModal, setShowIOSModal] = useState(false); // iOS: modal wrapper
+  const [urgent, setUrgent] = useState(true);
 
-  const [charCount, setCharCount] = useState(0);
-  const maxChars = 100;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
 
-  const handleTitleChange = text => {
-    if (text.length <= maxChars) {
-      setFormData({ ...formData, title: text });
-      setCharCount(text.length);
+  // ── Open picker ──────────────────────────────────────────
+  const openDatePicker = () => {
+    setTempDate(selectedDate || new Date());
+    if (Platform.OS === 'ios') {
+      setShowIOSModal(true);
+    } else {
+      setShowPicker(true);
     }
   };
 
-  // Calculate progress percentage (25% for step 1)
-  const progressPercent = (CURRENT_STEP / TOTAL_STEPS) * 100;
+  // ── Android: onChange fires on every spin AND on confirm ─
+  const onAndroidChange = (event, date) => {
+    setShowPicker(false); // always close spinner
+    if (event.type === 'set' && date) {
+      setSelectedDate(date);
+    }
+    // event.type === 'dismissed' → user pressed back, do nothing
+  };
+
+  // ── iOS: runs on every scroll, only commit on Done ───────
+  const onIOSChange = (event, date) => {
+    if (date) setTempDate(date);
+  };
+
+  const onIOSConfirm = () => {
+    setSelectedDate(tempDate);
+    setShowIOSModal(false);
+  };
+
+  const onIOSCancel = () => {
+    setShowIOSModal(false);
+  };
+
+  // ── Today as minimum selectable date ─────────────────────
+  const today = new Date();
 
   return (
     <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
-      {/* Fixed Header */}
-      <View style={s.header}>
-        <TouchableOpacity
-          style={s.closeBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Icons name="x" size={scale(24)} color={C.textDark} />
-        </TouchableOpacity>
+      <StepHeader
+        step={1}
+        total={4}
+        title="Create Campaign"
+        onLeft={() => navigation.goBack()}
+        isFirst
+      />
 
-        <Text style={s.headerTitle}>Create Campaign</Text>
-
-        <View style={s.stepIndicator}>
-          <Text style={s.stepText}>
-            <Text style={s.stepActive}>{CURRENT_STEP}</Text>
-            <Text style={s.stepTotal}> of {TOTAL_STEPS}</Text>
-          </Text>
-        </View>
-      </View>
-
-      {/* Progress Bar */}
-      <View style={s.progressContainer}>
-        <View style={s.progressBar}>
-          <View style={[s.progressFill, { width: `${progressPercent}%` }]} />
-        </View>
-      </View>
-
-      {/* Main Content with Keyboard Handling */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={s.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? vscale(90) : 0}
-      >
+      <Animated.View style={[s.flex, { opacity: fadeAnim }]}>
         <ScrollView
-          style={s.scrollView}
-          contentContainerStyle={s.scrollContent}
+          style={s.scroll}
+          contentContainerStyle={s.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={s.sectionTitle}>Basic Information</Text>
+          <Text style={s.pageTitle}>Basic Information</Text>
 
           {/* Campaign Title */}
-          <View style={s.fieldContainer}>
-            <View style={s.labelRow}>
-              <Text style={s.label}>Campaign Title</Text>
-              <Text style={s.charCounter}>
-                {charCount}/{maxChars}
-              </Text>
-            </View>
-            <View style={s.inputWrapper}>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. Help build a school"
-                placeholderTextColor={C.textLight}
-                value={formData.title}
-                onChangeText={handleTitleChange}
-                maxLength={maxChars}
-              />
-            </View>
+          <View style={s.fieldBlock}>
+            <FieldLabel text="Campaign Title" right={`${title.length}/100`} />
+            <TextInput
+              style={s.input}
+              placeholder="e.g. Help build a school"
+              placeholderTextColor={C.placeholderColor}
+              value={title}
+              onChangeText={t => t.length <= 100 && setTitle(t)}
+            />
           </View>
 
           {/* Category */}
-          <View style={s.fieldContainer}>
-            <Text style={s.label}>Category</Text>
-            <TouchableOpacity style={s.dropdown} activeOpacity={0.7}>
-              <Text
-                style={[
-                  s.dropdownText,
-                  !formData.category && { color: C.textLight },
-                ]}
-              >
-                {formData.category || 'Select Category'}
-              </Text>
-              <Icons name="chevron-down" size={scale(20)} color={C.textGray} />
-            </TouchableOpacity>
-          </View>
+          <Dropdown
+            label="Category"
+            value={category}
+            options={CATEGORIES}
+            onSelect={setCategory}
+            placeholder="Select category"
+          />
 
           {/* Funding Goal */}
-          <View style={s.fieldContainer}>
-            <Text style={s.label}>Funding Goal</Text>
-            <View style={s.inputWrapper}>
-              <View style={s.prefixContainer}>
-                <Text style={s.prefix}>PKR</Text>
-                <View style={s.prefixLine} />
+          <View style={s.fieldBlock}>
+            <FieldLabel text="Funding Goal" />
+            <View style={s.prefixWrap}>
+              <View style={s.prefixBox}>
+                <Text style={s.prefixTxt}>PKR</Text>
               </View>
               <TextInput
-                style={[s.input, s.inputWithPrefix]}
+                style={s.prefixInput}
                 placeholder="0"
-                placeholderTextColor={C.textLight}
-                keyboardType="numeric"
-                value={formData.fundingGoal}
-                onChangeText={text =>
-                  setFormData({ ...formData, fundingGoal: text })
-                }
+                placeholderTextColor={C.placeholderColor}
+                value={goal}
+                onChangeText={setGoal}
+                keyboardType="number-pad"
               />
             </View>
           </View>
 
-          {/* End Date */}
-          <View style={s.fieldContainer}>
-            <Text style={s.label}>End Date</Text>
-            <TouchableOpacity style={s.datePicker} activeOpacity={0.7}>
-              <Text
-                style={[
-                  s.dateText,
-                  !formData.endDate && { color: C.textLight },
-                ]}
-              >
-                {formData.endDate || 'Select date'}
+          {/* ── End Date — real calendar picker ── */}
+          <View style={s.fieldBlock}>
+            <FieldLabel text="End Date" />
+            <TouchableOpacity
+              style={s.dateWrap}
+              onPress={openDatePicker}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.dateTxt, !selectedDate && s.datePlaceholder]}>
+                {selectedDate ? formatDate(selectedDate) : 'Select date'}
               </Text>
-              <Icons name="calendar" size={scale(20)} color={C.textGray} />
+              <Icon
+                name="calendar-blank-outline"
+                size={20}
+                color={selectedDate ? C.dark : C.textLight}
+                style={s.calIcon}
+              />
             </TouchableOpacity>
           </View>
 
-          {/* Urgent Checkbox */}
+          {/* ── Android native date picker (shown inline) ── */}
+          {Platform.OS === 'android' && showPicker && (
+            <DateTimePicker
+              value={tempDate}
+              mode="date"
+              display="calendar" // full calendar grid
+              minimumDate={today}
+              onChange={onAndroidChange}
+            />
+          )}
+
+          {/* Mark as Urgent */}
           <TouchableOpacity
-            style={s.urgentContainer}
-            onPress={() =>
-              setFormData({ ...formData, isUrgent: !formData.isUrgent })
-            }
-            activeOpacity={0.7}
+            style={s.urgentRow}
+            onPress={() => setUrgent(p => !p)}
+            activeOpacity={0.8}
           >
-            <View style={[s.checkbox, formData.isUrgent && s.checkboxActive]}>
-              {formData.isUrgent && (
-                <Icons name="check" size={scale(14)} color={C.white} />
-              )}
+            <View style={[s.checkbox, urgent && s.checkboxOn]}>
+              {urgent && <Icon name="check" size={12} color={C.white} />}
             </View>
-            <Text style={s.urgentText}>Mark as Urgent</Text>
-            <Text style={s.fireIcon}>🔥</Text>
+            <Text style={s.urgentLabel}>Mark as Urgent 🔥</Text>
           </TouchableOpacity>
 
-          {/* Info Box */}
-          <View style={s.infoBox}>
-            <View style={s.infoIconContainer}>
-              <Icons name="info" size={scale(16)} color={C.infoText} />
+          {urgent && (
+            <View style={s.infoBanner}>
+              <Icon
+                name="information-outline"
+                size={16}
+                color={C.teal}
+                style={{ marginRight: 8, marginTop: 1 }}
+              />
+              <Text style={s.infoTxt}>
+                Urgent campaigns get priority visibility on the home feed to
+                help you raise funds faster.
+              </Text>
             </View>
-            <Text style={s.infoText}>
-              Urgent campaigns get priority visibility on the home feed to help
-              you raise funds faster.
-            </Text>
-          </View>
+          )}
 
-          {/* Bottom padding to ensure content above button */}
-          <View style={s.bottomPadding} />
+          <View style={{ height: 16 }} />
         </ScrollView>
 
-        {/* Fixed Bottom Button - Now inside KeyboardAvoidingView but not absolute */}
-        <View style={s.footer}>
+        {/* Next button */}
+        <View style={s.btnWrap}>
           <TouchableOpacity
-            style={s.nextButton}
-            onPress={() => navigation.navigate('CampaignDetails')}
+            style={s.nextBtn}
             activeOpacity={0.85}
+            onPress={() =>
+              navigation.navigate('CampaignDetails', {
+                title,
+                category,
+                goal,
+                endDate: selectedDate ? formatDate(selectedDate) : '',
+                urgent,
+              })
+            }
           >
-            <Text style={s.nextButtonText}>Next</Text>
-            <Icons
-              name="arrow-right"
-              size={scale(18)}
-              color={C.white}
-              style={s.nextIcon}
-            />
+            <Text style={s.nextBtnTxt}>Next</Text>
+            <Icon name="arrow-right" size={17} color={C.white} />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
+
+      {/* ── iOS date picker modal ── */}
+      <Modal
+        visible={showIOSModal}
+        transparent
+        animationType="slide"
+        onRequestClose={onIOSCancel}
+      >
+        {/* Dim overlay tapping closes modal */}
+        <TouchableOpacity
+          style={ios.overlay}
+          activeOpacity={1}
+          onPress={onIOSCancel}
+        />
+
+        <View style={ios.sheet}>
+          {/* Toolbar */}
+          <View style={ios.toolbar}>
+            <TouchableOpacity onPress={onIOSCancel} style={ios.toolBtn}>
+              <Text style={ios.cancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={ios.toolTitle}>Select End Date</Text>
+            <TouchableOpacity onPress={onIOSConfirm} style={ios.toolBtn}>
+              <Text style={ios.doneTxt}>Done</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* iOS spinner / inline calendar */}
+          <DateTimePicker
+            value={tempDate}
+            mode="date"
+            display="inline" // full calendar grid on iOS 14+
+            minimumDate={today}
+            onChange={onIOSChange}
+            style={ios.picker}
+          />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const s = StyleSheet.create({
-  safe: {
+export default CreateCampaign;
+
+// ── iOS modal styles ───────────────────────────────────────
+const ios = StyleSheet.create({
+  overlay: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  container: {
-    flex: 1,
+  sheet: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 36,
   },
-  // Header Styles
-  header: {
+  toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
-    paddingTop: vscale(12),
-    paddingBottom: vscale(12),
-    backgroundColor: C.bg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
   },
-  closeBtn: {
-    padding: scale(4),
-  },
-  headerTitle: {
-    fontSize: scale(17),
+  toolBtn: { minWidth: 60 },
+  toolTitle: { fontSize: 15, fontWeight: '700', color: C.dark },
+  cancelTxt: { fontSize: 15, color: C.textGray },
+  doneTxt: {
+    fontSize: 15,
+    color: C.teal,
     fontWeight: '700',
-    color: C.textDark,
-    letterSpacing: -0.3,
+    textAlign: 'right',
   },
-  stepIndicator: {
-    minWidth: scale(50),
-    alignItems: 'flex-end',
-  },
-  stepText: {
-    fontSize: scale(14),
-  },
-  stepActive: {
-    fontWeight: '700',
-    color: C.textDark,
-  },
-  stepTotal: {
-    color: C.textGray,
-    fontWeight: '500',
-  },
-  // Progress Bar
-  progressContainer: {
-    paddingHorizontal: scale(20),
-    paddingBottom: vscale(8),
-    backgroundColor: C.bg,
-  },
-  progressBar: {
-    height: scale(4),
-    backgroundColor: C.progressBg,
-    borderRadius: scale(2),
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: C.primary,
-    borderRadius: scale(2),
-  },
-  // Content Styles
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: scale(20),
-    paddingTop: vscale(16),
-    paddingBottom: vscale(20),
-  },
-  sectionTitle: {
-    fontSize: scale(20),
-    fontWeight: '800',
-    color: C.textDark,
-    marginBottom: vscale(24),
-    letterSpacing: -0.5,
-  },
-  fieldContainer: {
-    marginBottom: vscale(20),
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: vscale(8),
-  },
-  label: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: C.textGray,
-  },
-  charCounter: {
-    fontSize: scale(12),
-    color: C.textLight,
-    fontWeight: '500',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: scale(12),
-    backgroundColor: C.white,
-    height: vscale(50),
-    overflow: 'hidden',
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    paddingHorizontal: scale(16),
-    fontSize: scale(15),
-    color: C.textDark,
-    fontWeight: '500',
-  },
-  inputWithPrefix: {
-    paddingLeft: scale(8),
-  },
-  prefixContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: scale(16),
-    height: '100%',
-  },
-  prefix: {
-    fontSize: scale(15),
-    color: C.textGray,
-    fontWeight: '600',
-    marginRight: scale(8),
-  },
-  prefixLine: {
-    width: 1,
-    height: scale(20),
-    backgroundColor: C.border,
-    marginRight: scale(8),
-  },
-  // Dropdown
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: scale(12),
-    backgroundColor: C.white,
-    height: vscale(50),
-    paddingHorizontal: scale(16),
-  },
-  dropdownText: {
-    fontSize: scale(15),
-    color: C.textDark,
-    fontWeight: '500',
-  },
-  // Date Picker
-  datePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: scale(12),
-    backgroundColor: C.white,
-    height: vscale(50),
-    paddingHorizontal: scale(16),
-  },
-  dateText: {
-    fontSize: scale(15),
-    color: C.textDark,
-    fontWeight: '500',
-  },
-  // Urgent Checkbox
-  urgentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: vscale(8),
-    marginBottom: vscale(16),
-  },
-  checkbox: {
-    width: scale(22),
-    height: scale(22),
-    borderRadius: scale(6),
-    borderWidth: 2,
-    borderColor: C.border,
-    marginRight: scale(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.white,
-  },
-  checkboxActive: {
-    backgroundColor: C.urgent,
-    borderColor: C.urgent,
-  },
-  urgentText: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: C.textDark,
-  },
-  fireIcon: {
-    fontSize: scale(14),
-    marginLeft: scale(4),
-  },
-  // Info Box
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: C.infoBg,
-    borderRadius: scale(12),
-    padding: scale(16),
-    alignItems: 'flex-start',
-  },
-  infoIconContainer: {
-    marginRight: scale(12),
-    marginTop: scale(2),
-  },
-  infoText: {
-    flex: 1,
-    fontSize: scale(13),
-    color: C.infoText,
-    lineHeight: scale(20),
-    fontWeight: '500',
-  },
-  // Footer - No longer absolute, properly handled by KeyboardAvoidingView
-  bottomPadding: {
-    height: vscale(20), // Extra scroll space
-  },
-  footer: {
-    backgroundColor: C.bg,
-    paddingHorizontal: scale(20),
-    paddingVertical: vscale(12),
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingBottom: Platform.OS === 'ios' ? vscale(24) : vscale(16),
-  },
-  nextButton: {
-    backgroundColor: C.primary,
-    height: vscale(52),
-    borderRadius: scale(12),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  nextButtonText: {
-    color: C.white,
-    fontSize: scale(16),
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  nextIcon: {
-    marginLeft: scale(8),
-  },
+  picker: { alignSelf: 'center' },
 });
 
-export default CreateCampaign;
+// ── Screen styles ──────────────────────────────────────────
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  flex: { flex: 1 },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 8 },
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.dark,
+    marginBottom: 22,
+  },
+  fieldBlock: { marginBottom: 14 },
+
+  input: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    backgroundColor: C.inputBg,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: C.dark,
+  },
+
+  prefixWrap: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    backgroundColor: C.inputBg,
+    overflow: 'hidden',
+    height: 48,
+  },
+  prefixBox: {
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: C.border,
+    backgroundColor: '#F8FAFC',
+  },
+  prefixTxt: { fontSize: 13, fontWeight: '700', color: C.dark },
+  prefixInput: { flex: 1, paddingHorizontal: 12, fontSize: 14, color: C.dark },
+
+  // ✅ Date field is now a TouchableOpacity, not a TextInput
+  dateWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    backgroundColor: C.inputBg,
+  },
+  dateTxt: { flex: 1, paddingHorizontal: 12, fontSize: 14, color: C.dark },
+  datePlaceholder: { color: C.placeholderColor },
+  calIcon: { paddingRight: 12 },
+
+  urgentRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  checkboxOn: { backgroundColor: C.navy, borderColor: C.navy },
+  urgentLabel: { fontSize: 14, fontWeight: '600', color: C.dark },
+
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: C.infoBg,
+    borderWidth: 1,
+    borderColor: C.infoBorder,
+    borderRadius: 8,
+    padding: 12,
+  },
+  infoTxt: { flex: 1, fontSize: 13, color: C.infoText, lineHeight: 19 },
+
+  btnWrap: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: C.white,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  nextBtn: {
+    backgroundColor: C.navy,
+    borderRadius: 10,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  nextBtnTxt: { color: C.white, fontSize: 15, fontWeight: '700' },
+});

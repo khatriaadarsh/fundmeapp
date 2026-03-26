@@ -1,7 +1,6 @@
-// src/screens/campaign/shared.js
+// src/screens/campaign/shared.jsx
 // ─────────────────────────────────────────────────────────────
-//  Shared design tokens, scale helpers & reusable components
-//  for all 4 Campaign Creation screens
+//  Shared components & tokens for Campaign Creation screens
 // ─────────────────────────────────────────────────────────────
 
 import React, { useState } from 'react';
@@ -10,136 +9,178 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Modal,
   FlatList,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-// ── Responsive helpers ─────────────────────────────────────
-const { width, height } = Dimensions.get('window');
-// Base design was built on 390pt wide screen
-export const rs = size => (width / 390) * size; // horizontal scale
-export const vs = size => (height / 844) * size; // vertical scale
-export const ms = (size, factor = 0.5) => size + (rs(size) - size) * factor;
+const { width } = Dimensions.get('window');
 
-// ── Colour tokens ──────────────────────────────────────────
+// ── Design tokens ──────────────────────────────────────────
 export const C = {
-  // Backgrounds
-  screenBg: '#F2F3F5',
+  bg: '#F4F5F7',
   white: '#FFFFFF',
-  inputBg: '#FFFFFF',
-
-  // Text
-  dark: '#111827',
-  mid: '#374151',
-  gray: '#6B7280',
-  light: '#9CA3AF',
-  placeholder: '#B0B7C3',
-
-  // Brand
-  teal: '#00B4CC',
-  tealDark: '#0097AA',
+  dark: '#1A1A2E',
   navy: '#1B2B4B',
+  teal: '#00B4CC',
   green: '#22C55E',
   greenDark: '#16A34A',
   greenLight: '#DCFCE7',
   red: '#EF4444',
-  pdfRed: '#DC2626',
-
-  // Borders
-  border: '#E5E7EB',
-  borderLight: '#F3F4F6',
-
-  // Info banner
-  infoBg: '#EFF8FF',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E2E8F0',
+  inputBg: '#FFFFFF',
+  progressBg: '#E5E7EB',
+  infoBg: '#EBF8FF',
   infoBorder: '#BAE6FD',
   infoText: '#0369A1',
-
-  // Badges
-  urgentBg: '#FEE2E2',
-  urgentText: '#DC2626',
-  medicalBg: '#EFF6FF',
-  medicalText: '#2563EB',
-
-  // Progress
-  progressBg: '#E5E7EB',
-  progressLine: '#00B4CC',
-  progressGreen: '#22C55E',
+  placeholderColor: '#B0B7C3',
 };
 
-// ── Step progress bar ──────────────────────────────────────
-export const StepProgressBar = ({ step, total, color }) => (
-  <View style={pb.row}>
-    {Array.from({ length: total }, (_, i) => (
-      <View
-        key={i}
-        style={[
-          pb.seg,
-          { backgroundColor: i < step ? color || C.teal : C.progressBg },
-        ]}
-      />
-    ))}
-  </View>
-);
-const pb = StyleSheet.create({
-  row: { flexDirection: 'row', gap: rs(4), height: vs(3) },
-  seg: { flex: 1, borderRadius: rs(2) },
-});
+// ── Responsive helpers ─────────────────────────────────────
+export const W = width;
 
-// ── Top navigation header ──────────────────────────────────
-export const NavHeader = ({
-  title,
-  step,
-  total,
-  onLeft,
-  leftIcon = 'arrow-left',
-  progressColor,
-}) => (
-  <View style={nh.wrap}>
-    <View style={nh.row}>
-      <TouchableOpacity onPress={onLeft} style={nh.iconBtn} activeOpacity={0.7}>
-        <Icon name={leftIcon} size={ms(22)} color={C.dark} />
+// ── Step Header ────────────────────────────────────────────
+// Screen 1: shows × (close)   — pass isFirst={true}
+// Screen 2-4: shows ← (back)  — default
+export const StepHeader = ({ step, total, title, onLeft, isFirst }) => (
+  <View style={sh.outer}>
+    <View style={sh.row}>
+      <TouchableOpacity
+        onPress={onLeft}
+        style={sh.iconBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon
+          name={isFirst ? 'close' : 'arrow-left'}
+          size={22}
+          color={C.dark}
+        />
       </TouchableOpacity>
-      <Text style={nh.title}>{title}</Text>
-      <Text style={nh.step}>
+      <Text style={sh.title}>{title}</Text>
+      <Text style={sh.step}>
         {step} of {total}
       </Text>
     </View>
-    <StepProgressBar step={step} total={total} color={progressColor} />
+    {/* Segmented progress bar — fills proportionally */}
+    <View style={sh.segsRow}>
+      {Array.from({ length: total }, (_, i) => (
+        <View
+          key={i}
+          style={[
+            sh.seg,
+            i < step ? (step === total ? sh.segGreen : sh.segTeal) : sh.segGray,
+          ]}
+        />
+      ))}
+    </View>
   </View>
 );
-const nh = StyleSheet.create({
-  wrap: {
+
+const sh = StyleSheet.create({
+  outer: {
     backgroundColor: C.white,
-    paddingTop: vs(6),
-    paddingBottom: 0,
+    paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
-    paddingHorizontal: rs(16),
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: vs(10),
+    paddingHorizontal: 18,
+    paddingBottom: 12,
   },
-  iconBtn: { padding: rs(4) },
-  title: { fontSize: ms(16), fontWeight: '700', color: C.dark },
+  iconBtn: { width: 32, alignItems: 'flex-start' },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.dark,
+  },
   step: {
-    fontSize: ms(13),
-    color: C.gray,
-    fontWeight: '500',
-    minWidth: rs(36),
+    width: 40,
     textAlign: 'right',
+    fontSize: 13,
+    color: C.textGray,
+    fontWeight: '500',
   },
+  segsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 18,
+    gap: 4,
+    paddingBottom: 0,
+  },
+  seg: { flex: 1, height: 2.5, borderRadius: 2 },
+  segTeal: { backgroundColor: C.teal },
+  segGreen: { backgroundColor: C.green },
+  segGray: { backgroundColor: C.progressBg },
+});
+
+// ── Bottom button row ──────────────────────────────────────
+export const BtnRow = ({ onBack, onNext, nextLabel = 'Next', hideBack }) => (
+  <View style={br.wrap}>
+    {!hideBack && (
+      <TouchableOpacity style={br.back} onPress={onBack} activeOpacity={0.8}>
+        <Icon name="arrow-left" size={15} color={C.dark} />
+        <Text style={br.backTxt}>Back</Text>
+      </TouchableOpacity>
+    )}
+    <TouchableOpacity
+      style={[br.next, hideBack && { flex: 1 }]}
+      onPress={onNext}
+      activeOpacity={0.85}
+    >
+      <Text style={br.nextTxt}>{nextLabel}</Text>
+      <Icon name="arrow-right" size={15} color={C.white} />
+    </TouchableOpacity>
+  </View>
+);
+
+const br = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: C.white,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  back: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 10,
+    paddingVertical: 13,
+    backgroundColor: C.white,
+  },
+  backTxt: { fontSize: 14, fontWeight: '600', color: C.dark },
+  next: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: C.navy,
+    borderRadius: 10,
+    paddingVertical: 13,
+  },
+  nextTxt: { fontSize: 14, fontWeight: '700', color: C.white },
 });
 
 // ── Field label ────────────────────────────────────────────
-export const FieldLabel = ({ label, counter }) => (
+export const FieldLabel = ({ text, right }) => (
   <View style={fl.row}>
-    <Text style={fl.label}>{label}</Text>
-    {counter !== undefined && <Text style={fl.counter}>{counter}</Text>}
+    <Text style={fl.label}>{text}</Text>
+    {right && <Text style={fl.right}>{right}</Text>}
   </View>
 );
 const fl = StyleSheet.create({
@@ -147,10 +188,10 @@ const fl = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: vs(6),
+    marginBottom: 6,
   },
-  label: { fontSize: ms(13), fontWeight: '600', color: C.dark },
-  counter: { fontSize: ms(12), color: C.light },
+  label: { fontSize: 13, fontWeight: '600', color: C.dark },
+  right: { fontSize: 12, color: C.textLight },
 });
 
 // ── Dropdown ───────────────────────────────────────────────
@@ -164,53 +205,57 @@ export const Dropdown = ({
 }) => {
   const [open, setOpen] = useState(false);
   return (
-    <View style={dr.wrap}>
-      {label && <FieldLabel label={label} />}
+    <View style={{ marginBottom: 14 }}>
+      {label && <FieldLabel text={label} />}
       <TouchableOpacity
-        style={[dr.trigger, open && dr.triggerOpen]}
+        style={dp.trigger}
         onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
         {leftIcon && (
           <Icon
             name={leftIcon}
-            size={ms(16)}
-            color={C.light}
-            style={dr.leftIcon}
+            size={16}
+            color={C.textLight}
+            style={dp.leftIcon}
           />
         )}
-        <Text style={[dr.val, !value && dr.placeholder]} numberOfLines={1}>
+        <Text style={[dp.val, !value && dp.placeholder]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Icon name="chevron-down" size={ms(18)} color={C.light} />
+        <Icon name="chevron-down" size={18} color={C.textLight} />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="fade">
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
         <TouchableOpacity
-          style={dr.overlay}
+          style={dp.overlay}
           activeOpacity={1}
           onPress={() => setOpen(false)}
         >
-          <View style={dr.sheet}>
-            <Text style={dr.sheetTitle}>{label || placeholder}</Text>
+          <View style={dp.sheet}>
+            <View style={dp.handle} />
+            <Text style={dp.sheetTitle}>{label || placeholder}</Text>
             <FlatList
               data={options}
               keyExtractor={item => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[dr.option, value === item && dr.optionActive]}
+                  style={[dp.opt, value === item && dp.optActive]}
                   onPress={() => {
                     onSelect(item);
                     setOpen(false);
                   }}
                 >
-                  <Text
-                    style={[dr.optionTxt, value === item && dr.optionTxtActive]}
-                  >
+                  <Text style={[dp.optTxt, value === item && dp.optTxtActive]}>
                     {item}
                   </Text>
                   {value === item && (
-                    <Icon name="check" size={ms(16)} color={C.teal} />
+                    <Icon name="check" size={16} color={C.teal} />
                   )}
                 </TouchableOpacity>
               )}
@@ -221,23 +266,21 @@ export const Dropdown = ({
     </View>
   );
 };
-const dr = StyleSheet.create({
-  wrap: { marginBottom: vs(16) },
+
+const dp = StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: rs(8),
+    borderRadius: 8,
     backgroundColor: C.inputBg,
-    paddingHorizontal: rs(12),
-    height: vs(48),
-    minHeight: 44,
+    paddingHorizontal: 12,
+    height: 48,
   },
-  triggerOpen: { borderColor: C.teal },
-  leftIcon: { marginRight: rs(8) },
-  val: { flex: 1, fontSize: ms(14), color: C.dark },
-  placeholder: { color: C.placeholder },
+  leftIcon: { marginRight: 8 },
+  val: { flex: 1, fontSize: 14, color: C.dark },
+  placeholder: { color: C.placeholderColor },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -245,91 +288,39 @@ const dr = StyleSheet.create({
   },
   sheet: {
     backgroundColor: C.white,
-    borderTopLeftRadius: rs(20),
-    borderTopRightRadius: rs(20),
-    paddingTop: vs(16),
-    paddingBottom: vs(40),
-    maxHeight: height * 0.55,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 36,
+    maxHeight: '60%',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.border,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
   },
   sheetTitle: {
-    fontSize: ms(15),
+    fontSize: 14,
     fontWeight: '700',
     color: C.dark,
     textAlign: 'center',
-    paddingBottom: vs(12),
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: C.border,
-    marginHorizontal: rs(20),
-    marginBottom: vs(8),
+    marginHorizontal: 20,
+    marginBottom: 6,
   },
-  option: {
+  opt: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: vs(13),
-    paddingHorizontal: rs(24),
+    paddingVertical: 14,
+    paddingHorizontal: 24,
   },
-  optionActive: { backgroundColor: 'rgba(0,180,204,0.06)' },
-  optionTxt: { fontSize: ms(14), color: C.dark },
-  optionTxtActive: { color: C.teal, fontWeight: '700' },
-});
-
-// ── Dual button row (Back + Next) ──────────────────────────
-export const DualButtons = ({
-  onBack,
-  onNext,
-  nextLabel = 'Next',
-  disabled,
-}) => (
-  <View style={db.wrap}>
-    <TouchableOpacity style={db.back} onPress={onBack} activeOpacity={0.8}>
-      <Icon name="arrow-left" size={ms(15)} color={C.dark} />
-      <Text style={db.backTxt}>Back</Text>
-    </TouchableOpacity>
-    <TouchableOpacity
-      style={[db.next, disabled && db.nextDisabled]}
-      onPress={onNext}
-      activeOpacity={0.85}
-      disabled={disabled}
-    >
-      <Text style={db.nextTxt}>{nextLabel}</Text>
-      <Icon name="arrow-right" size={ms(15)} color={C.white} />
-    </TouchableOpacity>
-  </View>
-);
-const db = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    gap: rs(10),
-    paddingHorizontal: rs(16),
-    paddingVertical: vs(12),
-    backgroundColor: C.white,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-  },
-  back: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: rs(6),
-    borderWidth: 1.5,
-    borderColor: C.border,
-    borderRadius: rs(10),
-    paddingVertical: vs(13),
-    backgroundColor: C.white,
-  },
-  backTxt: { fontSize: ms(15), fontWeight: '600', color: C.dark },
-  next: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: rs(6),
-    backgroundColor: C.navy,
-    borderRadius: rs(10),
-    paddingVertical: vs(13),
-  },
-  nextDisabled: { opacity: 0.5 },
-  nextTxt: { fontSize: ms(15), fontWeight: '700', color: C.white },
+  optActive: { backgroundColor: 'rgba(0,180,204,0.06)' },
+  optTxt: { fontSize: 14, color: C.dark },
+  optTxtActive: { color: C.teal, fontWeight: '700' },
 });

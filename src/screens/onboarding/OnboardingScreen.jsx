@@ -969,7 +969,7 @@ const s = StyleSheet.create({
   },
   skipBtn: {
     position: 'absolute',
-    top: vscale(16),
+    top: vscale(35),
     right: scale(24),
     zIndex: 10,
     paddingHorizontal: scale(14),
