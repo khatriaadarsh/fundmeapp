@@ -183,6 +183,25 @@ const ProfileScreen = ({ navigation }) => {
     navigation.navigate('EditProfile'); // or whatever your screen name is in navigator
     return;
   }
+  if(id==='donate'){
+    navigation.navigate('MyDonationScreen');
+    return;
+  }
+
+   if(id==='camp'){
+    navigation.navigate('MyCampaignsScreen');
+    return;
+  }
+
+  if(id==='with'){
+    navigation.navigate('RequestWithdrawalScreen');
+    return;
+  }
+  if(id==='notif'){
+    navigation.navigate('NotificationsScreen');
+    return;
+  }
+  
   // Handle other menu items...
   console.log('Menu:', id);
 }, [navigation]);
