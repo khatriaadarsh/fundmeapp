@@ -33,11 +33,13 @@ const C = {
   textBlueGray: '#7B8FA6',
   border: '#E5E7EB',
   checkBorder: '#D1D5DB',
-  checkActive: '#7C3AED',
-  purpleStart: '#9B6BF5',
+  checkActive: '#00B4CC',
+  purpleStart: '#0B5E6B',
   purpleEnd: '#F472B6',
-  mutedStart: '#C4B5FD',
+  mutedStart: '#b9d8dd',
   mutedEnd: '#FBCFE8',
+  primary: '#00B4CC',
+  primaryDark: '#0B5E6B',
 };
 
 // ── Terms sections data ────────────────────────────────────
@@ -270,8 +272,8 @@ const TermsConditions = ({ navigation }) => {
             <LinearGradient
               colors={
                 agreed
-                  ? [C.purpleStart, C.purpleEnd] // ✅ vivid purple → pink
-                  : [C.mutedStart, C.mutedEnd] // ⬜ muted / disabled look
+                  ? [C.primary, C.primary, C.primaryDark]
+                  : [C.mutedStart, C.primary]
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -365,8 +367,8 @@ const s = StyleSheet.create({
     marginRight: 10,
   },
   checkboxActive: {
-    backgroundColor: C.checkActive,
-    borderColor: C.checkActive,
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   checkLabel: {
     flex: 1,

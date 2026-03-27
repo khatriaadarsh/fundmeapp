@@ -40,6 +40,7 @@ import MyCampaignsScreen from '../screens/campaigns/MyCampaignsScreen';
 import RequestWithdrawalScreen from '../screens/campaigns/RequestWithdrawalScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import TermsConditions from '../screens/campaigns/TermsConditions';
+import FAQScreen from '../screens/Profile/FAQScreen';
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
@@ -53,7 +54,6 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View style={tabStyles.bar}>
       {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
         const isFocused = state.index === index;
 
         if (route.name === 'CreateTab') {
@@ -249,6 +249,7 @@ const StackNavigator = () => {
         component={RequestWithdrawalScreen}
       />
       <Stack.Screen name="TermsConditions" component={TermsConditions} />
+      <Stack.Screen name="FAQScreen" component={FAQScreen} />
       <Stack.Screen
         name="NotificationsScreen"
         component={NotificationsScreen}

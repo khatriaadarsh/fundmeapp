@@ -208,6 +208,11 @@ const ProfileScreen = ({ navigation }) => {
         return;
       }
 
+      if (id === 'faq') {
+        navigation.navigate('FAQScreen');
+        return;
+      }
+
       // Handle other menu items...
       console.log('Menu:', id);
     },
