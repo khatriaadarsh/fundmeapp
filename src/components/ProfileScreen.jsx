@@ -203,6 +203,11 @@ const ProfileScreen = ({ navigation }) => {
         return;
       }
 
+      if (id === 'terms') {
+        navigation.navigate('TermsConditions');
+        return;
+      }
+
       // Handle other menu items...
       console.log('Menu:', id);
     },

@@ -351,7 +351,7 @@ const s = StyleSheet.create({
   fieldBlock: { marginBottom: 14 },
 
   input: {
-    height: 48,
+    height: 50,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 8,
@@ -368,7 +368,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: C.inputBg,
     overflow: 'hidden',
-    height: 48,
+    height: 55,
   },
   prefixBox: {
     paddingHorizontal: 14,
@@ -384,7 +384,7 @@ const s = StyleSheet.create({
   dateWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
+    height: 55,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 8,

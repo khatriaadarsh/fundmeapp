@@ -276,7 +276,7 @@ const dp = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: C.inputBg,
     paddingHorizontal: 12,
-    height: 48,
+    height: 55,
   },
   leftIcon: { marginRight: 8 },
   val: { flex: 1, fontSize: 14, color: C.dark },

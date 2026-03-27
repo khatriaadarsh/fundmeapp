@@ -39,6 +39,7 @@ import MyDonationScreen from '../screens/donation/MyDonationsScreen';
 import MyCampaignsScreen from '../screens/campaigns/MyCampaignsScreen';
 import RequestWithdrawalScreen from '../screens/campaigns/RequestWithdrawalScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
+import TermsConditions from '../screens/campaigns/TermsConditions';
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
@@ -242,9 +243,16 @@ const StackNavigator = () => {
       <Stack.Screen name="EditProfile" component={EditProfile} />
       {/* <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} /> */}
       <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
-      <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} /> 
-      <Stack.Screen name="RequestWithdrawalScreen" component={RequestWithdrawalScreen} />
-      <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+      <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} />
+      <Stack.Screen
+        name="RequestWithdrawalScreen"
+        component={RequestWithdrawalScreen}
+      />
+      <Stack.Screen name="TermsConditions" component={TermsConditions} />
+      <Stack.Screen
+        name="NotificationsScreen"
+        component={NotificationsScreen}
+      />
     </Stack.Navigator>
   );
 };
