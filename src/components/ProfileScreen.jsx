@@ -203,6 +203,11 @@ const ProfileScreen = ({ navigation }) => {
         return;
       }
 
+      if (id === 'settings') {
+        navigation.navigate('SettingsScreen');
+        return;
+      }
+
       if (id === 'terms') {
         navigation.navigate('TermsConditions');
         return;

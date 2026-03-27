@@ -12,11 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
-
 import Splash from '../screens/splash/Splash';
-// import OnboardingScreen1 from '../screens/onboarding/OnboardingScreen1';
-// import OnboardingScreen2 from '../screens/onboarding/OnboardingScreen2';
-// import OnboardingScreen3 from '../screens/onboarding/OnboardingScreen3';
 import OnboardingScreen from '../screens/onboarding/OnboardingScreen';
 import Login from '../screens/auth/Login';
 import SignUpScreen from '../screens/auth/SignUpScreen';
@@ -29,7 +25,7 @@ import SendResetCode from '../screens/auth/SendResetCode';
 import HomeScreen from '../screens/home/HomeScreen';
 import ExploreScreen from '../screens/explore/ExploreScreen';
 import SavedScreen from '../components/saved/SavedScreen';
-import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
+// import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 import ProfileScreen from '../components/ProfileScreen';
 import CampaignDetails from '../screens/campaigncreation/CampaignDetails';
 import PhotosDocuments from '../screens/campaigncreation/PhotosDocuments';
@@ -41,6 +37,9 @@ import RequestWithdrawalScreen from '../screens/campaigns/RequestWithdrawalScree
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import TermsConditions from '../screens/campaigns/TermsConditions';
 import FAQScreen from '../screens/Profile/FAQScreen';
+
+import SettingsScreen from '../screens/settings/SettingsScreen';
+
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
@@ -227,33 +226,25 @@ const StackNavigator = () => {
       />
       <Stack.Screen name="CNICUploadScreen" component={CNICUploadScreen} />
       <Stack.Screen
-        name="ProfileCompletionScreen"
-        component={ProfileCompletionScreen}
-      />
+        name="ProfileCompletionScreen" component={ProfileCompletionScreen}/>
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
 
       {/* ── Main App ── */}
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-
-      <Stack.Screen name="CreateCampaign" component={CreateCampaign} />
       <Stack.Screen name="CampaignDetails" component={CampaignDetails} />
       <Stack.Screen name="PhotosDocuments" component={PhotosDocuments} />
       <Stack.Screen name="ReviewSubmit" component={ReviewSubmit} />
       <Stack.Screen name="EditProfile" component={EditProfile} />
-      {/* <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} /> */}
-      <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
+     <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
       <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} />
-      <Stack.Screen
-        name="RequestWithdrawalScreen"
-        component={RequestWithdrawalScreen}
-      />
+      <Stack.Screen   name="RequestWithdrawalScreen"component={RequestWithdrawalScreen}/>
       <Stack.Screen name="TermsConditions" component={TermsConditions} />
+
       <Stack.Screen name="FAQScreen" component={FAQScreen} />
-      <Stack.Screen
-        name="NotificationsScreen"
-        component={NotificationsScreen}
-      />
+      <Stack.Screen name="NotificationsScreen" component={NotificationsScreen}/>
+
+      <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
     </Stack.Navigator>
   );
 };
