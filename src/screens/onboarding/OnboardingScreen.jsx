@@ -50,6 +50,11 @@ const C = {
 
 const RING_COLOR = '#15AABF';
 
+// ✅ Gradient colors for AboutScreen bg + CircularProgress inner
+// linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
+const GRAD_START = '#0A3D62';
+const GRAD_END   = '#15AABF';
+
 const SCREENS = [
   {
     id:          1,
@@ -101,9 +106,7 @@ const CircularProgress = memo(({ progress, onPress }) => {
         ]).start();
         setShowDone(true);
       }
-      if (progress < 1 && showDone) {
-        setShowDone(false);
-      }
+      if (progress < 1 && showDone) setShowDone(false);
     });
   }, [progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -160,8 +163,13 @@ const CircularProgress = memo(({ progress, onPress }) => {
             },
           ]}
         />
+        {/*
+          ✅ CircularProgress inner button gradient:
+          linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
+          start:{x:0,y:0} end:{x:1,y:1} = 135deg diagonal
+        */}
         <LinearGradient
-          colors={[C.primary, C.primaryLight]}
+          colors={[GRAD_START, GRAD_END]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={cpr.inner}
@@ -303,7 +311,7 @@ const SwipeToStart = memo(({ onSwipeComplete }) => {
     PanResponder.create({
       onStartShouldSetPanResponder: () => !swiped,
       onMoveShouldSetPanResponder:  (_, g) => !swiped && g.dx > 5,
-      onPanResponderMove:   (_, g) => {
+      onPanResponderMove: (_, g) => {
         translateX.setValue(Math.max(0, Math.min(g.dx, SWIPE_MAX)));
       },
       onPanResponderRelease: (_, g) => {
@@ -394,17 +402,17 @@ const swSt = StyleSheet.create({
     letterSpacing: 0.5,
   },
   thumb: {
-    width:          SWIPE_THUMB_SIZE,
-    height:         SWIPE_THUMB_SIZE,
-    borderRadius:   SWIPE_THUMB_SIZE / 2,
+    width:           SWIPE_THUMB_SIZE,
+    height:          SWIPE_THUMB_SIZE,
+    borderRadius:    SWIPE_THUMB_SIZE / 2,
     backgroundColor: C.swipeThumb,
-    alignItems:     'center',
-    justifyContent: 'center',
-    elevation:      6,
-    shadowColor:    '#000',
-    shadowOffset:   { width: 0, height: 3 },
-    shadowOpacity:  0.2,
-    shadowRadius:   6,
+    alignItems:      'center',
+    justifyContent:  'center',
+    elevation:       6,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 3 },
+    shadowOpacity:   0.2,
+    shadowRadius:    6,
   },
   startContent: {
     flexDirection:  'row',
@@ -446,15 +454,15 @@ const AboutScreen = memo(({ visible, onStart }) => {
         ]).start(() => {
           Animated.stagger(120, [
             Animated.parallel([
-              Animated.timing(feat1, { toValue: 1, duration: 350, useNativeDriver: true }),
+              Animated.timing(feat1,      { toValue: 1, duration: 350, useNativeDriver: true }),
               Animated.spring(featSlide1, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
             ]),
             Animated.parallel([
-              Animated.timing(feat2, { toValue: 1, duration: 350, useNativeDriver: true }),
+              Animated.timing(feat2,      { toValue: 1, duration: 350, useNativeDriver: true }),
               Animated.spring(featSlide2, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
             ]),
             Animated.parallel([
-              Animated.timing(feat3, { toValue: 1, duration: 350, useNativeDriver: true }),
+              Animated.timing(feat3,      { toValue: 1, duration: 350, useNativeDriver: true }),
               Animated.spring(featSlide3, { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
             ]),
           ]).start();
@@ -486,7 +494,19 @@ const AboutScreen = memo(({ visible, onStart }) => {
     <Animated.View
       style={[abSt.fullScreen, { transform: [{ translateY: slideAnim }] }]}
     >
-      <StatusBar barStyle="light-content" backgroundColor={C.primary} />
+      {/*
+        ✅ AboutScreen background:
+        linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
+        Covers the entire screen behind all content.
+      */}
+      <LinearGradient
+        colors={[GRAD_START, GRAD_END]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <StatusBar barStyle="light-content" backgroundColor={GRAD_START} />
       <View style={abSt.decoCircle1} />
       <View style={abSt.decoCircle2} />
 
@@ -496,9 +516,12 @@ const AboutScreen = memo(({ visible, onStart }) => {
           { opacity: contentFade, transform: [{ translateY: contentSlide }] },
         ]}
       >
+        {/* Logo */}
         <View style={abSt.logoWrap}>
           <LinearGradient
-            colors={[C.teal, C.tealDark]}
+            colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.10)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={abSt.logoGradient}
           >
             <Text style={abSt.logoEmoji}>🤲</Text>
@@ -523,7 +546,7 @@ const AboutScreen = memo(({ visible, onStart }) => {
               ]}
             >
               <View style={abSt.featureIcon}>
-                <Icons name={f.icon} size={scale(18)} color={C.teal} />
+                <Icons name={f.icon} size={scale(18)} color={C.white} />
               </View>
               <View style={abSt.featureTextWrap}>
                 <Text style={abSt.featureTitle}>{f.text}</Text>
@@ -544,10 +567,10 @@ const AboutScreen = memo(({ visible, onStart }) => {
 });
 
 const abSt = StyleSheet.create({
+  // ✅ fullScreen: no backgroundColor — LinearGradient handles it
   fullScreen: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: C.primary,
-    zIndex:          100,
+    zIndex: 100,
   },
   decoCircle1: {
     position:     'absolute',
@@ -557,7 +580,7 @@ const abSt = StyleSheet.create({
     height:       scale(180),
     borderRadius: scale(90),
     borderWidth:  scale(25),
-    borderColor:  'rgba(255,255,255,0.04)',
+    borderColor:  'rgba(255,255,255,0.06)',
   },
   decoCircle2: {
     position:     'absolute',
@@ -567,7 +590,7 @@ const abSt = StyleSheet.create({
     height:       scale(120),
     borderRadius: scale(60),
     borderWidth:  scale(18),
-    borderColor:  'rgba(255,255,255,0.03)',
+    borderColor:  'rgba(255,255,255,0.04)',
   },
   content: {
     flex:              1,
@@ -584,29 +607,85 @@ const abSt = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
     elevation:      8,
-    shadowColor:    C.teal,
+    shadowColor:    '#000',
     shadowOffset:   { width: 0, height: 4 },
-    shadowOpacity:  0.4,
+    shadowOpacity:  0.25,
     shadowRadius:   10,
-    borderWidth:    2,
-    borderColor:    'rgba(255,255,255,0.15)',
+    borderWidth:    1.5,
+    borderColor:    'rgba(255,255,255,0.20)',
   },
-  logoEmoji:       { fontSize: scale(38) },
-  title:           { fontSize: scale(26), fontWeight: '800', color: C.white, textAlign: 'center', marginBottom: scale(6), letterSpacing: -0.5 },
-  subtitle:        { fontSize: scale(13), fontWeight: '600', color: C.teal, textAlign: 'center', marginBottom: scale(18), letterSpacing: 0.3 },
-  description:     { fontSize: scale(13.5), color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: scale(21), marginBottom: scale(26), paddingHorizontal: scale(4) },
-  featureList:     { width: '100%', gap: scale(10), marginBottom: scale(22) },
-  featureCard:     { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: scale(14), padding: scale(14), borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  featureIcon:     { width: scale(40), height: scale(40), borderRadius: scale(12), backgroundColor: 'rgba(0,180,204,0.12)', alignItems: 'center', justifyContent: 'center', marginRight: scale(12) },
+  logoEmoji: { fontSize: scale(38) },
+
+  title: {
+    fontSize:     scale(26),
+    fontWeight:   '800',
+    color:        C.white,
+    textAlign:    'center',
+    marginBottom: scale(6),
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize:      scale(13),
+    fontWeight:    '600',
+    color:         'rgba(255,255,255,0.80)',
+    textAlign:     'center',
+    marginBottom:  scale(18),
+    letterSpacing: 0.3,
+  },
+  description: {
+    fontSize:          scale(13.5),
+    color:             'rgba(255,255,255,0.65)',
+    textAlign:         'center',
+    lineHeight:        scale(21),
+    marginBottom:      scale(26),
+    paddingHorizontal: scale(4),
+  },
+
+  featureList:  { width: '100%', gap: scale(10), marginBottom: scale(22) },
+  featureCard: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderRadius:    scale(14),
+    padding:         scale(14),
+    borderWidth:     1,
+    borderColor:     'rgba(255,255,255,0.12)',
+  },
+  featureIcon: {
+    width:           scale(40),
+    height:          scale(40),
+    borderRadius:    scale(12),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginRight:     scale(12),
+  },
   featureTextWrap: { flex: 1 },
-  featureTitle:    { fontSize: scale(13.5), fontWeight: '700', color: C.white, marginBottom: scale(2) },
-  featureDesc:     { fontSize: scale(11.5), color: 'rgba(255,255,255,0.5)', lineHeight: scale(16) },
-  tagline:         { fontSize: scale(12), fontStyle: 'italic', color: 'rgba(255,255,255,0.35)', textAlign: 'center' },
-  bottomWrap:      { paddingBottom: Platform.OS === 'android' ? scale(28) : scale(40), paddingHorizontal: scale(16) },
+  featureTitle: {
+    fontSize:     scale(13.5),
+    fontWeight:   '700',
+    color:        C.white,
+    marginBottom: scale(2),
+  },
+  featureDesc: {
+    fontSize:   scale(11.5),
+    color:      'rgba(255,255,255,0.55)',
+    lineHeight: scale(16),
+  },
+  tagline: {
+    fontSize:   scale(12),
+    fontStyle:  'italic',
+    color:      'rgba(255,255,255,0.40)',
+    textAlign:  'center',
+  },
+  bottomWrap: {
+    paddingBottom:     Platform.OS === 'android' ? scale(28) : scale(40),
+    paddingHorizontal: scale(16),
+  },
 });
 
 // ════════════════════════════════════════════════════════════
-// MAIN OnboardingScreen
+// MAIN OnboardingScreen — unchanged
 // ════════════════════════════════════════════════════════════
 const OnboardingScreen = ({ navigation }) => {
   const [currentIndex,    setCurrentIndex]    = useState(0);
@@ -681,7 +760,6 @@ const OnboardingScreen = ({ navigation }) => {
           { opacity: mountFade, transform: [{ translateY: mountSlide }] },
         ]}
       >
-        {/* ✅ Skip — top right, no header, proper padding */}
         <TouchableOpacity
           style={s.skipBtn}
           onPress={() => setShowAbout(true)}
@@ -691,7 +769,6 @@ const OnboardingScreen = ({ navigation }) => {
           <Text style={s.skipText}>Skip</Text>
         </TouchableOpacity>
 
-        {/* ── Image ─────────────────────────────────────── */}
         <View style={s.imageSection}>
           <Animated.View
             style={[
@@ -709,7 +786,6 @@ const OnboardingScreen = ({ navigation }) => {
           </Animated.View>
         </View>
 
-        {/* ── Text ──────────────────────────────────────── */}
         <Animated.View
           style={[
             s.textSection,
@@ -720,7 +796,6 @@ const OnboardingScreen = ({ navigation }) => {
           <Text style={s.description}>{currentScreen.description}</Text>
         </Animated.View>
 
-        {/* ── Bottom controls ───────────────────────────── */}
         <View style={s.bottomSection}>
           <StepDots active={currentIndex} />
           <Text style={s.counter}>
@@ -734,7 +809,6 @@ const OnboardingScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* ── Login row ─────────────────────────────────── */}
         <View style={s.loginRow}>
           <Text style={s.loginText}>Already have an account? </Text>
           <TouchableOpacity
@@ -754,7 +828,7 @@ const OnboardingScreen = ({ navigation }) => {
 export default OnboardingScreen;
 
 // ════════════════════════════════════════════════════════════
-// STYLES
+// STYLES — unchanged
 // ════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
 
@@ -763,20 +837,16 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
   },
 
-  // ✅ Full flex container — no header, just content
   container: {
     flex:              1,
     alignItems:        'center',
     paddingHorizontal: scale(24),
-    // Top padding gives breathing room below status bar
     paddingTop:        vscale(8),
   },
 
-  // ✅ Skip button — positioned inside container at top right
-  // Uses position:absolute so it doesn't consume layout space
   skipBtn: {
     position:          'absolute',
-    top:               vscale(16),  // ✅ comfortable below status bar
+    top:               vscale(16),
     right:             scale(24),
     zIndex:            10,
     paddingHorizontal: scale(16),
@@ -790,19 +860,14 @@ const s = StyleSheet.create({
     color:      C.gray,
   },
 
-  // ── Image section ─────────────────────────────────────────
-  // flex:4 gives most space to the image
   imageSection: {
     flex:           4,
     justifyContent: 'center',
     alignItems:     'center',
     width:          '100%',
-    // Extra top push so image doesn't sit under skip button
     paddingTop:     vscale(48),
   },
-  imageWrap: {
-    position: 'relative',
-  },
+  imageWrap: { position: 'relative' },
   image: {
     width:        scale(272),
     height:       scale(272),
@@ -816,10 +881,9 @@ const s = StyleSheet.create({
     backgroundColor: C.teal,
     opacity:         0.3,
   },
-  cornerDotTL: { top: scale(-5), left:  scale(-5) },
+  cornerDotTL: { top: scale(-5),    left:  scale(-5) },
   cornerDotBR: { bottom: scale(-5), right: scale(-5) },
 
-  // ── Text section ──────────────────────────────────────────
   textSection: {
     flex:           2,
     justifyContent: 'center',
@@ -844,7 +908,6 @@ const s = StyleSheet.create({
     paddingHorizontal: scale(4),
   },
 
-  // ── Bottom controls ───────────────────────────────────────
   bottomSection: {
     flex:           2,
     alignItems:     'center',
@@ -852,38 +915,17 @@ const s = StyleSheet.create({
     gap:            vscale(12),
   },
 
-  counter: {
-    marginTop: vscale(4),
-  },
-  counterActive: {
-    fontSize:   scale(16),
-    fontWeight: '800',
-    color:      C.primary,
-  },
-  counterSep: {
-    fontSize: scale(14),
-    color:    C.lightGray,
-  },
-  counterTotal: {
-    fontSize:   scale(14),
-    fontWeight: '600',
-    color:      C.lightGray,
-  },
+  counter:       { marginTop: vscale(4) },
+  counterActive: { fontSize: scale(16), fontWeight: '800', color: C.primary },
+  counterSep:    { fontSize: scale(14), color: C.lightGray },
+  counterTotal:  { fontSize: scale(14), fontWeight: '600', color: C.lightGray },
 
-  // ── Login row ─────────────────────────────────────────────
   loginRow: {
     flexDirection:  'row',
     alignItems:     'center',
     paddingBottom:  Platform.OS === 'ios' ? vscale(8) : vscale(16),
     paddingTop:     vscale(4),
   },
-  loginText: {
-    fontSize: scale(14),
-    color:    C.gray,
-  },
-  loginLink: {
-    fontSize:   scale(14),
-    color:      C.teal,
-    fontWeight: '700',
-  },
+  loginText: { fontSize: scale(14), color: C.gray },
+  loginLink: { fontSize: scale(14), color: C.teal, fontWeight: '700' },
 });
