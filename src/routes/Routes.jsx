@@ -2,9 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import {
-  View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions,
-} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Dimensions,} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
@@ -34,6 +32,8 @@ import NotificationsScreen      from '../screens/notifications/NotificationsScre
 import TermsConditions          from '../screens/campaigns/TermsConditions';
 import FAQScreen                from '../screens/Profile/FAQScreen';
 import SettingsScreen           from '../screens/settings/SettingsScreen';
+import CampaignDetail from '../screens/campaigns/CampaignDetail';
+import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -53,8 +53,6 @@ const TAB_CONFIG = {
 
 // ─── CustomTabBar ────────────────────────────────────────────
 const CustomTabBar = ({ state, navigation }) => {
-  // insets.bottom = height of home bar / nav bar on every device
-  // Pixel: 0 (physical buttons)  |  Vivo gesture nav: ~34px
   const { bottom } = useSafeAreaInsets();
   const pb = bottom > 0 ? bottom : sp(10);
 
@@ -68,7 +66,8 @@ const CustomTabBar = ({ state, navigation }) => {
           return (
             <View key={route.key} style={tabSt.fabSlot}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('CreateCampaign')}
+                // onPress={() => navigation.navigate('CreateCampaign')}
+                 onPress={() => navigation.navigate('CreateCampaign')}
                 activeOpacity={0.85}
               >
                 <LinearGradient
@@ -173,7 +172,8 @@ const MainTabNavigator = () => (
       name="CreateTab"
       component={DummyScreen}
       listeners={({ navigation }) => ({
-        tabPress: e => { e.preventDefault(); navigation.navigate('CreateCampaign'); },
+        // tabPress: e => { e.preventDefault(); navigation.navigate('CreateCampaign'); },
+          tabPress: e => { e.preventDefault(); navigation.navigate('CreateCampaign'); },
       })}
     />
     <Tab.Screen name="SavedTab"   component={SavedScreen}   />
@@ -207,6 +207,8 @@ const StackNavigator = () => (
     <Stack.Screen name="FAQScreen"                component={FAQScreen}               />
     <Stack.Screen name="NotificationsScreen"      component={NotificationsScreen}     />
     <Stack.Screen name="SettingsScreen"           component={SettingsScreen}          />
+    <Stack.Screen name="CampaignDetail"            component={CampaignDetail}           />
+    <Stack.Screen name="CreateCampaign"            component={CreateCampaign}           />
   </Stack.Navigator>
 );
 
