@@ -349,6 +349,40 @@ export const WITHDRAWAL_DATA = {
   available: 225000, // Available Balance
 };
 
+export const MOCK_CREATOR = {
+  id: '1',
+  name: 'Sarah Ahmed',
+  username: '@sarahahmed',
+  avatar: 'https://i.pravatar.cc/300?img=32',
+  location: 'Karachi, Pakistan',
+  joinedDate: 'March 2023',
+  isVerified: true,
+  totalCampaigns: 12,
+  totalRaised: '4.5M',
+  totalDonors: 234,
+  rating: 4.8,
+  trustScore: 92,
+};
+
+export const STATS_DATA = [
+  { label: 'Campaigns', value: '12' },
+  { label: 'Raised', value: 'PKR 4.5M' },
+  { label: 'Donors', value: '234' },
+  { label: 'Rating', value: '4.8★' },
+];
+
+export const MOCK_REVIEWS = [
+  {
+    id: '1',
+    donorName: 'Ahmed K.',
+    donorAvatar: 'https://i.pravatar.cc/300?img=12',
+    rating: 5,
+    date: '2 days ago',
+    comment: 'Sarah is incredibly transparent and provided regular updates throughout the campaign.',
+    helpful: 12,
+  },
+];
+
 export const PAYMENT_METHODS = [
   { id: 'easypaisa', label: 'EasyPaisa', placeholder: '03XX XXXXXXX' },
   { id: 'jazzcash', label: 'JazzCash', placeholder: '03XX XXXXXXX' },

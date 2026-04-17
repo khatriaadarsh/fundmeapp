@@ -38,6 +38,7 @@ import CampaignDetail from '../screens/campaigns/CampaignDetail';
 // import CampaignDetails from '../screens/campaigncreation/CampaignDetails';
 import DonateScreen from '../screens/campaigns/DonateScreen';
 import CheckUser from '../screens/auth/CheckUser';
+import CreatorProfileScreen from '../screens/Profile/CreatorProfileScreen';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -217,6 +218,7 @@ const StackNavigator = () => (
     <Stack.Screen name="DonateScreen"             component={DonateScreen}           />
     {/* <Stack.Navigator initialRouteName="CheckUser"> */}
   <Stack.Screen name="CheckUser" component={CheckUser} options={{ headerShown: false }} />
+  <Stack.Screen  name="CreatorProfileScreen" component={CreatorProfileScreen}  options={{ headerShown: false }}/>
   </Stack.Navigator>
 );
 

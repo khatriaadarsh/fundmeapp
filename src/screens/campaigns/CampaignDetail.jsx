@@ -439,7 +439,7 @@ const dn = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════
 // CREATOR CARD
 // ═══════════════════════════════════════════════════════════
-const CreatorCard = memo(({ onViewProfile }) => (
+const CreatorCard = memo(({ onViewProfile}) => (
   <View style={cr.card}>
     <Image source={{ uri: CAMPAIGN.creator.avatar }} style={cr.avatar} />
     <View style={cr.info}>
@@ -758,7 +758,8 @@ const CampaignDetail = ({ navigation }) => {
   const handleShare   = useCallback(() => {}, []);
   const handleSave    = useCallback(() => setSaved(v => !v), []);
   const handleDonate  = useCallback(() => navigation?.navigate?.('DonateScreen'), [navigation]);
-  const handleProfile = useCallback(() => {}, []);
+const handleProfile = useCallback(() => {navigation?.navigate?.('CreatorProfileScreen', { userId: CAMPAIGN.creator.id }); // Add userId if available
+}, [navigation]);
 
   return (
     <View style={s.root}>
@@ -783,7 +784,8 @@ const CampaignDetail = ({ navigation }) => {
 
           <ProgressCard />
           <DonateButton onPress={handleDonate} />
-          <CreatorCard onViewProfile={handleProfile} />
+          {/* <CreatorCard onViewProfile={handleProfile} /> */}
+          <CreatorCard onViewProfile={handleProfile} navigation={navigation} />
           <StorySection />
           <MediaGallery />
           <SocialProof />
