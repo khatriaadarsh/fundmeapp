@@ -744,7 +744,7 @@ const OnboardingScreen = ({ navigation }) => {
   }, [currentIndex, isTransitioning, animateTransition]);
 
   const handleStart = useCallback(() => {
-    navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    navigation.reset({ index: 0, routes: [{ name: 'CheckUser' }] });
   }, [navigation]);
 
   const currentScreen = SCREENS[currentIndex];

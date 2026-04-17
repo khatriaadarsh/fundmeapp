@@ -1,15 +1,4 @@
-// src/screens/auth/OTPVerification.jsx
-// ─────────────────────────────────────────────────────────────
-//  OTP Verification — FundMe App (React Native CLI)
-//
-//  ✅ Header row (back arrow + step label) REMOVED
-//  ✅ Progress bar REMOVED
-//  ✅ Hand-drawn envelope Views REMOVED
-//  ✅ Real envelope icon from react-native-vector-icons
-//  ✅ Entire content centred vertically on screen
-// ─────────────────────────────────────────────────────────────
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,8 +14,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-// ── Colour tokens ──────────────────────────────────────────
-const C = {
+const COLORS = {
   bg: '#F9FAFB',
   white: '#FFFFFF',
   teal: '#00B4CC',
@@ -42,17 +30,15 @@ const C = {
   boxFill: '#FFFFFF',
 };
 
-// ── OTP config ────────────────────────────────────────────
 const OTP_LENGTH = 5;
 
-// ── Single OTP box ────────────────────────────────────────
 const OTPBox = ({ value, isFocused, inputRef, onChangeText, onKeyPress }) => (
   <TextInput
     ref={inputRef}
     style={[
-      otpStyle.box,
-      value && otpStyle.boxFilled,
-      isFocused && otpStyle.boxFocused,
+      styles.otpBox,
+      value && styles.otpBoxFilled,
+      isFocused && styles.otpBoxFocused,
     ]}
     value={value}
     onChangeText={onChangeText}
@@ -65,34 +51,28 @@ const OTPBox = ({ value, isFocused, inputRef, onChangeText, onKeyPress }) => (
   />
 );
 
-// ── Main screen ────────────────────────────────────────────
 const SendResetCode = ({ navigation, route }) => {
   const email = route?.params?.email ?? 'ahmed@gmail.com';
 
   const [otp, setOtp] = useState(Array(OTP_LENGTH).fill(''));
-  const [seconds, setSeconds] = useState(272); // 4:32
+  const [seconds, setSeconds] = useState(272);
   const [focused, setFocused] = useState(0);
 
   const inputRefs = useRef(
-    Array(OTP_LENGTH)
-      .fill(null)
-      .map(() => React.createRef()),
+    Array(OTP_LENGTH).fill(null).map(() => React.createRef())
   );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const iconScale = useRef(new Animated.Value(0.6)).current;
 
-  // ── Countdown timer ──────────────────────────────────────
   useEffect(() => {
     if (seconds <= 0) return;
-    const id = setInterval(() => setSeconds(s => s - 1), 1000);
-    return () => clearInterval(id);
+    const timer = setInterval(() => setSeconds((s) => s - 1), 1000);
+    return () => clearInterval(timer);
   }, [seconds]);
 
-  // ── Entrance animations ──────────────────────────────────
   useEffect(() => {
-    // Icon pops in
     Animated.spring(iconScale, {
       toValue: 1,
       tension: 55,
@@ -101,7 +81,6 @@ const SendResetCode = ({ navigation, route }) => {
       useNativeDriver: true,
     }).start();
 
-    // Content fades + slides up
     Animated.sequence([
       Animated.delay(200),
       Animated.parallel([
@@ -119,76 +98,77 @@ const SendResetCode = ({ navigation, route }) => {
       ]),
     ]).start();
 
-    // Auto-focus first OTP box
     setTimeout(() => inputRefs.current[0]?.current?.focus(), 500);
-  }, [fadeAnim, slideAnim, iconScale]);
+  }, [fadeAnim, slideAnim, iconScale ]);
 
-  const formatTime = s => {
+  const formatTime = useCallback((s) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
-  };
+  }, []);
 
-  const handleChange = (text, idx) => {
-    const newOtp = [...otp];
-    newOtp[idx] = text;
-    setOtp(newOtp);
-    if (text && idx < OTP_LENGTH - 1) {
-      inputRefs.current[idx + 1]?.current?.focus();
-      setFocused(idx + 1);
-    }
-  };
+  const handleChange = useCallback(
+    (text, idx) => {
+      const newOtp = [...otp];
+      newOtp[idx] = text;
+      setOtp(newOtp);
+      if (text && idx < OTP_LENGTH - 1) {
+        inputRefs.current[idx + 1]?.current?.focus();
+        setFocused(idx + 1);
+      }
+    },
+    [otp]
+  );
 
-  const handleKeyPress = ({ nativeEvent: { key } }, idx) => {
-    if (key === 'Backspace' && !otp[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.current?.focus();
-      setFocused(idx - 1);
-    }
-  };
+  const handleKeyPress = useCallback(
+    ({ nativeEvent: { key } }, idx) => {
+      if (key === 'Backspace' && !otp[idx] && idx > 0) {
+        inputRefs.current[idx - 1]?.current?.focus();
+        setFocused(idx - 1);
+      }
+    },
+    [otp]
+  );
 
-  const handleResend = () => setSeconds(272);
+  const handleResend = useCallback(() => setSeconds(272), []);
 
-  const handleVerify = () => navigation.navigate('NewPasswordScreen');
+  const handleVerify = useCallback(
+    () => navigation.navigate('NewPasswordScreen'),
+    [navigation]
+  );
 
   return (
-    <SafeAreaView style={s.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
 
       <KeyboardAvoidingView
-        style={s.kav}
+        style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={s.centreWrap}>
-          {/* ── Envelope icon from library ── */}
+        <View style={styles.centreWrap}>
           <Animated.View
-            style={[s.iconCircle, { transform: [{ scale: iconScale }] }]}
+            style={[styles.iconCircle, { transform: [{ scale: iconScale }] }]}
           >
-            <Icon
-              name="email-outline" // MaterialCommunityIcons envelope
-              size={38}
-              color={C.teal}
-            />
+            <Icon name="email-outline" size={38} color={COLORS.teal} />
           </Animated.View>
 
-          {/* ── Text content ── */}
           <Animated.View
             style={[
-              s.textBlock,
+              styles.textBlock,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
               },
             ]}
           >
-            <Text style={s.headline}>Verify Your Email</Text>
-            <Text style={s.subtitle}>We sent a 6-digit code to</Text>
-            <Text style={s.emailText}>{email}</Text>
+            <Text style={styles.headline}>Verify Your Email</Text>
+            <Text style={styles.subtitle}>We sent a 6-digit code to</Text>
+            <Text style={styles.emailText}>{email}</Text>
           </Animated.View>
 
-          {/* ── OTP boxes ── */}
           <Animated.View
             style={[
-              s.otpRow,
+              styles.otpRow,
               {
                 opacity: fadeAnim,
                 transform: [{ translateY: slideAnim }],
@@ -201,41 +181,38 @@ const SendResetCode = ({ navigation, route }) => {
                 value={val}
                 isFocused={focused === idx}
                 inputRef={inputRefs.current[idx]}
-                onChangeText={text => handleChange(text, idx)}
-                onKeyPress={e => handleKeyPress(e, idx)}
+                onChangeText={(text) => handleChange(text, idx)}
+                onKeyPress={(e) => handleKeyPress(e, idx)}
               />
             ))}
           </Animated.View>
 
-          {/* ── Expiry badge ── */}
-          <Animated.View style={[s.expiryBadge, { opacity: fadeAnim }]}>
-            <Icon name="clock-outline" size={16} color={C.amber} />
-            <Text style={s.expiryText}>
+          <Animated.View style={[styles.expiryBadge, { opacity: fadeAnim }]}>
+            <Icon name="clock-outline" size={16} color={COLORS.amber} />
+            <Text style={styles.expiryText}>
               {seconds > 0
                 ? `Expires in ${formatTime(seconds)}`
                 : 'Code expired'}
             </Text>
           </Animated.View>
 
-          {/* ── Verify button ── */}
-          <Animated.View style={[s.btnWrap, { opacity: fadeAnim }]}>
+          <Animated.View style={[styles.btnWrap, { opacity: fadeAnim }]}>
             <TouchableOpacity onPress={handleVerify} activeOpacity={0.85}>
               <LinearGradient
-                colors={[C.teal, C.tealDark]}
+                colors={[COLORS.teal, COLORS.tealDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={s.verifyBtn}
+                style={styles.verifyBtn}
               >
-                <Text style={s.verifyBtnText}>Verify</Text>
+                <Text style={styles.verifyBtnText}>Verify</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
 
-          {/* ── Resend link ── */}
-          <Animated.View style={[s.resendRow, { opacity: fadeAnim }]}>
-            <Text style={s.resendText}>{"Didn't get the code? "}</Text>
+          <Animated.View style={[styles.resendRow, { opacity: fadeAnim }]}>
+            <Text style={styles.resendText}>{"Didn't get the code? "}</Text>
             <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
-              <Text style={s.resendLink}>Resend</Text>
+              <Text style={styles.resendLink}>Resend</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -244,63 +221,30 @@ const SendResetCode = ({ navigation, route }) => {
   );
 };
 
-export default SendResetCode;
-
-// ── OTP box styles ─────────────────────────────────────────
-const otpStyle = StyleSheet.create({
-  box: {
-    width: 52,
-    height: 56,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: C.boxBorder,
-    backgroundColor: C.boxFill,
-    fontSize: 22,
-    fontWeight: '700',
-    color: C.textDark,
-    textAlign: 'center',
-  },
-  boxFilled: {
-    borderColor: C.teal,
-    backgroundColor: 'rgba(0,180,204,0.06)',
-  },
-  boxFocused: {
-    borderColor: C.teal,
-    borderWidth: 2,
-  },
-});
-
-// ── Screen styles ──────────────────────────────────────────
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: COLORS.bg,
   },
-
-  kav: { flex: 1 },
-
-  // ✅ All content centred vertically and horizontally
+  keyboardView: {
+    flex: 1,
+  },
   centreWrap: {
     flex: 1,
-    justifyContent: 'center', // ← vertical centre
-    alignItems: 'center', // ← horizontal centre
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 28,
     paddingVertical: 24,
   },
-
-  // ── Envelope icon circle ──
-  // ✅ Real icon from MaterialCommunityIcons: 'email-outline'
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: C.tealLight,
+    backgroundColor: COLORS.tealLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
-
-  // ── Text block ──
   textBlock: {
     alignItems: 'center',
     marginBottom: 28,
@@ -308,35 +252,51 @@ const s = StyleSheet.create({
   headline: {
     fontSize: 22,
     fontWeight: '800',
-    color: C.textDark,
+    color: COLORS.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 14,
-    color: C.textGray,
+    color: COLORS.textGray,
     marginBottom: 3,
     textAlign: 'center',
   },
   emailText: {
     fontSize: 14,
-    color: C.teal,
+    color: COLORS.teal,
     fontWeight: '700',
     textAlign: 'center',
   },
-
-  // ── OTP row ──
   otpRow: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: 20,
   },
-
-  // ── Expiry badge ──
+  otpBox: {
+    width: 52,
+    height: 56,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.boxBorder,
+    backgroundColor: COLORS.boxFill,
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    textAlign: 'center',
+  },
+  otpBoxFilled: {
+    borderColor: COLORS.teal,
+    backgroundColor: 'rgba(0,180,204,0.06)',
+  },
+  otpBoxFocused: {
+    borderColor: COLORS.teal,
+    borderWidth: 2,
+  },
   expiryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.amberLight,
+    backgroundColor: COLORS.amberLight,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -345,19 +305,20 @@ const s = StyleSheet.create({
   },
   expiryText: {
     fontSize: 13,
-    color: C.amber,
+    color: COLORS.amber,
     fontWeight: '700',
   },
-
-  // ── Verify button ──
-  btnWrap: { width: '100%', marginBottom: 20 },
+  btnWrap: {
+    width: '100%',
+    marginBottom: 20,
+  },
   verifyBtn: {
     width: '100%',
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
     elevation: 3,
-    shadowColor: C.teal,
+    shadowColor: COLORS.teal,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -367,12 +328,19 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-
-  // ── Resend row ──
   resendRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  resendText: { fontSize: 13, color: C.textGray },
-  resendLink: { fontSize: 13, color: C.teal, fontWeight: '700' },
+  resendText: {
+    fontSize: 13,
+    color: COLORS.textGray,
+  },
+  resendLink: {
+    fontSize: 13,
+    color: COLORS.teal,
+    fontWeight: '700',
+  },
 });
+
+export default SendResetCode;

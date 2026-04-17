@@ -1,6 +1,4 @@
-// src/screens/auth/NewPassword.jsx
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,8 +13,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
-// ── Colours ────────────────────────────────────────────────
-const C = {
+const COLORS = {
   bg: '#FFFFFF',
   teal: '#00B4CC',
   tealDark: '#0097AA',
@@ -30,49 +27,48 @@ const C = {
   border: '#E5E7EB',
 };
 
-// ── Password strength calculator ──────────────────────────
-const getStrength = pass => {
-  if (!pass) return { score: 0, label: '', color: C.border };
+const getPasswordStrength = (password) => {
+  if (!password) return { score: 0, label: '', color: COLORS.border };
+  
   let score = 0;
-  if (pass.length >= 8) score++;
-  if (/[A-Z]/.test(pass)) score++;
-  if (/[0-9]/.test(pass)) score++;
-  if (/[^A-Za-z0-9]/.test(pass)) score++;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
 
-  const map = [
-    { label: '', color: C.border },
-    { label: 'Weak', color: C.red },
-    { label: 'Fair', color: C.amber },
-    { label: 'Good', color: C.teal },
-    { label: 'Strong', color: C.green },
+  const strengthMap = [
+    { label: '', color: COLORS.border },
+    { label: 'Weak', color: COLORS.red },
+    { label: 'Fair', color: COLORS.amber },
+    { label: 'Good', color: COLORS.teal },
+    { label: 'Strong', color: COLORS.green },
   ];
-  return { score, ...map[score] };
+  
+  return { score, ...strengthMap[score] };
 };
 
-// ── Strength bar ───────────────────────────────────────────
 const StrengthBar = ({ password }) => {
-  const { score, label, color } = getStrength(password);
+  const { score, label, color } = getPasswordStrength(password);
   if (!password) return null;
 
   return (
-    <View style={sb.wrap}>
-      <View style={sb.track}>
-        {[1, 2, 3, 4].map(i => (
+    <View style={styles.strengthWrap}>
+      <View style={styles.strengthTrack}>
+        {[1, 2, 3, 4].map((i) => (
           <View
             key={i}
             style={[
-              sb.segment,
-              { backgroundColor: i <= score ? color : C.border },
+              styles.strengthSegment,
+              { backgroundColor: i <= score ? color : COLORS.border },
             ]}
           />
         ))}
       </View>
-      <Text style={[sb.label, { color }]}>{label}</Text>
+      <Text style={[styles.strengthLabel, { color }]}>{label}</Text>
     </View>
   );
 };
 
-// ── Main screen ────────────────────────────────────────────
 const NewPasswordScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -106,47 +102,48 @@ const NewPasswordScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim, iconScale]);
+  }, [fadeAnim, slideAnim, iconScale ]);
 
   const passwordsMatch = confirm.length > 0 && password === confirm;
   const passwordMismatch = confirm.length > 0 && password !== confirm;
 
+  const handleResetPassword = useCallback(() => {
+    navigation.navigate('Login');
+  }, [navigation]);
+
   return (
-    <View style={s.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={s.inner}>
+        <View style={styles.inner}>
           <Animated.View
             style={[
-              s.content,
+              styles.content,
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
-            {/* Icon */}
             <Animated.View
-              style={[s.iconCircle, { transform: [{ scale: iconScale }] }]}
+              style={[styles.iconCircle, { transform: [{ scale: iconScale }] }]}
             >
-              <Icons name="lock" size={28} color={C.teal} />
+              <Icons name="lock" size={28} color={COLORS.teal} />
             </Animated.View>
 
-            {/* Headline */}
-            <Text style={s.headline}>New Password</Text>
-            <Text style={s.subtitle}>
+            <Text style={styles.headline}>New Password</Text>
+            <Text style={styles.subtitle}>
               Your new password must be different from previous used passwords.
             </Text>
 
-            {/* Password */}
-            <View style={s.fieldWrap}>
-              <View style={[s.inputRow, passFocused && s.inputFocused]}>
-                <Icons name="lock" size={16} color={C.textGray} />
+            <View style={styles.fieldWrap}>
+              <View style={[styles.inputRow, passFocused && styles.inputFocused]}>
+                <Icons name="lock" size={16} color={COLORS.textGray} />
                 <TextInput
-                  style={s.input}
+                  style={styles.input}
                   placeholder="••••••••••••"
-                  placeholderTextColor={C.textLight}
+                  placeholderTextColor={COLORS.textLight}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPass}
@@ -158,7 +155,7 @@ const NewPasswordScreen = ({ navigation }) => {
                   <Icons
                     name={showPass ? 'eye-off' : 'eye'}
                     size={18}
-                    color={C.textGray}
+                    color={COLORS.textGray}
                   />
                 </TouchableOpacity>
               </View>
@@ -166,20 +163,19 @@ const NewPasswordScreen = ({ navigation }) => {
               <StrengthBar password={password} />
             </View>
 
-            {/* Confirm Password */}
-            <View style={s.fieldWrap}>
+            <View style={styles.fieldWrap}>
               <View
                 style={[
-                  s.inputRow,
-                  confFocused && s.inputFocused,
-                  passwordMismatch && s.inputError,
+                  styles.inputRow,
+                  confFocused && styles.inputFocused,
+                  passwordMismatch && styles.inputError,
                 ]}
               >
-                <Icons name="lock" size={16} color={C.textGray} />
+                <Icons name="lock" size={16} color={COLORS.textGray} />
                 <TextInput
-                  style={s.input}
+                  style={styles.input}
                   placeholder="••••••••••••"
-                  placeholderTextColor={C.textLight}
+                  placeholderTextColor={COLORS.textLight}
                   value={confirm}
                   onChangeText={setConfirm}
                   secureTextEntry={!showConfirm}
@@ -191,27 +187,29 @@ const NewPasswordScreen = ({ navigation }) => {
                   <Icons
                     name={showConfirm ? 'eye-off' : 'eye'}
                     size={18}
-                    color={C.textGray}
+                    color={COLORS.textGray}
                   />
                 </TouchableOpacity>
               </View>
 
               {passwordsMatch && (
-                <Text style={s.matchText}>✓ Passwords match</Text>
+                <Text style={styles.matchText}>✓ Passwords match</Text>
               )}
               {passwordMismatch && (
-                <Text style={s.mismatchText}>✗ Passwords do not match</Text>
+                <Text style={styles.mismatchText}>✗ Passwords do not match</Text>
               )}
             </View>
 
-            {/* Button */}
             <TouchableOpacity
-              onPress={() => navigation.navigate('Login')}
+              onPress={handleResetPassword}
               activeOpacity={0.85}
-              style={{ width: '100%' }}
+              style={styles.buttonWrap}
             >
-              <LinearGradient colors={[C.teal, C.tealDark]} style={s.resetBtn}>
-                <Text style={s.resetBtnText}>Reset Password</Text>
+              <LinearGradient
+                colors={[COLORS.teal, COLORS.tealDark]}
+                style={styles.resetBtn}
+              >
+                <Text style={styles.resetBtnText}>Reset Password</Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
@@ -221,23 +219,14 @@ const NewPasswordScreen = ({ navigation }) => {
   );
 };
 
-export default NewPasswordScreen;
-
-// ── Strength bar styles ────────────────────────────────────
-const sb = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  track: { flex: 1, flexDirection: 'row', gap: 4 },
-  segment: { flex: 1, height: 4, borderRadius: 2 },
-  label: { fontSize: 12, fontWeight: '700', minWidth: 50, textAlign: 'right' },
-});
-
-// ── Screen styles ──────────────────────────────────────────
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: COLORS.bg,
   },
-
+  keyboardView: {
+    flex: 1,
+  },
   inner: {
     flex: 1,
     justifyContent: 'center',
@@ -246,77 +235,97 @@ const s = StyleSheet.create({
     paddingBottom: 36,
     paddingTop: 20,
   },
-
   content: {
     width: '100%',
-    maxWidth: 420, // ✅ responsive magic
+    maxWidth: 420,
     alignItems: 'center',
   },
-
   iconCircle: {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: C.tealLight,
+    backgroundColor: COLORS.tealLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 22,
   },
-
   headline: {
     fontSize: 24,
     fontWeight: '800',
-    color: C.textDark,
+    color: COLORS.textDark,
     marginBottom: 10,
     textAlign: 'center',
   },
-
   subtitle: {
     fontSize: 14,
-    color: C.textGray,
+    color: COLORS.textGray,
     textAlign: 'center',
     lineHeight: 21,
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-
-  fieldWrap: { width: '100%', marginBottom: 16 },
-
+  fieldWrap: {
+    width: '100%',
+    marginBottom: 16,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: COLORS.border,
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
     height: 50,
   },
-
-  inputFocused: { borderColor: C.teal },
-  inputError: { borderColor: C.red },
-
+  inputFocused: {
+    borderColor: COLORS.teal,
+  },
+  inputError: {
+    borderColor: COLORS.red,
+  },
   input: {
     flex: 1,
     fontSize: 15,
-    color: C.textDark,
+    color: COLORS.textDark,
     marginLeft: 10,
   },
-
+  strengthWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  strengthTrack: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  strengthSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  strengthLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    minWidth: 50,
+    textAlign: 'right',
+  },
   matchText: {
     marginTop: 6,
     fontSize: 12,
-    color: C.green,
+    color: COLORS.green,
     fontWeight: '600',
   },
-
   mismatchText: {
     marginTop: 6,
     fontSize: 12,
-    color: C.red,
+    color: COLORS.red,
     fontWeight: '600',
   },
-
+  buttonWrap: {
+    width: '100%',
+  },
   resetBtn: {
     width: '100%',
     paddingVertical: 16,
@@ -324,10 +333,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
-
   resetBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
 });
+
+export default NewPasswordScreen;

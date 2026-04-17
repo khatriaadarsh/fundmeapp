@@ -757,7 +757,7 @@ const CampaignDetail = ({ navigation }) => {
   const handleBack    = useCallback(() => navigation?.goBack?.(), [navigation]);
   const handleShare   = useCallback(() => {}, []);
   const handleSave    = useCallback(() => setSaved(v => !v), []);
-  const handleDonate  = useCallback(() => navigation?.navigate?.('Donate'), [navigation]);
+  const handleDonate  = useCallback(() => navigation?.navigate?.('DonateScreen'), [navigation]);
   const handleProfile = useCallback(() => {}, []);
 
   return (

@@ -11,636 +11,155 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  Animated,
-  Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
+import { Animated as RNAnimated, Easing } from 'react-native';
 
-// ═══════════════════════════════════════════════════════════
-// Responsive Scale
-// ═══════════════════════════════════════════════════════════
+// THEME & DATA IMPORTS
+import { P, sp } from '../../theme/theme';
+import { WITHDRAWAL_DATA, PAYMENT_METHODS } from '../../constants/mockData';
+
 const { width: SW, height: SH } = Dimensions.get('window');
 const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
-
-// ═══════════════════════════════════════════════════════════
-// Design Tokens
-// ═══════════════════════════════════════════════════════════
-const C = {
-  pageBg: '#F4F6F9',
-  white: '#FFFFFF',
-  primary: '#0A3D62',
-  teal: '#15AABF',
-  textDark: '#111827',
-  textGray: '#6B7280',
-  textLight: '#9CA3AF',
-  border: '#E5E7EB',
-  success: '#16A34A',
-  warning: '#D97706',
-  warningBg: '#FEF3C7',
-  warningBorder: '#FDE68A',
-  selectedBg: '#EFF6FF',
-  selectedBorder: '#0A3D62',
-};
-
-// ═══════════════════════════════════════════════════════════
-// Static Data
-// ═══════════════════════════════════════════════════════════
-const CAMPAIGN = {
-  title: "Help Fatima's Heart Surgery",
-  raised: 325000,
-  withdrawn: 100000,
-  available: 225000,
-};
-
-const PAYMENT_METHODS = [
-  { id: 'easypaisa', label: 'EasyPaisa', placeholder: '03XX XXXXXXX' },
-  { id: 'jazzcash', label: 'JazzCash', placeholder: '03XX XXXXXXX' },
-  { id: 'bank', label: 'Bank Transfer', placeholder: 'IBAN / Account Number' },
-];
-
-const formatPKR = n => n.toLocaleString('en-PK');
-
 const BUTTON_HEIGHT = vscale(54);
 const FULL_WIDTH = SW - scale(32);
+const formatPKR = n => n.toLocaleString('en-PK');
 
 // ═══════════════════════════════════════════════════════════
-// ✅ ANIMATED SUBMIT BUTTON
-// idle → loading (shrinks to circle + spins) →
-// success (ripples + color + check + expands) →
-// auto navigate after 1.8s
+// VALIDATION HELPERS
+// ═══════════════════════════════════════════════════════════
+const validateAccountNumber = (val) => {
+  if (!val || val.trim().length === 0) return ''; 
+  const regex = /^0\d{10}$/; 
+  if (val.length === 11 && !regex.test(val)) return 'Must start with 0 (11 digits total)';
+  if (val.length < 11) return `${11 - val.length} more digit(s)`;
+  return '';
+};
+
+const validateTitle = (val) => {
+  if (!val || val.trim().length === 0) return ''; 
+  if (val.length > 0 && val.length < 3) return 'Min 3 characters';
+  return '';
+};
+
+// ═══════════════════════════════════════════════════════════
+// ANIMATED BUTTON
 // ═══════════════════════════════════════════════════════════
 const AnimatedSubmitButton = ({ state, onPress }) => {
-  // Width: 0 = circle, 1 = full
-  const widthAnim = useRef(new Animated.Value(1)).current;
-  const radiusAnim = useRef(new Animated.Value(scale(12))).current;
-
-  // Colors
-  const bgAnim = useRef(new Animated.Value(0)).current; // 0=primary,1=success
-
-  // Idle text
-  const idleOpacity = useRef(new Animated.Value(1)).current;
-
-  // Spinner
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  const spinOpacity = useRef(new Animated.Value(0)).current;
-  const spinPulse = useRef(new Animated.Value(1)).current;
+  const widthAnim = useRef(new RNAnimated.Value(1)).current;
+  const radiusAnim = useRef(new RNAnimated.Value(scale(12))).current;
+  const bgAnim = useRef(new RNAnimated.Value(0)).current; 
+  const idleOpacity = useRef(new RNAnimated.Value(1)).current;
+  
+  const spinAnim = useRef(new RNAnimated.Value(0)).current;
+  const spinOpacity = useRef(new RNAnimated.Value(0)).current;
   const spinLoop = useRef(null);
-  const pulseLoop = useRef(null);
+  const spinPulse = useRef(new RNAnimated.Value(1)).current;
 
-  // Ripples (3 layers)
-  const ripple1 = useRef(new Animated.Value(0)).current;
-  const ripple2 = useRef(new Animated.Value(0)).current;
-  const ripple3 = useRef(new Animated.Value(0)).current;
-  const ripple1Op = useRef(new Animated.Value(0)).current;
-  const ripple2Op = useRef(new Animated.Value(0)).current;
-  const ripple3Op = useRef(new Animated.Value(0)).current;
+  const ripple1 = useRef(new RNAnimated.Value(0)).current;
+  const ripple1Op = useRef(new RNAnimated.Value(0)).current;
+  
+  const checkScale = useRef(new RNAnimated.Value(0)).current;
+  const checkOpacity = useRef(new RNAnimated.Value(0)).current;
+  
+  const textOpacity = useRef(new RNAnimated.Value(0)).current;
+  const textTranslate = useRef(new RNAnimated.Value(14)).current;
 
-  // Check icon
-  const checkScale = useRef(new Animated.Value(0)).current;
-  const checkOpacity = useRef(new Animated.Value(0)).current;
-  const checkRotate = useRef(new Animated.Value(-45)).current;
-
-  // Success text
-  const textOpacity = useRef(new Animated.Value(0)).current;
-  const textTranslate = useRef(new Animated.Value(14)).current;
-
-  // Shine sweep
-  const shineX = useRef(new Animated.Value(-1)).current;
-  const shineOpacity = useRef(new Animated.Value(0)).current;
-
-  // ── Stop all loops cleanly ───────────────────────────────
   const stopLoops = useCallback(() => {
     spinLoop.current?.stop();
-    pulseLoop.current?.stop();
   }, []);
 
   useEffect(() => {
     if (state === 'loading') {
-      // 1. Fade out idle text
-      Animated.timing(idleOpacity, {
-        toValue: 0,
-        duration: 160,
-        useNativeDriver: true,
-      }).start();
-
-      // 2. Morph to circle
-      Animated.parallel([
-        Animated.spring(widthAnim, {
-          toValue: 0,
-          tension: 70,
-          friction: 11,
-          useNativeDriver: false,
-        }),
-        Animated.spring(radiusAnim, {
-          toValue: BUTTON_HEIGHT / 2,
-          tension: 70,
-          friction: 11,
-          useNativeDriver: false,
-        }),
+      RNAnimated.timing(idleOpacity, { toValue: 0, duration: 160, useNativeDriver: true }).start();
+      
+      RNAnimated.parallel([
+        RNAnimated.spring(widthAnim, { toValue: 0, tension: 70, friction: 11, useNativeDriver: false }),
+        RNAnimated.spring(radiusAnim, { toValue: BUTTON_HEIGHT / 2, tension: 70, friction: 11, useNativeDriver: false }),
       ]).start(() => {
-        // 3. Show spinner + start loops
-        Animated.timing(spinOpacity, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }).start();
-
-        spinLoop.current = Animated.loop(
-          Animated.timing(spinAnim, {
-            toValue: 1,
-            duration: 750,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
+        RNAnimated.timing(spinOpacity, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+        
+        spinLoop.current = RNAnimated.loop(
+          RNAnimated.timing(spinAnim, { toValue: 1, duration: 750, easing: Easing.linear, useNativeDriver: true })
         );
         spinLoop.current.start();
-
-        // Pulse the circle
-        pulseLoop.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(spinPulse, {
-              toValue: 1.08,
-              duration: 550,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: false,
-            }),
-            Animated.timing(spinPulse, {
-              toValue: 1,
-              duration: 550,
-              easing: Easing.inOut(Easing.ease),
-              useNativeDriver: false,
-            }),
-          ]),
-        );
-        pulseLoop.current.start();
       });
-    }
-
-    if (state === 'success') {
+    } else if (state === 'success') {
       stopLoops();
       spinAnim.setValue(0);
 
-      Animated.sequence([
-        // Step 1 — hide spinner instantly
-        Animated.timing(spinOpacity, {
-          toValue: 0,
-          duration: 120,
-          useNativeDriver: true,
-        }),
-
-        // Step 2 — triple ripple burst + color change simultaneously
-        Animated.parallel([
-          // Ripple 1 — fastest
-          Animated.sequence([
-            Animated.timing(ripple1Op, {
-              toValue: 0.8,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.parallel([
-              Animated.timing(ripple1, {
-                toValue: 1,
-                duration: 400,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-              }),
-              Animated.timing(ripple1Op, {
-                toValue: 0,
-                duration: 400,
-                useNativeDriver: true,
-              }),
-            ]),
-          ]),
-          // Ripple 2 — medium delay
-          Animated.sequence([
-            Animated.delay(80),
-            Animated.timing(ripple2Op, {
-              toValue: 0.6,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.parallel([
-              Animated.timing(ripple2, {
-                toValue: 1,
-                duration: 450,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-              }),
-              Animated.timing(ripple2Op, {
-                toValue: 0,
-                duration: 450,
-                useNativeDriver: true,
-              }),
-            ]),
-          ]),
-          // Ripple 3 — slowest
-          Animated.sequence([
-            Animated.delay(160),
-            Animated.timing(ripple3Op, {
-              toValue: 0.4,
-              duration: 80,
-              useNativeDriver: true,
-            }),
-            Animated.parallel([
-              Animated.timing(ripple3, {
-                toValue: 1,
-                duration: 500,
-                easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
-              }),
-              Animated.timing(ripple3Op, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-              }),
-            ]),
-          ]),
-          // Color flip to green
-          Animated.timing(bgAnim, {
-            toValue: 1,
-            duration: 380,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: false,
-          }),
-        ]),
-
-        // Step 3 — check icon pops in with rotation + bounce
-        Animated.parallel([
-          Animated.spring(checkScale, {
-            toValue: 1,
-            tension: 220,
-            friction: 5,
-            useNativeDriver: true,
-          }),
-          Animated.timing(checkOpacity, {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-          Animated.spring(checkRotate, {
-            toValue: 0,
-            tension: 180,
-            friction: 6,
-            useNativeDriver: true,
-          }),
-        ]),
-
-        // Step 4 — expand back to full width with spring overshoot
-        Animated.parallel([
-          Animated.spring(widthAnim, {
-            toValue: 1,
-            tension: 55,
-            friction: 7,
-            useNativeDriver: false,
-          }),
-          Animated.spring(radiusAnim, {
-            toValue: scale(12),
-            tension: 55,
-            friction: 7,
-            useNativeDriver: false,
-          }),
-          Animated.spring(spinPulse, {
-            toValue: 1,
-            tension: 80,
-            friction: 8,
-            useNativeDriver: false,
-          }),
-        ]),
-
-        // Step 5 — shine sweep across button
-        Animated.parallel([
-          Animated.timing(shineOpacity, {
-            toValue: 1,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(shineX, {
-            toValue: 2,
-            duration: 600,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ]),
-
-        // Step 6 — success text slides up
-        Animated.parallel([
-          Animated.timing(textOpacity, {
-            toValue: 1,
-            duration: 280,
-            useNativeDriver: true,
-          }),
-          Animated.spring(textTranslate, {
-            toValue: 0,
-            tension: 65,
-            friction: 9,
-            useNativeDriver: true,
-          }),
-        ]),
+      RNAnimated.sequence([
+        RNAnimated.timing(spinOpacity, { toValue: 0, duration: 120, useNativeDriver: true }),
+        RNAnimated.parallel([
+           RNAnimated.sequence([
+             RNAnimated.timing(ripple1Op, { toValue: 0.8, duration: 80, useNativeDriver: true }),
+             RNAnimated.parallel([
+                RNAnimated.timing(ripple1, { toValue: 1, duration: 400, useNativeDriver: true }),
+                RNAnimated.timing(ripple1Op, { toValue: 0, duration: 400, useNativeDriver: true })
+             ])
+           ]),
+           RNAnimated.timing(bgAnim, { toValue: 1, duration: 380, useNativeDriver: false }),
+           RNAnimated.parallel([
+              RNAnimated.spring(checkScale, { toValue: 1, tension: 220, friction: 5, useNativeDriver: true }),
+              RNAnimated.timing(checkOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+              RNAnimated.timing(textOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+              RNAnimated.spring(textTranslate, { toValue: 0, tension: 65, friction: 9, useNativeDriver: true }),
+              RNAnimated.spring(widthAnim, { toValue: 1, tension: 55, friction: 7, useNativeDriver: false }),
+              RNAnimated.spring(radiusAnim, { toValue: scale(12), tension: 55, friction: 7, useNativeDriver: false })
+           ])
+        ])
       ]).start();
     }
-
     return () => stopLoops();
-  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state,bgAnim,checkOpacity,checkScale,idleOpacity,spinAnim,spinOpacity,textTranslate,widthAnim,radiusAnim,stopLoops,ripple1,ripple1Op,textOpacity]);
 
-  // ── Interpolations ────────────────────────────────────────
-  const animWidth = widthAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [BUTTON_HEIGHT, FULL_WIDTH],
-  });
-
-  const bgColor = bgAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [C.primary, C.success],
-  });
-
-  const spinRotate = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const checkDeg = checkRotate.interpolate({
-    inputRange: [-45, 0],
-    outputRange: ['-45deg', '0deg'],
-  });
-
-  const makeRippleSize = anim =>
-    anim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, BUTTON_HEIGHT * 2.8],
-    });
-
-  const shineTranslate = shineX.interpolate({
-    inputRange: [-1, 2],
-    outputRange: [-FULL_WIDTH * 0.5, FULL_WIDTH * 1.5],
-  });
-
-  const isIdle = state === 'idle';
+  const animWidth = widthAnim.interpolate({ inputRange: [0, 1], outputRange: [BUTTON_HEIGHT, FULL_WIDTH] });
+  const bgColor = bgAnim.interpolate({ inputRange: [0, 1], outputRange: [P.darkOcean || '#0A3D62', P.green || '#10B981'] });
+  const spinRotate = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Animated.View
-      style={[
-        s.btnOuter,
-        {
-          width: animWidth,
-          borderRadius: radiusAnim,
-          backgroundColor: bgColor,
-          transform: [{ scale: spinPulse }],
-        },
-      ]}
-    >
+    <RNAnimated.View style={[styles.btnOuter, { width: animWidth, borderRadius: radiusAnim, backgroundColor: bgColor, transform: [{ scale: spinPulse }] }]}>
       <TouchableOpacity
-        style={s.btnTouchable}
-        onPress={isIdle ? onPress : undefined}
-        disabled={!isIdle}
+        style={styles.btnTouchable}
+        onPress={state === 'idle' ? onPress : undefined}
+        disabled={state !== 'idle'}
         activeOpacity={0.88}
       >
-        {/* ── RIPPLE LAYERS ────────────────────────────── */}
-        {[
-          [ripple1, ripple1Op],
-          [ripple2, ripple2Op],
-          [ripple3, ripple3Op],
-        ].map(([r, o], i) => (
-          <Animated.View
-            key={i}
-            style={[
-              s.rippleLayer,
-              {
-                width: makeRippleSize(r),
-                height: makeRippleSize(r),
-                borderRadius: BUTTON_HEIGHT * 2.8,
-                opacity: o,
-              },
-            ]}
-          />
-        ))}
-
-        {/* ── SHINE SWEEP ──────────────────────────────── */}
-        <Animated.View
-          style={[
-            s.shine,
-            {
-              opacity: shineOpacity,
-              transform: [{ translateX: shineTranslate }],
-            },
-          ]}
-        />
-
-        {/* ── IDLE TEXT ────────────────────────────────── */}
-        <Animated.Text style={[s.btnText, { opacity: idleOpacity }]}>
-          Submit Request
-        </Animated.Text>
-
-        {/* ── SPINNER ──────────────────────────────────── */}
-        <Animated.View
-          style={[s.absoluteCenter, { opacity: spinOpacity }]}
-          pointerEvents="none"
-        >
-          {/* Faint track ring */}
-          <View style={ss.trackRing} />
-          {/* Gradient-like arc — two overlapping arcs */}
-          <Animated.View
-            style={[ss.arc1, { transform: [{ rotate: spinRotate }] }]}
-          />
-          <Animated.View
-            style={[ss.arc2, { transform: [{ rotate: spinRotate }] }]}
-          />
-          {/* Bright leading dot */}
-          <Animated.View
-            style={[ss.leadDot, { transform: [{ rotate: spinRotate }] }]}
-          />
-        </Animated.View>
-
-        {/* ── SUCCESS CONTENT ───────────────────────────── */}
-        <Animated.View
-          style={[
-            s.absoluteCenter,
-            s.successRow,
-            {
-              opacity: textOpacity,
-              transform: [{ translateY: textTranslate }],
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <Animated.View
-            style={{
-              transform: [{ scale: checkScale }, { rotate: checkDeg }],
-              opacity: checkOpacity,
-            }}
-          >
-            <Icons name="check-circle" size={scale(22)} color={C.white} />
-          </Animated.View>
-          <Text style={s.successText}>Submitted Successfully!</Text>
-        </Animated.View>
+        <RNAnimated.View style={[styles.rippleLayer, { width: ripple1, height: ripple1, opacity: ripple1Op, borderRadius: BUTTON_HEIGHT * 1.4 }]} />
+        <RNAnimated.Text style={[styles.btnText, { opacity: idleOpacity }]}>Submit Request</RNAnimated.Text>
+        <RNAnimated.View style={[styles.absoluteCenter, { opacity: spinOpacity }]}>
+           <RNAnimated.View style={{ transform: [{ rotate: spinRotate }] }}>
+               <Icons name="loader" size={sp(22)} color="#FFFFFF" />
+           </RNAnimated.View>
+        </RNAnimated.View>
+        <RNAnimated.View style={[styles.absoluteCenter, styles.successRow, { opacity: textOpacity, transform: [{ translateY: textTranslate }] }]}>
+           <RNAnimated.View style={{ transform: [{ scale: checkScale }], opacity: checkOpacity }}>
+              <Icons name="check-circle" size={scale(22)} color={P.white} />
+           </RNAnimated.View>
+           <Text style={styles.successText}>Submitted Successfully!</Text>
+        </RNAnimated.View>
       </TouchableOpacity>
-    </Animated.View>
+    </RNAnimated.View>
   );
 };
 
-// Spinner sub-styles
-const ss = StyleSheet.create({
-  trackRing: {
-    position: 'absolute',
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
-    borderWidth: scale(2.8),
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
-  arc1: {
-    position: 'absolute',
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
-    borderWidth: scale(2.8),
-    borderColor: 'transparent',
-    borderTopColor: C.white,
-  },
-  arc2: {
-    position: 'absolute',
-    width: scale(28),
-    height: scale(28),
-    borderRadius: scale(14),
-    borderWidth: scale(2.8),
-    borderColor: 'transparent',
-    borderRightColor: 'rgba(255,255,255,0.55)',
-  },
-  leadDot: {
-    position: 'absolute',
-    top: scale(0),
-    alignSelf: 'center',
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
-    backgroundColor: C.white,
-    marginTop: -scale(1),
-    shadowColor: C.white,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-});
-
-// ═══════════════════════════════════════════════════════════
-// HEADER
-// ═══════════════════════════════════════════════════════════
-const Header = ({ onBack }) => (
-  <View style={s.header}>
-    <TouchableOpacity
-      onPress={onBack}
-      style={s.headerBack}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
-    </TouchableOpacity>
-    <Text style={s.headerTitle}>Request Withdrawal</Text>
-    <View style={s.headerBack} />
-  </View>
-);
-
-// ═══════════════════════════════════════════════════════════
-// CAMPAIGN CARD
-// ═══════════════════════════════════════════════════════════
-const CampaignCard = ({ campaign }) => (
-  <View style={s.card}>
-    <Text style={s.campaignTitle} numberOfLines={1}>
-      {campaign.title}
-    </Text>
-    <Text style={s.balanceLabel}>Available Balance</Text>
-    <Text style={s.balanceAmount}>PKR {formatPKR(campaign.available)}</Text>
-    <View style={s.statsRow}>
-      <Text style={s.statItem}>
-        Raised: <Text style={s.statValue}>{formatPKR(campaign.raised)}</Text>
-      </Text>
-      <Text style={s.statItem}>
-        Withdrawn:{' '}
-        <Text style={s.statValue}>{formatPKR(campaign.withdrawn)}</Text>
-      </Text>
-    </View>
-  </View>
-);
-
-// ═══════════════════════════════════════════════════════════
-// SECTION LABEL
-// ═══════════════════════════════════════════════════════════
-const SectionLabel = ({ label }) => <Text style={s.sectionLabel}>{label}</Text>;
-
-// ═══════════════════════════════════════════════════════════
-// AMOUNT INPUT
-// ═══════════════════════════════════════════════════════════
-const AmountInput = ({ value, onChange }) => (
-  <View style={s.amountBox}>
-    <Text style={s.amountPrefix}>PKR</Text>
-    <View style={s.amountDivider} />
+// Optimized Input Field
+const InputField = ({ label, value, onChange, placeholder, keyboardType = 'default', error, onBlur }) => (
+  <View style={styles.fieldWrap}>
+    <Text style={styles.sectionLabel}>{label}</Text>
     <TextInput
-      style={s.amountInput}
-      value={value}
-      onChangeText={onChange}
-      keyboardType="numeric"
-      placeholder="0"
-      placeholderTextColor={C.textLight}
-      returnKeyType="done"
-    />
-  </View>
-);
-
-// ═══════════════════════════════════════════════════════════
-// METHOD ROW
-// ═══════════════════════════════════════════════════════════
-const MethodRow = ({ method, selected, onSelect }) => {
-  const active = selected === method.id;
-  return (
-    <TouchableOpacity
-      style={[s.methodRow, active && s.methodRowActive]}
-      onPress={() => onSelect(method.id)}
-      activeOpacity={0.75}
-    >
-      <View style={[s.radioOuter, active && s.radioOuterActive]}>
-        {active && <View style={s.radioInner} />}
-      </View>
-      <Text style={[s.methodLabel, active && s.methodLabelActive]}>
-        {method.label}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
-// ═══════════════════════════════════════════════════════════
-// INPUT FIELD
-// ═══════════════════════════════════════════════════════════
-const InputField = ({
-  label,
-  value,
-  onChange,
-  placeholder,
-  keyboardType = 'default',
-}) => (
-  <View style={s.fieldWrap}>
-    <SectionLabel label={label} />
-    <TextInput
-      style={s.textInput}
+      style={[styles.textInput, error && styles.inputError]}
       value={value}
       onChangeText={onChange}
       placeholder={placeholder}
-      placeholderTextColor={C.textLight}
+      placeholderTextColor={P.light}
       keyboardType={keyboardType}
-      returnKeyType="next"
-      autoCapitalize="words"
+      autoCapitalize="none"
+      onBlur={onBlur}
     />
-  </View>
-);
-
-// ═══════════════════════════════════════════════════════════
-// REVIEW NOTICE
-// ═══════════════════════════════════════════════════════════
-const ReviewNotice = () => (
-  <View style={s.noticeBanner}>
-    <Icons name="clock" size={scale(16)} color={C.warning} />
-    <Text style={s.noticeText}>Reviewed within 24–48 hours</Text>
+    {error ? <Text style={styles.errorText}>{error}</Text> : null}
   </View>
 );
 
@@ -648,101 +167,129 @@ const ReviewNotice = () => (
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════
 const RequestWithdrawalScreen = ({ navigation }) => {
-  const [amount, setAmount] = useState(String(CAMPAIGN.available));
+  const [amount, setAmount] = useState(String(WITHDRAWAL_DATA.available));
   const [selectedMethod, setSelectedMethod] = useState('easypaisa');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountTitle, setAccountTitle] = useState('');
   const [btnState, setBtnState] = useState('idle');
-
+  
+  const [errors, setErrors] = useState({ amount: '', account: '', title: '' });
   const selectedMethodData = PAYMENT_METHODS.find(m => m.id === selectedMethod);
 
+  const clearErrors = () => setErrors({ amount: '', account: '', title: '' });
+
+  const checkValidation = useCallback(() => {
+    let isValid = true;
+    const amtError = !amount || Number(amount) <= 0 ? 'Required' : 
+                     Number(amount) > WITHDRAWAL_DATA.available ? `Max ${formatPKR(WITHDRAWAL_DATA.available)}` : '';
+    const accError = validateAccountNumber(accountNumber);
+    const titleError = validateTitle(accountTitle);
+    setErrors({ amount: amtError, account: accError, title: titleError });
+    return !amtError && !accError && !titleError;
+  }, [amount, accountNumber, accountTitle]);
+
   const handleSubmit = useCallback(() => {
-    if (!amount || Number(amount) <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
-      return;
-    }
-    if (Number(amount) > CAMPAIGN.available) {
-      Alert.alert('Exceeds Balance', 'Amount exceeds your available balance.');
-      return;
-    }
-    if (!accountNumber.trim()) {
-      Alert.alert('Required', 'Please enter your account number.');
-      return;
-    }
-    if (!accountTitle.trim()) {
-      Alert.alert('Required', 'Please enter your account title.');
-      return;
-    }
-
-    // ── Phase 1: Loading ──────────────────────────────────
+    if (!checkValidation()) return;
     setBtnState('loading');
-
     setTimeout(() => {
-      // ── Phase 2: Success animation ────────────────────
       setBtnState('success');
-
-      // ── Phase 3: Auto-navigate to Profile after animation
-      setTimeout(() => {
-        navigation.navigate('Profile'); // ← change to your actual route name
-      }, 2200); // enough time to enjoy the full success animation
+      setTimeout(() => navigation.navigate('Profile'), 2200);
     }, 2000);
-  }, [amount, accountNumber, accountTitle, navigation]);
+  }, [navigation, checkValidation]);
 
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={P.bg} />
 
-      <Header onBack={() => navigation.goBack()} />
+      {/* ✅ SYNCED HEADER - Matches MyCampaignsScreen EXACTLY */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+           <Icons name="arrow-left" size={sp(22)} color={P.dark} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Request Withdrawal</Text>
+        <View style={{width: sp(32)}} />
+      </View>
 
-      <KeyboardAvoidingView
-        style={s.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={s.flex}
-          contentContainerStyle={s.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <CampaignCard campaign={CAMPAIGN} />
-
-          <View style={s.section}>
-            <SectionLabel label="Withdrawal Amount" />
-            <AmountInput value={amount} onChange={setAmount} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          
+          <View style={styles.card}>
+            <Text style={styles.campaignTitle}>{WITHDRAWAL_DATA.campaignTitle}</Text>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceAmount}>PKR {typeof WITHDRAWAL_DATA.available === 'number' ? WITHDRAWAL_DATA.available.toLocaleString() : '0'}</Text>
+            
+            <View style={styles.statsRow}>
+               <View><Text style={styles.statVal}>{WITHDRAWAL_DATA.raised.toLocaleString()}</Text><Text style={styles.statLbl}>Raised</Text></View>
+                <View style={{width: sp(1), backgroundColor: '#E5E7EB'}}/>
+               <View><Text style={styles.statVal}>{WITHDRAWAL_DATA.withdrawn.toLocaleString()}</Text><Text style={styles.statLbl}>Withdrawn</Text></View>
+            </View>
           </View>
 
-          <View style={s.section}>
-            <SectionLabel label="Select Account" />
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Withdrawal Amount *</Text>
+            <View style={styles.amountBox}>
+               <Text style={styles.currencyPrefix}>PKR</Text>
+               <View style={styles.divider} />
+               <TextInput
+                  style={[styles.amountInput, errors.amount && styles.inputError]}
+                  value={amount}
+                  onChangeText={(text) => { setAmount(text); if(errors.amount) clearErrors(); }}
+                  onBlur={checkValidation}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={P.light}
+               />
+            </View>
+            {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Select Account *</Text>
             {PAYMENT_METHODS.map(method => (
-              <MethodRow
+              <TouchableOpacity
                 key={method.id}
-                method={method}
-                selected={selectedMethod}
-                onSelect={setSelectedMethod}
-              />
+                style={[styles.methodRow, selectedMethod === method.id && styles.methodRowActive]}
+                onPress={() => setSelectedMethod(method.id)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.radioOuter, selectedMethod === method.id && styles.radioOuterActive]}>
+                   {selectedMethod === method.id && <View style={styles.radioInner}/>}
+                </View>
+                <Text style={[styles.methodLabel, selectedMethod === method.id && styles.methodLabelActive]}>
+                    {method.label}
+                </Text>
+              </TouchableOpacity>
             ))}
           </View>
 
           <InputField
-            label="Account Number"
+            label="Account Number *"
             value={accountNumber}
-            onChange={setAccountNumber}
+            onChange={(text) => { setAccountNumber(text); if(errors.account) setErrors(e =>({...e, account: ''})); }}
+            error={errors.account}
+            onBlur={checkValidation}
             placeholder={selectedMethodData?.placeholder ?? '03XX XXXXXXX'}
             keyboardType="phone-pad"
           />
 
           <InputField
-            label="Account Title"
+            label="Account Title *"
             value={accountTitle}
-            onChange={setAccountTitle}
+            onChange={(text) => { setAccountTitle(text); if(errors.title) setErrors(e =>({...e, title: ''})); }}
+            error={errors.title}
+            onBlur={checkValidation}
             placeholder="e.g. Ahmed Khan"
           />
 
-          <ReviewNotice />
-          <View style={{ height: vscale(12) }} />
+          <View style={styles.noticeBanner}>
+            <Icons name="clock" size={sp(16)} color="#D97706" />
+            <Text style={styles.noticeText}>Requests are processed within 24–48 hours.</Text>
+          </View>
+          
+          <View style={{height: sp(16)}} />
         </ScrollView>
 
-        <View style={s.footer}>
+        <View style={styles.footer}>
           <AnimatedSubmitButton state={btnState} onPress={handleSubmit} />
         </View>
       </KeyboardAvoidingView>
@@ -751,298 +298,76 @@ const RequestWithdrawalScreen = ({ navigation }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// STYLES
+// STYLES (SYNCED)
 // ═══════════════════════════════════════════════════════════
-const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.pageBg },
+const styles = StyleSheet.create({
+  // ✅ BACKGROUND MATCH
+  safe: { flex: 1, backgroundColor: P.bg },
   flex: { flex: 1 },
 
+  // ✅ HEADER SYNC
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: scale(16),
-    // paddingVertical: vscale(14),
-    backgroundColor: C.pageBg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: C.border,
+    paddingHorizontal: sp(16),
+    paddingVertical: sp(12),
+    borderBottomWidth: StyleSheet.hairlineWidth, 
+    borderBottomColor: P.border,              
+    backgroundColor: P.bg,                     
   },
-  headerBack: {
-    width: scale(36),
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: scale(17),
-    fontWeight: '700',
-    color: C.textDark,
-    letterSpacing: -0.2,
-  },
+  
+  headerTitle: { fontSize: sp(17), fontWeight: '700', color: P.dark, letterSpacing: -0.2 },
 
-  scrollContent: {
-    paddingHorizontal: scale(16),
-    paddingTop: vscale(16),
-    paddingBottom: vscale(8),
-  },
+  scrollContent: { paddingHorizontal: sp(16), paddingTop: sp(16), paddingBottom: sp(32) },
 
   card: {
-    backgroundColor: C.white,
-    borderRadius: scale(12),
-    padding: scale(16),
-    marginBottom: vscale(20),
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.07,
-    shadowRadius: 4,
+    backgroundColor: '#FFFFFF', borderRadius: sp(12), padding: sp(16), marginBottom: sp(20),
+    elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05,
   },
-  campaignTitle: {
-    fontSize: scale(14),
-    fontWeight: '700',
-    color: C.textDark,
-    marginBottom: vscale(8),
-    includeFontPadding: false,
-  },
-  balanceLabel: {
-    fontSize: scale(12),
-    fontWeight: '500',
-    color: C.textGray,
-    marginBottom: vscale(3),
-    includeFontPadding: false,
-  },
-  balanceAmount: {
-    fontSize: scale(26),
-    fontWeight: '800',
-    color: C.success,
-    marginBottom: vscale(12),
-    letterSpacing: -0.3,
-    includeFontPadding: false,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: vscale(10),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.border,
-  },
-  statItem: {
-    fontSize: scale(12),
-    color: C.textGray,
-    includeFontPadding: false,
-  },
-  statValue: {
-    fontWeight: '600',
-    color: C.textDark,
-  },
+  campaignTitle: { fontSize: sp(14), fontWeight: '700', color: P.dark, marginBottom: sp(8) },
+  balanceLabel: { fontSize: sp(12), color: P.gray, marginBottom: sp(3) },
+  balanceAmount: { fontSize: sp(26), fontWeight: '800', color: P.green, marginBottom: sp(12) },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: sp(10), borderTopWidth: 1, borderTopColor: P.border },
+  statVal: { fontSize: sp(14), fontWeight: '600', color: P.dark },
+  statLbl: { fontSize: sp(11), color: P.light },
 
-  section: { marginBottom: vscale(20) },
-  sectionLabel: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: C.textDark,
-    marginBottom: vscale(10),
-    includeFontPadding: false,
-  },
+  section: { marginBottom: sp(20) },
+  sectionLabel: { fontSize: sp(14), fontWeight: '700', color: P.dark, marginBottom: sp(10) },
 
-  amountBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.white,
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: C.border,
-    height: vscale(54),
-    paddingHorizontal: scale(16),
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  amountPrefix: {
-    fontSize: scale(15),
-    fontWeight: '700',
-    color: C.textGray,
-    marginRight: scale(12),
-    includeFontPadding: false,
-  },
-  amountDivider: {
-    width: 1,
-    height: '55%',
-    backgroundColor: C.border,
-    marginRight: scale(12),
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: C.textDark,
-    padding: 0,
-    margin: 0,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-
-  methodRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.white,
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: C.border,
-    paddingHorizontal: scale(16),
-    height: vscale(54),
-    marginBottom: vscale(10),
-    gap: scale(14),
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-  },
-  methodRowActive: {
-    borderColor: C.selectedBorder,
-    backgroundColor: C.selectedBg,
-  },
-  radioOuter: {
-    width: scale(22),
-    height: scale(22),
-    borderRadius: scale(11),
-    borderWidth: 2,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioOuterActive: { borderColor: C.primary },
-  radioInner: {
-    width: scale(11),
-    height: scale(11),
-    borderRadius: scale(6),
-    backgroundColor: C.primary,
-  },
-  methodLabel: {
-    fontSize: scale(15),
-    fontWeight: '500',
-    color: C.textGray,
-    includeFontPadding: false,
-  },
-  methodLabelActive: {
-    color: C.textDark,
-    fontWeight: '600',
-  },
-
-  fieldWrap: { marginBottom: vscale(16) },
+  amountBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: P.white, borderRadius: sp(10), borderWidth: 1, borderColor: P.border, height: sp(54), paddingHorizontal: sp(16) },
+  currencyPrefix: { fontSize: sp(15), fontWeight: '700', color: P.gray, marginRight: sp(12) },
+  divider: { width: 1, height: '55%', backgroundColor: P.border, marginRight: sp(12) },
+  amountInput: { flex: 1, fontSize: sp(16), fontWeight: '600', color: P.dark },
+  
+  fieldWrap: { marginBottom: sp(12) }, 
   textInput: {
-    backgroundColor: C.white,
-    borderRadius: scale(10),
-    borderWidth: 1,
-    borderColor: C.border,
-    height: vscale(54),
-    paddingHorizontal: scale(16),
-    fontSize: scale(15),
-    fontWeight: '500',
-    color: C.textDark,
-    padding: 0,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    backgroundColor: P.white, borderRadius: sp(10), borderWidth: 1, borderColor: P.border,
+    height: sp(54), paddingHorizontal: sp(16), fontSize: sp(15), color: P.dark,
   },
+  inputError: { borderColor: '#EF4444', backgroundColor: '#FFFBFB' },
+  errorText: { fontSize: sp(11), color: '#EF4444', marginTop: sp(4), marginLeft: sp(4), marginBottom: sp(10) },
 
-  noticeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(10),
-    backgroundColor: C.warningBg,
-    borderWidth: 1,
-    borderColor: C.warningBorder,
-    borderRadius: scale(10),
-    paddingHorizontal: scale(16),
-    paddingVertical: vscale(14),
-    marginBottom: vscale(4),
-  },
-  noticeText: {
-    fontSize: scale(14),
-    fontWeight: '500',
-    color: C.warning,
-    includeFontPadding: false,
-  },
+  methodRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: P.white, borderRadius: sp(10), borderWidth: 1, borderColor: P.border, paddingHorizontal: sp(16), height: sp(54), marginBottom: sp(10), gap: sp(14) },
+  methodRowActive: { borderColor: P.teal, backgroundColor: P.tealLight },
+  radioOuter: { width: sp(22), height: sp(22), borderRadius: sp(11), borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
+  radioOuterActive: { borderColor: P.teal },
+  radioInner: { width: sp(11), height: sp(11), borderRadius: sp(6), backgroundColor: P.teal },
+  methodLabel: { fontSize: sp(15), fontWeight: '500', color: P.gray },
+  methodLabelActive: { color: P.dark, fontWeight: '600' },
 
-  footer: {
-    paddingHorizontal: scale(16),
-    paddingTop: vscale(12),
-    paddingBottom: Platform.OS === 'ios' ? vscale(20) : vscale(16),
-    backgroundColor: C.pageBg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.border,
-    alignItems: 'center',
-  },
+  noticeBanner: { flexDirection: 'row', alignItems: 'center', gap: sp(10), backgroundColor: '#FEF3C7', borderRadius: sp(10), padding: sp(14), marginBottom: sp(8) },
+  noticeText: { fontSize: sp(13), color: '#D97706', fontWeight: '500' },
 
-  // ── Animated Button ───────────────────────────────────────
-  btnOuter: {
-    height: BUTTON_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.32,
-    shadowRadius: 12,
-  },
-  btnTouchable: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  footer: { paddingHorizontal: sp(16), paddingTop: sp(12), paddingBottom: Platform.OS === 'ios' ? sp(28) : sp(16), backgroundColor: P.bg, borderTopWidth: 1, borderTopColor: P.border, alignItems: 'center' },
 
-  // Ripple layers
-  rippleLayer: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-
-  // Shine sweep
-  shine: {
-    position: 'absolute',
-    top: 0,
-    width: scale(60),
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    transform: [{ skewX: '-20deg' }],
-  },
-
-  btnText: {
-    position: 'absolute',
-    color: C.white,
-    fontSize: scale(16),
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    includeFontPadding: false,
-  },
-
-  absoluteCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  successRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-  },
-  successText: {
-    color: C.white,
-    fontSize: scale(15),
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    includeFontPadding: false,
-  },
+  btnOuter: { height: BUTTON_HEIGHT, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2 },
+  btnTouchable: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  rippleLayer: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.22)' },
+  btnText: { fontSize: sp(16), fontWeight: '700', color: '#FFFFFF' },
+  absoluteCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  successRow: { flexDirection: 'row', alignItems: 'center', gap: sp(8) },
+  successText: { color: '#FFFFFF', fontSize: sp(15), fontWeight: '700' },
 });
 
 export default RequestWithdrawalScreen;

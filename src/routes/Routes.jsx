@@ -19,7 +19,8 @@ import NewPasswordScreen        from '../screens/auth/NewPasswordScreen';
 import SendResetCode            from '../screens/auth/SendResetCode';
 import HomeScreen               from '../screens/home/HomeScreen';
 import ExploreScreen            from '../screens/explore/ExploreScreen';
-import SavedScreen              from '../components/saved/SavedScreen';
+// import SavedScreen              from '../components/saved/SavedScreen';
+import SavedScreen              from '../screens/saved/SavedScreen';
 import ProfileScreen            from '../components/ProfileScreen';
 import CampaignDetails          from '../screens/campaigncreation/CampaignDetails';
 import PhotosDocuments          from '../screens/campaigncreation/PhotosDocuments';
@@ -33,7 +34,10 @@ import TermsConditions          from '../screens/campaigns/TermsConditions';
 import FAQScreen                from '../screens/Profile/FAQScreen';
 import SettingsScreen           from '../screens/settings/SettingsScreen';
 import CampaignDetail from '../screens/campaigns/CampaignDetail';
-import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
+// import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
+// import CampaignDetails from '../screens/campaigncreation/CampaignDetails';
+import DonateScreen from '../screens/campaigns/DonateScreen';
+import CheckUser from '../screens/auth/CheckUser';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -67,7 +71,7 @@ const CustomTabBar = ({ state, navigation }) => {
             <View key={route.key} style={tabSt.fabSlot}>
               <TouchableOpacity
                 // onPress={() => navigation.navigate('CreateCampaign')}
-                 onPress={() => navigation.navigate('CreateCampaign')}
+                 onPress={() => navigation.navigate('ReviewSubmit')}
                 activeOpacity={0.85}
               >
                 <LinearGradient
@@ -208,7 +212,11 @@ const StackNavigator = () => (
     <Stack.Screen name="NotificationsScreen"      component={NotificationsScreen}     />
     <Stack.Screen name="SettingsScreen"           component={SettingsScreen}          />
     <Stack.Screen name="CampaignDetail"            component={CampaignDetail}           />
-    <Stack.Screen name="CreateCampaign"            component={CreateCampaign}           />
+    {/* <Stack.Screen name="CreateCampaign"            component={CreateCampaign}           /> */}
+    {/* <Stack.Screen name="CampaignDetails"            component={CampaignDetails}           /> */}
+    <Stack.Screen name="DonateScreen"             component={DonateScreen}           />
+    {/* <Stack.Navigator initialRouteName="CheckUser"> */}
+  <Stack.Screen name="CheckUser" component={CheckUser} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
 
