@@ -22,6 +22,8 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
+// ✅ FIX: Import useSafeAreaInsets to get real status bar height
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ImgOnboarding1 from '../../assets/onBoardScreenImg01.jpeg';
 import ImgOnboarding2 from '../../assets/onBoardScreenImg02.jpeg';
@@ -49,9 +51,6 @@ const C = {
 };
 
 const RING_COLOR = '#15AABF';
-
-// ✅ Gradient colors for AboutScreen bg + CircularProgress inner
-// linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
 const GRAD_START = '#0A3D62';
 const GRAD_END   = '#15AABF';
 
@@ -79,7 +78,7 @@ const SCREENS = [
 const TOTAL = SCREENS.length;
 
 // ════════════════════════════════════════════════════════════
-// CircularProgress
+// CircularProgress — unchanged
 // ════════════════════════════════════════════════════════════
 const RING_SIZE   = scale(82);
 const RING_BORDER = scale(4);
@@ -163,11 +162,6 @@ const CircularProgress = memo(({ progress, onPress }) => {
             },
           ]}
         />
-        {/*
-          ✅ CircularProgress inner button gradient:
-          linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
-          start:{x:0,y:0} end:{x:1,y:1} = 135deg diagonal
-        */}
         <LinearGradient
           colors={[GRAD_START, GRAD_END]}
           start={{ x: 0, y: 0 }}
@@ -220,7 +214,7 @@ const cpr = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-// StepDots
+// StepDots — unchanged
 // ════════════════════════════════════════════════════════════
 const StepDots = memo(({ active }) => {
   const dotWidths = useRef(
@@ -277,7 +271,7 @@ const dotSt = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-// SwipeToStart
+// SwipeToStart — unchanged
 // ════════════════════════════════════════════════════════════
 const SWIPE_TRACK_WIDTH = SW - scale(80);
 const SWIPE_THUMB_SIZE  = scale(52);
@@ -430,7 +424,7 @@ const swSt = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-// AboutScreen
+// AboutScreen — unchanged
 // ════════════════════════════════════════════════════════════
 const AboutScreen = memo(({ visible, onStart }) => {
   const slideAnim    = useRef(new Animated.Value(SH)).current;
@@ -494,18 +488,12 @@ const AboutScreen = memo(({ visible, onStart }) => {
     <Animated.View
       style={[abSt.fullScreen, { transform: [{ translateY: slideAnim }] }]}
     >
-      {/*
-        ✅ AboutScreen background:
-        linear-gradient(135deg, #0A3D62 0%, #15AABF 100%)
-        Covers the entire screen behind all content.
-      */}
       <LinearGradient
         colors={[GRAD_START, GRAD_END]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-
       <StatusBar barStyle="light-content" backgroundColor={GRAD_START} />
       <View style={abSt.decoCircle1} />
       <View style={abSt.decoCircle2} />
@@ -516,7 +504,6 @@ const AboutScreen = memo(({ visible, onStart }) => {
           { opacity: contentFade, transform: [{ translateY: contentSlide }] },
         ]}
       >
-        {/* Logo */}
         <View style={abSt.logoWrap}>
           <LinearGradient
             colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.10)']}
@@ -567,7 +554,6 @@ const AboutScreen = memo(({ visible, onStart }) => {
 });
 
 const abSt = StyleSheet.create({
-  // ✅ fullScreen: no backgroundColor — LinearGradient handles it
   fullScreen: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,
@@ -615,13 +601,12 @@ const abSt = StyleSheet.create({
     borderColor:    'rgba(255,255,255,0.20)',
   },
   logoEmoji: { fontSize: scale(38) },
-
   title: {
-    fontSize:     scale(26),
-    fontWeight:   '800',
-    color:        C.white,
-    textAlign:    'center',
-    marginBottom: scale(6),
+    fontSize:      scale(26),
+    fontWeight:    '800',
+    color:         C.white,
+    textAlign:     'center',
+    marginBottom:  scale(6),
     letterSpacing: -0.5,
   },
   subtitle: {
@@ -640,7 +625,6 @@ const abSt = StyleSheet.create({
     marginBottom:      scale(26),
     paddingHorizontal: scale(4),
   },
-
   featureList:  { width: '100%', gap: scale(10), marginBottom: scale(22) },
   featureCard: {
     flexDirection:   'row',
@@ -673,10 +657,10 @@ const abSt = StyleSheet.create({
     lineHeight: scale(16),
   },
   tagline: {
-    fontSize:   scale(12),
-    fontStyle:  'italic',
-    color:      'rgba(255,255,255,0.40)',
-    textAlign:  'center',
+    fontSize:  scale(12),
+    fontStyle: 'italic',
+    color:     'rgba(255,255,255,0.40)',
+    textAlign: 'center',
   },
   bottomWrap: {
     paddingBottom:     Platform.OS === 'android' ? scale(28) : scale(40),
@@ -685,12 +669,17 @@ const abSt = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-// MAIN OnboardingScreen — unchanged
+// MAIN OnboardingScreen
 // ════════════════════════════════════════════════════════════
 const OnboardingScreen = ({ navigation }) => {
   const [currentIndex,    setCurrentIndex]    = useState(0);
   const [showAbout,       setShowAbout]       = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // ✅ FIX: Get real safe area insets — works on all devices
+  // insets.top = status bar height + notch on iOS / status bar on Android
+  // This is the ONLY reliable way to position content below the status bar
+  const insets = useSafeAreaInsets();
 
   const imageOpacity = useRef(new Animated.Value(1)).current;
   const imageScale   = useRef(new Animated.Value(1)).current;
@@ -750,6 +739,14 @@ const OnboardingScreen = ({ navigation }) => {
   const currentScreen = SCREENS[currentIndex];
   const progress      = (currentIndex + 1) / TOTAL;
 
+  // ✅ FIX: Skip button top = safe area top inset + a small visual gap
+  // This guarantees it always appears BELOW the status bar on every device:
+  //   • Pixel 5 (Android):  insets.top ≈ 24px  → skipTop ≈ 24 + 10 = 34
+  //   • Vivo V50 Lite:      insets.top ≈ 30+px → skipTop ≈ 40+ (never hidden)
+  //   • iPhone with notch:  insets.top ≈ 44px  → skipTop ≈ 54 (below notch)
+  //   • iPhone no notch:    insets.top ≈ 20px  → skipTop ≈ 30
+  const SKIP_TOP = insets.top + scale(10);
+
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
@@ -760,11 +757,23 @@ const OnboardingScreen = ({ navigation }) => {
           { opacity: mountFade, transform: [{ translateY: mountSlide }] },
         ]}
       >
+        {/*
+          ✅ FIX: Skip button uses SKIP_TOP (insets.top + gap) instead of
+          a hardcoded vscale(16).
+
+          vscale(16) on Vivo V50 Lite: (SH/812)*16 — SH is bigger so this
+          gives more px, but it's still relative to a fixed 812 baseline
+          and doesn't know the actual status bar height.
+
+          insets.top is the REAL measured safe area top on THIS device —
+          it's always exactly the status bar height (+ notch on iPhone).
+          Adding scale(10) gives a small consistent visual gap below it.
+        */}
         <TouchableOpacity
-          style={s.skipBtn}
+          style={[s.skipBtn, { top: SKIP_TOP }]}
           onPress={() => setShowAbout(true)}
           activeOpacity={0.7}
-          hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Text style={s.skipText}>Skip</Text>
         </TouchableOpacity>
@@ -803,10 +812,7 @@ const OnboardingScreen = ({ navigation }) => {
             <Text style={s.counterSep}> / </Text>
             <Text style={s.counterTotal}>{TOTAL}</Text>
           </Text>
-          <CircularProgress
-            progress={progress}
-            onPress={handleNext}
-          />
+          <CircularProgress progress={progress} onPress={handleNext} />
         </View>
 
         <View style={s.loginRow}>
@@ -828,15 +834,13 @@ const OnboardingScreen = ({ navigation }) => {
 export default OnboardingScreen;
 
 // ════════════════════════════════════════════════════════════
-// STYLES — unchanged
+// STYLES
 // ════════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
   safe: {
     flex:            1,
     backgroundColor: C.bg,
   },
-
   container: {
     flex:              1,
     alignItems:        'center',
@@ -844,13 +848,14 @@ const s = StyleSheet.create({
     paddingTop:        vscale(8),
   },
 
+  // ✅ FIX: `top` is NOT set here — it's applied inline using SKIP_TOP
+  // so the static StyleSheet value never conflicts with the dynamic inset
   skipBtn: {
     position:          'absolute',
-    top:               vscale(16),
-    right:             scale(24),
+    right:             scale(20),
     zIndex:            10,
     paddingHorizontal: scale(16),
-    paddingVertical:   vscale(8),
+    paddingVertical:   scale(7),
     borderRadius:      scale(20),
     backgroundColor:   'rgba(10,61,98,0.07)',
   },
@@ -914,17 +919,16 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     gap:            vscale(12),
   },
-
   counter:       { marginTop: vscale(4) },
   counterActive: { fontSize: scale(16), fontWeight: '800', color: C.primary },
   counterSep:    { fontSize: scale(14), color: C.lightGray },
   counterTotal:  { fontSize: scale(14), fontWeight: '600', color: C.lightGray },
 
   loginRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    paddingBottom:  Platform.OS === 'ios' ? vscale(8) : vscale(16),
-    paddingTop:     vscale(4),
+    flexDirection: 'row',
+    alignItems:    'center',
+    paddingBottom: Platform.OS === 'ios' ? vscale(8) : vscale(16),
+    paddingTop:    vscale(4),
   },
   loginText: { fontSize: scale(14), color: C.gray },
   loginLink: { fontSize: scale(14), color: C.teal, fontWeight: '700' },
