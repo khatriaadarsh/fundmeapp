@@ -26,7 +26,7 @@ import {
 } from '@react-native-documents/picker';
 
 // ── Shared Imports ──────────────────────────────────────────
-import StepHeader from '../../components/shared/StepHeader';
+import { StepHeader } from '../../components/shared/StepHeader';
 import { P, sp, SW } from '../../theme/theme';
 
 // ── Constants ───────────────────────────────────────────────
@@ -456,14 +456,6 @@ const PhotosDocuments = ({ navigation, route }) => {
       {/* ── Footer ─────────────────────────────────────────── */}
       <View style={s.footer}>
         <TouchableOpacity
-          style={s.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.8}
-        >
-          <Icons name="arrow-left" size={sp(16)} color={P.darkOcean} />
-          <Text style={s.backTxt}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={s.nextBtn}
           onPress={handleNext}
           activeOpacity={0.85}
@@ -556,8 +548,8 @@ const s = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     paddingHorizontal: sp(18),
-    paddingTop: sp(12),
-    paddingBottom: Platform.OS === 'android' ? sp(18) : sp(10),
+    paddingTop: sp(15),
+    paddingBottom: Platform.OS === 'android' ? sp(22) : sp(10),
     backgroundColor: P.white,
     borderTopWidth: 1,
     borderTopColor: P.border,

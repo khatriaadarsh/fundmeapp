@@ -59,7 +59,9 @@ const SendResetCode = ({ navigation, route }) => {
   const [focused, setFocused] = useState(0);
 
   const inputRefs = useRef(
-    Array(OTP_LENGTH).fill(null).map(() => React.createRef())
+    Array(OTP_LENGTH)
+      .fill(null)
+      .map(() => React.createRef()),
   );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,7 +70,7 @@ const SendResetCode = ({ navigation, route }) => {
 
   useEffect(() => {
     if (seconds <= 0) return;
-    const timer = setInterval(() => setSeconds((s) => s - 1), 1000);
+    const timer = setInterval(() => setSeconds(s => s - 1), 1000);
     return () => clearInterval(timer);
   }, [seconds]);
 
@@ -99,9 +101,9 @@ const SendResetCode = ({ navigation, route }) => {
     ]).start();
 
     setTimeout(() => inputRefs.current[0]?.current?.focus(), 500);
-  }, [fadeAnim, slideAnim, iconScale ]);
+  }, [fadeAnim, slideAnim, iconScale]);
 
-  const formatTime = useCallback((s) => {
+  const formatTime = useCallback(s => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
@@ -117,7 +119,7 @@ const SendResetCode = ({ navigation, route }) => {
         setFocused(idx + 1);
       }
     },
-    [otp]
+    [otp],
   );
 
   const handleKeyPress = useCallback(
@@ -127,14 +129,14 @@ const SendResetCode = ({ navigation, route }) => {
         setFocused(idx - 1);
       }
     },
-    [otp]
+    [otp],
   );
 
   const handleResend = useCallback(() => setSeconds(272), []);
 
   const handleVerify = useCallback(
     () => navigation.navigate('NewPasswordScreen'),
-    [navigation]
+    [navigation],
   );
 
   return (
@@ -181,8 +183,8 @@ const SendResetCode = ({ navigation, route }) => {
                 value={val}
                 isFocused={focused === idx}
                 inputRef={inputRefs.current[idx]}
-                onChangeText={(text) => handleChange(text, idx)}
-                onKeyPress={(e) => handleKeyPress(e, idx)}
+                onChangeText={text => handleChange(text, idx)}
+                onKeyPress={e => handleKeyPress(e, idx)}
               />
             ))}
           </Animated.View>

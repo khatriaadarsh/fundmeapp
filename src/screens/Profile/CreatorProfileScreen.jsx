@@ -33,48 +33,50 @@ import Icons from 'react-native-vector-icons/Feather';
 
 // ── Components ───────────────────────────────────────────────
 import ProfileHeader from './components/ProfileHeader';
-import TrustBadges   from './components/TrustBadges';
-import StatsRow      from './components/StatsRow';
-import ReportModal   from './components/ReportModal';
+import TrustBadges from './components/TrustBadges';
+import StatsRow from './components/StatsRow';
+import ReportModal from './components/ReportModal';
 
 // ── Tabs ─────────────────────────────────────────────────────
-import AboutTab     from './tabs/AboutTab';
+import AboutTab from './tabs/AboutTab';
 import CampaignsTab from './tabs/CampaignsTab';
-import ReviewsTab   from './tabs/ReviewsTab';
+import ReviewsTab from './tabs/ReviewsTab';
 
 // ── Scale ────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
-const STATUSBAR_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+const STATUSBAR_H =
+  Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0;
 
 // ── Palette ──────────────────────────────────────────────────
 const P = {
   darkOcean: '#0A3D62',
-  teal:      '#00B4CC',
-  dark:      '#111827',
-  gray:      '#6B7280',
-  light:     '#9CA3AF',
-  white:     '#FFFFFF',
-  border:    '#E5E7EB',
-  bg:        '#F4F5F7',
+  teal: '#00B4CC',
+  dark: '#111827',
+  gray: '#6B7280',
+  light: '#9CA3AF',
+  white: '#FFFFFF',
+  border: '#E5E7EB',
+  bg: '#F4F5F7',
 };
 
 // ── Tab definitions ──────────────────────────────────────────
 const TABS = [
-  { id: 'about',     label: 'About'     },
+  { id: 'about', label: 'About' },
   { id: 'campaigns', label: 'Campaigns' },
-  { id: 'reviews',   label: 'Reviews'   },
+  { id: 'reviews', label: 'Reviews' },
 ];
 
 // ── Mock user data — replace with route.params / API ────────
 const MOCK_USER = {
-  name:       'Sarah Ahmed',
-  username:   'sarahahmed',
-  avatarUri:  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-  location:   'Karachi, Pakistan',
+  name: 'Sarah Ahmed',
+  username: 'sarahahmed',
+  avatarUri:
+    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+  location: 'Karachi, Pakistan',
   joinedDate: 'March 2023',
-  bio:        'Passionate about helping families in need. I started FundMe campaigns in 2023 to support children\'s medical care in Pakistan. Every donation makes a real difference. Thank you for trusting our cause.',
+  bio: "Passionate about helping families in need. I started FundMe campaigns in 2023 to support children's medical care in Pakistan. Every donation makes a real difference. Thank you for trusting our cause.",
   trustScore: 92,
 };
 
@@ -184,7 +186,7 @@ const tbs = StyleSheet.create({
     right: '20%',
     height: sp(3),
     backgroundColor: P.teal,
-    borderTopLeftRadius:  sp(2),
+    borderTopLeftRadius: sp(2),
     borderTopRightRadius: sp(2),
   },
 });
@@ -195,12 +197,12 @@ const tbs = StyleSheet.create({
 const CreatorProfileScreen = ({ navigation, route }) => {
   const user = route?.params?.user ?? MOCK_USER;
 
-  const [activeTab,      setActiveTab     ] = useState('about');
-  const [modalVisible,   setModalVisible  ] = useState(false);
+  const [activeTab, setActiveTab] = useState('about');
+  const [modalVisible, setModalVisible] = useState(false);
 
   const handleTabChange = useCallback(id => setActiveTab(id), []);
 
-  const handleMenuPress  = useCallback(() => setModalVisible(true),  []);
+  const handleMenuPress = useCallback(() => setModalVisible(true), []);
   const handleModalClose = useCallback(() => setModalVisible(false), []);
 
   const handleModalAction = useCallback(action => {
@@ -208,9 +210,12 @@ const CreatorProfileScreen = ({ navigation, route }) => {
     console.log('Action:', action);
   }, []);
 
-  const handleCampaignPress = useCallback(item => {
-    navigation?.navigate?.('CampaignDetail', { id: item.id });
-  }, [navigation]);
+  const handleCampaignPress = useCallback(
+    item => {
+      navigation?.navigate?.('CampaignDetail', { id: item.id });
+    },
+    [navigation],
+  );
 
   // Render active tab content
   const renderTabContent = () => {
@@ -260,9 +265,7 @@ const CreatorProfileScreen = ({ navigation, route }) => {
         <TabSwitcher active={activeTab} onChange={handleTabChange} />
 
         {/* index 3 — Tab content */}
-        <View style={s.tabContent}>
-          {renderTabContent()}
-        </View>
+        <View style={s.tabContent}>{renderTabContent()}</View>
       </ScrollView>
 
       {/* ── Report / Options modal ─────────────────────── */}
@@ -278,8 +281,8 @@ const CreatorProfileScreen = ({ navigation, route }) => {
 export default CreatorProfileScreen;
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: P.bg },
-  scroll:  { flex: 1 },
+  safe: { flex: 1, backgroundColor: P.bg },
+  scroll: { flex: 1 },
   content: { paddingBottom: sp(24) },
   tabContent: {
     backgroundColor: P.bg,

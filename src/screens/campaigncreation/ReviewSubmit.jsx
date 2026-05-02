@@ -4,7 +4,7 @@
 //  FundMe App  ·  React Native CLI  ·  100% responsive
 // ─────────────────────────────────────────────────────────────
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, memo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,10 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { C, StepHeader } from './Shared';
+import { StepHeader } from '../../components/shared/StepHeader';
+import { P } from '../../theme/theme';
+import { C } from './Shared';
 
 // ── Section card ───────────────────────────────────────────
 const SectionCard = ({ label, onEdit, children }) => (
@@ -149,6 +150,16 @@ const dr = StyleSheet.create({
   name: { fontSize: 13, color: C.dark, fontWeight: '500' },
 });
 
+const ProgressLine = memo(({ pct }) => (
+  <View style={plSt.bg}>
+    <View style={[plSt.fill, { width: `${pct}%` }]} />
+  </View>
+));
+const plSt = StyleSheet.create({
+  bg: { height: 3, backgroundColor: P.border },
+  fill: { height: 3, backgroundColor: P.teal },
+});
+
 // ── Main Screen ────────────────────────────────────────────
 const ReviewSubmit = ({ navigation, route }) => {
   const p = route?.params || {};
@@ -189,7 +200,13 @@ const ReviewSubmit = ({ navigation, route }) => {
     Alert.alert(
       'Submitted',
       'Your application is submitted for review.\nYou will receive a notification.',
-      [{ text: 'OK', onPress: () => navigation.navigate('HomeScreen') }],
+      [
+        {
+          text: 'OK',
+          onPress: () =>
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }),
+        },
+      ],
     );
   };
 
@@ -204,6 +221,7 @@ const ReviewSubmit = ({ navigation, route }) => {
         title="Review & Submit"
         onLeft={() => navigation.goBack()}
       />
+      <ProgressLine pct={100} />
 
       <Animated.View style={[s.flex, { opacity: fadeAnim }]}>
         <ScrollView
@@ -288,7 +306,7 @@ const ReviewSubmit = ({ navigation, route }) => {
             onEdit={() => goStep('PhotosDocuments')}
           >
             {docs.map((doc, i) => (
-              <View key={doc.id}>
+              <View key={doc.id} style={s.docCol}>
                 <DocRow name={doc.name} />
                 {i < docs.length - 1 && <Divider />}
               </View>
@@ -368,7 +386,11 @@ const s = StyleSheet.create({
   descBody: { fontSize: 13, color: C.dark, lineHeight: 19 },
 
   /* ── Media ── */
-  mediaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  mediaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
 
   /* ── Bottom area ── */
   btnArea: {
@@ -379,8 +401,8 @@ const s = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
   },
-  btnRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-
+  btnRow: { flexDirection: 'row', columnGap: 10, marginBottom: 8 },
+  docCol: { paddingVertical: 4, overflow: 'hidden' },
   draftBtn: {
     flex: 1,
     borderWidth: 1.5,

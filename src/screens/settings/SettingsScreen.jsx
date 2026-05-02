@@ -23,7 +23,7 @@ import Icons from 'react-native-vector-icons/Feather';
 // Responsive Scale
 // ═══════════════════════════════════════════════════════════
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale  = size => (SW / 375) * size;
+const scale = size => (SW / 375) * size;
 const vscale = size => (SH / 812) * size;
 
 // ═══════════════════════════════════════════════════════════
@@ -31,20 +31,20 @@ const vscale = size => (SH / 812) * size;
 // ═══════════════════════════════════════════════════════════
 const C = {
   // Figma background is teal/gradient — page bg is light
-  pageBg:     '#F0F8FA',
-  white:      '#FFFFFF',
-  primary:    '#0A3D62',
-  teal:       '#15AABF',
-  textDark:   '#0A3D62',   // Figma uses dark blue for row labels
-  textMid:    '#374151',
-  textGray:   '#6B7280',
-  textLight:  '#9CA3AF',
-  border:     '#E8F4F7',   // Figma: very light teal border
-  danger:     '#EF4444',
-  switchOn:   '#15AABF',
-  sectionLbl: '#15AABF',   // Figma: teal section labels
-  overlay:    'rgba(0,0,0,0.45)',
-  sheetBg:    '#FFFFFF',
+  pageBg: '#F0F8FA',
+  white: '#FFFFFF',
+  primary: '#0A3D62',
+  teal: '#15AABF',
+  textDark: '#0A3D62', // Figma uses dark blue for row labels
+  textMid: '#374151',
+  textGray: '#6B7280',
+  textLight: '#9CA3AF',
+  border: '#E8F4F7', // Figma: very light teal border
+  danger: '#EF4444',
+  switchOn: '#15AABF',
+  sectionLbl: '#15AABF', // Figma: teal section labels
+  overlay: 'rgba(0,0,0,0.45)',
+  sheetBg: '#FFFFFF',
   selectedBg: '#EEF9FC',
   selectedBorder: '#15AABF',
   checkColor: '#15AABF',
@@ -57,17 +57,21 @@ const APP_VERSION = '1.0.0';
 // ═══════════════════════════════════════════════════════════
 const LANGUAGES = ['English', 'Urdu', 'Arabic', 'French'];
 const CURRENCIES = ['PKR', 'USD', 'EUR', 'GBP', 'SAR', 'AED'];
-const THEMES     = ['Light', 'Dark', 'System'];
+const THEMES = ['Light', 'Dark', 'System'];
 
 // ═══════════════════════════════════════════════════════════
 // ✅ ANIMATED BOTTOM SHEET MODAL
 // Attractive slide-up + fade — used for Language/Currency/Theme
 // ═══════════════════════════════════════════════════════════
 const BottomSheetModal = ({
-  visible, title, options,
-  selected, onSelect, onClose,
+  visible,
+  title,
+  options,
+  selected,
+  onSelect,
+  onClose,
 }) => {
-  const slideAnim   = useRef(new Animated.Value(SH)).current;
+  const slideAnim = useRef(new Animated.Value(SH)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -105,10 +109,13 @@ const BottomSheetModal = ({
     }
   }, [visible, slideAnim, backdropAnim]);
 
-  const handleSelect = useCallback(option => {
-    onSelect(option);
-    onClose();
-  }, [onSelect, onClose]);
+  const handleSelect = useCallback(
+    option => {
+      onSelect(option);
+      onClose();
+    },
+    [onSelect, onClose],
+  );
 
   return (
     <Modal
@@ -119,9 +126,7 @@ const BottomSheetModal = ({
       statusBarTranslucent
     >
       {/* Backdrop */}
-      <Animated.View
-        style={[bs.backdrop, { opacity: backdropAnim }]}
-      >
+      <Animated.View style={[bs.backdrop, { opacity: backdropAnim }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -141,7 +146,7 @@ const BottomSheetModal = ({
           <Text style={bs.title}>{title}</Text>
           <TouchableOpacity
             onPress={onClose}
-            hitSlop={{ top:8, bottom:8, left:8, right:8 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Icons name="x" size={scale(20)} color={C.textGray} />
           </TouchableOpacity>
@@ -161,7 +166,9 @@ const BottomSheetModal = ({
                 onPress={() => handleSelect(item)}
                 activeOpacity={0.72}
               >
-                <Text style={[bs.optionText, isSelected && bs.optionTextSelected]}>
+                <Text
+                  style={[bs.optionText, isSelected && bs.optionTextSelected]}
+                >
                   {item}
                 </Text>
                 {isSelected && (
@@ -179,7 +186,9 @@ const BottomSheetModal = ({
         />
 
         {/* Bottom safe area pad */}
-        <View style={{ height: Platform.OS === 'ios' ? vscale(20) : vscale(12) }} />
+        <View
+          style={{ height: Platform.OS === 'ios' ? vscale(20) : vscale(12) }}
+        />
       </Animated.View>
     </Modal>
   );
@@ -202,7 +211,7 @@ const bs = StyleSheet.create({
     paddingTop: vscale(10),
     elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width:0, height:-4 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
   },
@@ -262,7 +271,7 @@ const Header = ({ onBack }) => (
     <TouchableOpacity
       onPress={onBack}
       style={s.headerBack}
-      hitSlop={{ top:10, bottom:10, left:10, right:10 }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
@@ -285,8 +294,12 @@ const Section = ({ label, children }) => (
 // NAV ROW — label + chevron
 // ═══════════════════════════════════════════════════════════
 const NavRow = ({
-  icon, label, labelColor,
-  iconColor, onPress, isLast = false,
+  icon,
+  label,
+  labelColor,
+  iconColor,
+  onPress,
+  isLast = false,
 }) => (
   <TouchableOpacity
     style={[s.row, !isLast && s.rowBorder]}
@@ -329,8 +342,11 @@ const ToggleRow = ({ label, value, onChange, isLast = false }) => (
 // VALUE ROW — label + value text + chevron
 // ═══════════════════════════════════════════════════════════
 const ValueRow = ({
-  label, value, onPress,
-  showChevron = true, isLast = false,
+  label,
+  value,
+  onPress,
+  showChevron = true,
+  isLast = false,
 }) => (
   <TouchableOpacity
     style={[s.row, !isLast && s.rowBorder]}
@@ -341,9 +357,7 @@ const ValueRow = ({
     <View style={s.rowNoIcon} />
     <Text style={s.rowLabel}>{label}</Text>
     <View style={s.rowRight}>
-      {value ? (
-        <Text style={s.rowValue}>{value}</Text>
-      ) : null}
+      {value ? <Text style={s.rowValue}>{value}</Text> : null}
       {showChevron && (
         <Icons name="chevron-right" size={scale(18)} color={C.textLight} />
       )}
@@ -355,20 +369,19 @@ const ValueRow = ({
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════
 const SettingsScreen = ({ navigation }) => {
-
   // ── Toggles ───────────────────────────────────────────────
-  const [pushEnabled,     setPushEnabled]     = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
   const [campaignUpdates, setCampaignUpdates] = useState(true);
 
   // ── Preferences ───────────────────────────────────────────
   const [language, setLanguage] = useState('English');
   const [currency, setCurrency] = useState('PKR');
-  const [theme,    setTheme]    = useState('Light');
+  const [theme, setTheme] = useState('Light');
 
   // ── Bottom sheet visibility ───────────────────────────────
-  const [langSheet,     setLangSheet]     = useState(false);
+  const [langSheet, setLangSheet] = useState(false);
   const [currencySheet, setCurrencySheet] = useState(false);
-  const [themeSheet,    setThemeSheet]    = useState(false);
+  const [themeSheet, setThemeSheet] = useState(false);
 
   // ── Delete account ────────────────────────────────────────
   const handleDeleteAccount = useCallback(() => {
@@ -402,17 +415,13 @@ const SettingsScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
       >
-
         {/* ── ACCOUNT ───────────────────────────────────── */}
         <Section label="ACCOUNT">
           <NavRow
             label="Change Password"
-            onPress={go('ChangePassword')}
+            onPress={go('EmailVerifyForResetPass')}
           />
-          <NavRow
-            label="Email Preferences"
-            onPress={go('EmailPreferences')}
-          />
+          <NavRow label="Email Preferences" onPress={go('EmailPreferences')} />
           <NavRow
             icon="trash-2"
             iconColor={C.danger}
@@ -460,10 +469,7 @@ const SettingsScreen = ({ navigation }) => {
 
         {/* ── ABOUT ─────────────────────────────────────── */}
         <Section label="ABOUT">
-          <NavRow
-            label="Privacy Policy"
-            onPress={go('PrivacyPolicy')}
-          />
+          <NavRow label="Privacy Policy" onPress={go('PrivacyPolicy')} />
           <ValueRow
             label="App Version"
             value={APP_VERSION}
@@ -471,7 +477,6 @@ const SettingsScreen = ({ navigation }) => {
             isLast
           />
         </Section>
-
       </ScrollView>
 
       {/* ── BOTTOM SHEET MODALS ───────────────────────────── */}
@@ -507,7 +512,6 @@ const SettingsScreen = ({ navigation }) => {
 // STYLES — Figma exact match
 // ═══════════════════════════════════════════════════════════
 const s = StyleSheet.create({
-
   safe: {
     flex: 1,
     backgroundColor: C.pageBg,
@@ -550,7 +554,7 @@ const s = StyleSheet.create({
   sectionLabel: {
     fontSize: scale(11),
     fontWeight: '800',
-    color: C.sectionLbl,       // ✅ Figma: teal section labels
+    color: C.sectionLbl, // ✅ Figma: teal section labels
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: vscale(8),
@@ -563,7 +567,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#15AABF',
-    shadowOffset: { width:0, height:2 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
@@ -597,7 +601,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: scale(14),
     fontWeight: '500',
-    color: C.textDark,         // ✅ Figma: dark blue labels
+    color: C.textDark, // ✅ Figma: dark blue labels
     includeFontPadding: false,
     lineHeight: scale(20),
   },
@@ -617,9 +621,8 @@ const s = StyleSheet.create({
 
   // Switch scale fix on iOS
   switchStyle: {
-    transform: Platform.OS === 'ios'
-      ? [{ scaleX: 0.85 }, { scaleY: 0.85 }]
-      : [],
+    transform:
+      Platform.OS === 'ios' ? [{ scaleX: 0.85 }, { scaleY: 0.85 }] : [],
   },
 });
 

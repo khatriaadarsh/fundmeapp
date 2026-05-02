@@ -20,6 +20,7 @@ import SignUpScreen from '../screens/auth/SignUpScreen';
 import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import CNICUploadScreen from '../screens/auth/CNICUploadScreen';
 import ProfileCompletionScreen from '../screens/auth/ProfileCompletionScreen';
+import EmailVerifyForResetPass from '../screens/auth/EmailVerifyForResetPass';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import NewPasswordScreen from '../screens/auth/NewPasswordScreen';
 import SendResetCode from '../screens/auth/SendResetCode';
@@ -55,6 +56,9 @@ const OCEAN_BLUE = '#0A3D62';
 const RED = '#e74c3c';
 const TEAL = '#00B4CC';
 
+const GRAD_START = '#0A3D62';
+const GRAD_END = '#15AABF';
+
 const TAB_CONFIG = {
   HomeTab: { icon: 'home', label: 'Home' },
   ExploreTab: { icon: 'compass', label: 'Explore' },
@@ -82,7 +86,7 @@ const CustomTabBar = ({ state, navigation }) => {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={[OCEAN_BLUE, OCEAN_BLUE]}
+                  colors={[GRAD_START, GRAD_END]}
                   style={tabSt.fab}
                 >
                   <Icons name="plus" size={sp(24)} color={WHITE} />
@@ -113,7 +117,7 @@ const CustomTabBar = ({ state, navigation }) => {
             <Icons
               name={config.icon}
               size={sp(22)}
-              color={isFocused ? RED : INACTIVE}
+              color={isFocused ? OCEAN_BLUE : INACTIVE}
             />
             <Text style={[tabSt.label, isFocused && tabSt.labelActive]}>
               {config.label}
@@ -147,7 +151,7 @@ const tabSt = StyleSheet.create({
     paddingVertical: sp(2),
   },
   label: { fontSize: sp(10), color: INACTIVE, marginTop: sp(3) },
-  labelActive: { color: RED, fontWeight: '700' },
+  labelActive: { color: OCEAN_BLUE, fontWeight: '700' },
   fabSlot: {
     flex: 1,
     alignItems: 'center',
@@ -203,6 +207,10 @@ const StackNavigator = () => (
     <Stack.Screen name="Splash" component={Splash} />
     <Stack.Screen name="OnboardingScreen" component={OnboardingScreen} />
     <Stack.Screen name="Login" component={Login} />
+    <Stack.Screen
+      name="EmailVerifyForResetPass"
+      component={EmailVerifyForResetPass}
+    />
     <Stack.Screen
       name="ForgotPasswordScreen"
       component={ForgotPasswordScreen}

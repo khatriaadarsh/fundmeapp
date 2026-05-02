@@ -113,7 +113,7 @@ const ForgotPasswordOTPScreen = ({ navigation, route }) => {
           </View>
 
           {/* Text */}
-          <Text style={styles.headline}>Verify Your Email</Text>
+          <Text style={styles.headline}>Verify OTP Now</Text>
           <Text style={styles.subtitle}>We sent a 5-digit code to</Text>
           <Text style={styles.email}>{email}</Text>
 

@@ -50,7 +50,7 @@ const LoginScreen = ({ navigation }) => {
   }, [navigation]);
 
   const handleForgotPassword = useCallback(() => {
-    navigation.navigate('ForgotPasswordScreen');
+    navigation.navigate('EmailVerifyForResetPass');
   }, [navigation]);
 
   const handleSignUp = useCallback(() => {
@@ -160,9 +160,7 @@ const LoginScreen = ({ navigation }) => {
 
               {/* Sign Up Link */}
               <View style={styles.signUpContainer}>
-                <Text style={styles.signUpText}>
-                  Don't have an account?{' '}
-                </Text>
+                <Text style={styles.signUpText}>Don't have an account? </Text>
                 <TouchableOpacity onPress={handleSignUp}>
                   <Text style={styles.signUpLink}>Sign Up</Text>
                 </TouchableOpacity>
