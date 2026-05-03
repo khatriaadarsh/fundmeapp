@@ -419,7 +419,7 @@ const SettingsScreen = ({ navigation }) => {
         <Section label="ACCOUNT">
           <NavRow
             label="Change Password"
-            onPress={go('EmailVerifyForResetPass')}
+            onPress={go('NewPasswordScreen')}
           />
           <NavRow label="Email Preferences" onPress={go('EmailPreferences')} />
           <NavRow

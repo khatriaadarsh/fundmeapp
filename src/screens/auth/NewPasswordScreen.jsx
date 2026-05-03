@@ -27,9 +27,9 @@ const COLORS = {
   border: '#E5E7EB',
 };
 
-const getPasswordStrength = (password) => {
+const getPasswordStrength = password => {
   if (!password) return { score: 0, label: '', color: COLORS.border };
-  
+
   let score = 0;
   if (password.length >= 8) score++;
   if (/[A-Z]/.test(password)) score++;
@@ -43,7 +43,7 @@ const getPasswordStrength = (password) => {
     { label: 'Good', color: COLORS.teal },
     { label: 'Strong', color: COLORS.green },
   ];
-  
+
   return { score, ...strengthMap[score] };
 };
 
@@ -54,7 +54,7 @@ const StrengthBar = ({ password }) => {
   return (
     <View style={styles.strengthWrap}>
       <View style={styles.strengthTrack}>
-        {[1, 2, 3, 4].map((i) => (
+        {[1, 2, 3, 4].map(i => (
           <View
             key={i}
             style={[
@@ -102,7 +102,7 @@ const NewPasswordScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim, iconScale ]);
+  }, [fadeAnim, slideAnim, iconScale]);
 
   const passwordsMatch = confirm.length > 0 && password === confirm;
   const passwordMismatch = confirm.length > 0 && password !== confirm;
@@ -138,7 +138,9 @@ const NewPasswordScreen = ({ navigation }) => {
             </Text>
 
             <View style={styles.fieldWrap}>
-              <View style={[styles.inputRow, passFocused && styles.inputFocused]}>
+              <View
+                style={[styles.inputRow, passFocused && styles.inputFocused]}
+              >
                 <Icons name="lock" size={16} color={COLORS.textGray} />
                 <TextInput
                   style={styles.input}
@@ -196,7 +198,9 @@ const NewPasswordScreen = ({ navigation }) => {
                 <Text style={styles.matchText}>✓ Passwords match</Text>
               )}
               {passwordMismatch && (
-                <Text style={styles.mismatchText}>✗ Passwords do not match</Text>
+                <Text style={styles.mismatchText}>
+                  ✗ Passwords do not match
+                </Text>
               )}
             </View>
 
@@ -234,6 +238,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 36,
     paddingTop: 20,
+    marginBottom: 45,
   },
   content: {
     width: '100%',

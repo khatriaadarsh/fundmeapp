@@ -1,6 +1,13 @@
 // src/screens/campaigns/MyCampaignsScreen.jsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+  StatusBar,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
@@ -19,9 +26,51 @@ const MyCampaignsScreen = ({ navigation }) => {
     return MY_CAMPAIGNS_DATA.filter(c => c.status === activeTab);
   }, [activeTab]);
 
-  const handleAction = useCallback((action, item) => {
-    console.warn(`Action: ${action} on ID: ${item.id}`);
-  }, []);
+  const handleAction = useCallback(
+    (action, item) => {
+      switch (action) {
+        case 'View':
+          navigation.navigate('CampaignDetails', { campaign: item });
+          break;
+
+        case 'Update':
+          navigation.navigate('CreateCampaign', {
+            editMode: true,
+            campaign: item,
+          });
+          break;
+
+        case 'Withdraw':
+          navigation.navigate('RequestWithdrawalScreen', {
+            campaign: item,
+          });
+          break;
+
+        case 'Edit':
+          navigation.navigate('CreateCampaign', {
+            editMode: true,
+            campaign: item,
+          });
+          break;
+
+        case 'Delete':
+          console.warn('Delete Campaign:', item.id);
+          break;
+
+        case 'Edit & Resubmit':
+          navigation.navigate('CreateCampaign', {
+            editMode: true,
+            campaign: item,
+            resubmit: true,
+          });
+          break;
+
+        default:
+          break;
+      }
+    },
+    [navigation],
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -29,8 +78,11 @@ const MyCampaignsScreen = ({ navigation }) => {
 
       {/* ✅ INTEGRATED HEADER - Matches MyDonationsScreen EXACTLY */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-           <Icons name="arrow-left" size={sp(22)} color="#111827" />
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icons name="arrow-left" size={sp(22)} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Campaigns</Text>
         <TouchableOpacity onPress={() => navigation.navigate('CreateCampaign')}>
@@ -39,28 +91,32 @@ const MyCampaignsScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={filteredData || []} 
+        data={filteredData || []}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        
         renderItem={({ item }) => (
-          <CampaignCard item={item} onAction={(act) => handleAction(act, item)} />
+          <CampaignCard item={item} onAction={act => handleAction(act, item)} />
         )}
-        
-        ItemSeparatorComponent={() => <View style={{height: sp(6)}} />}
-        
+        ItemSeparatorComponent={() => <View style={{ height: sp(6) }} />}
         ListHeaderComponent={
           <View style={styles.tabContainer}>
             {/* ✅ SPACER: Replaces the gap you felt was missing */}
             <View style={styles.topSpacer} />
-            
-            <FilterTabs tabs={CAMPAIGN_TABS} active={activeTab} onChange={setActiveTab} />
+
+            <FilterTabs
+              tabs={CAMPAIGN_TABS}
+              active={activeTab}
+              onChange={setActiveTab}
+            />
           </View>
         }
-
         ListEmptyComponent={
-          <EmptyState icon="folder" title={`No ${activeTab} Campaigns`} subtitle="We couldn't find any matching campaigns." />
+          <EmptyState
+            icon="folder"
+            title={`No ${activeTab} Campaigns`}
+            subtitle="We couldn't find any matching campaigns."
+          />
         }
       />
     </SafeAreaView>
@@ -70,7 +126,7 @@ const MyCampaignsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   // ✅ MATCHED: Uses P.bg to blend seamlessly (Just like Donations used PAGE_BG)
   safe: { flex: 1, backgroundColor: P.bg },
-  
+
   // ✅ MATCHED: Copied exact properties from MyDonationsScreen
   header: {
     flexDirection: 'row',
@@ -79,18 +135,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: sp(16),
     paddingVertical: sp(12),
     borderBottomWidth: StyleSheet.hairlineWidth, // Exact property for subtle line
-    borderBottomColor: '#E5E7EB',              // Exact color
-    backgroundColor: P.bg,                     // Matches body background
+    borderBottomColor: '#E5E7EB', // Exact color
+    backgroundColor: P.bg, // Matches body background
   },
-  
-  headerTitle: { fontSize: sp(17), fontWeight: '700', color: '#111827', letterSpacing: -0.2 },
+
+  headerTitle: {
+    fontSize: sp(17),
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.2,
+  },
   newBtn: { fontSize: sp(14), fontWeight: '700', color: P.teal }, // Using Theme Teal
-  
+
   // ✅ FIXED: Removed unnecessary paddingTop here to prevent jumpiness
-  listContent: { paddingBottom: sp(32), flexGrow: 1 }, 
-  
+  listContent: { paddingBottom: sp(32), flexGrow: 1 },
+
   tabContainer: { marginBottom: sp(14) },
-  
+
   // NEW: Creates consistent gap between Header and Tabs
   topSpacer: { height: sp(16) },
 });
