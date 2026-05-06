@@ -195,7 +195,7 @@ const ProfileScreen = ({ navigation }) => {
       }
 
       if (id === 'with') {
-        navigation.navigate('RequestWithdrawalScreen');
+        navigation.navigate('MyWithdrawalsScreen');
         return;
       }
       if (id === 'notif') {

@@ -27,8 +27,9 @@ import {
   Dimensions,
   Platform,
   Animated,
+  SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 // ── Components ───────────────────────────────────────────────

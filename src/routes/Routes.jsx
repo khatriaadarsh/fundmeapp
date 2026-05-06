@@ -35,6 +35,7 @@ import ReviewSubmit from '../screens/campaigncreation/ReviewSubmit';
 import EditProfile from '../screens/Profile/EditProfile';
 import MyDonationScreen from '../screens/donation/MyDonationsScreen';
 import MyCampaignsScreen from '../screens/campaigns/MyCampaignsScreen';
+import MyWithdrawalsScreen from '../screens/campaigns/MyWithdrawalsScreen';
 import RequestWithdrawalScreen from '../screens/campaigns/RequestWithdrawalScreen';
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 import TermsConditions from '../screens/campaigns/TermsConditions';
@@ -229,6 +230,7 @@ const StackNavigator = () => (
     />
     <Stack.Screen name="MainTabs" component={MainTabNavigator} />
     <Stack.Screen name="HomeScreen" component={HomeScreen} />
+    <Stack.Screen name="ExploreScreen" component={ExploreScreen} />
     <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
     <Stack.Screen name="CampaignDetails" component={CampaignDetails} />
     <Stack.Screen name="PhotosDocuments" component={PhotosDocuments} />
@@ -236,6 +238,7 @@ const StackNavigator = () => (
     <Stack.Screen name="EditProfile" component={EditProfile} />
     <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
     <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} />
+    <Stack.Screen name="MyWithdrawalsScreen" component={MyWithdrawalsScreen} />
     <Stack.Screen
       name="RequestWithdrawalScreen"
       component={RequestWithdrawalScreen}
@@ -246,7 +249,7 @@ const StackNavigator = () => (
     <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
     <Stack.Screen name="CampaignDetail" component={CampaignDetail} />
     <Stack.Screen name="CreateCampaign" component={CreateCampaign} />
-    {/* <Stack.Screen name="CampaignDetails"            component={CampaignDetails}           /> */}
+    {/* <Stack.Screen name="CampaignDetails" component={CampaignDetails}  /> */}
     <Stack.Screen name="DonateScreen" component={DonateScreen} />
     {/* <Stack.Navigator initialRouteName="CheckUser"> */}
     <Stack.Screen

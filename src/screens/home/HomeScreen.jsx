@@ -27,13 +27,19 @@ const HomeScreen = ({ navigation }) => {
     navigation?.navigate?.('ProfileTab');
   }, [navigation]);
 
+  const handleSeeAll = () => {
+    navigation.navigate('ExploreScreen');
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
       <TopBar
         user={CURRENT_USER}
         onAvatarPress={openProfile}
-        onBellPress={() => { /* Handle notification press */ }}
+        onBellPress={() => {
+          /* Handle notification press */
+        }}
       />
       <ScrollView
         style={styles.scroll}
@@ -46,11 +52,19 @@ const HomeScreen = ({ navigation }) => {
         <HeroBanner />
         <StatsRow />
 
-        <SectionHeader title="Categories" linkText="See All" onPress={() => {}} />
+        <SectionHeader
+          title="Categories"
+          linkText="See All"
+          onPress={handleSeeAll}
+        />
         <CategoryChips active={activeCat} onChange={handleCatChange} />
 
         {/* ✅ FIX: "linkText" is now identical to the one above, ensuring perfect alignment. */}
-        <SectionHeader title="🔥 Urgent Campaigns" linkText="See All" onPress={() => {}} />
+        <SectionHeader
+          title="🔥 Urgent Campaigns"
+          linkText="See All"
+          onPress={() => {}}
+        />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -61,7 +75,11 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </ScrollView>
 
-        <SectionHeader title="⭐ Featured" linkText="See All" onPress={() => {}} />
+        <SectionHeader
+          title="⭐ Featured"
+          linkText="See All"
+          onPress={() => {}}
+        />
         <View style={styles.featuredList}>
           {FEATURED.map(item => (
             <FeaturedItem key={item.id} item={item} />
@@ -73,16 +91,16 @@ const HomeScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  safe: { 
-    flex: 1, 
-    backgroundColor: P.white 
+  safe: {
+    flex: 1,
+    backgroundColor: P.white,
   },
-  scroll: { 
-    flex: 1, 
-    backgroundColor: P.bg 
+  scroll: {
+    flex: 1,
+    backgroundColor: P.bg,
   },
-  content: { 
-    paddingBottom: sp(28) 
+  content: {
+    paddingBottom: sp(28),
   },
   horizontalList: {
     paddingLeft: sp(16),

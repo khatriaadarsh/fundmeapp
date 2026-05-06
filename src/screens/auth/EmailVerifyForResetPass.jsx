@@ -15,14 +15,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Animated,
   Keyboard,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import GradientButton from '../../components/common/GradientButton';
 import { COLORS, SPACING, TYPOGRAPHY, scale } from '../../theme';
 
@@ -34,6 +36,7 @@ const EmailVerifyForResetPass = ({ navigation }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Shake animation ref — used on validation failure
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -114,7 +117,12 @@ const EmailVerifyForResetPass = ({ navigation }) => {
 
       {/* ── Back button ─────────────────────────────────── */}
       <TouchableOpacity
-        style={styles.backBtn}
+        style={[
+          styles.backBtn,
+          {
+            top: insets.top + scale(4),
+          },
+        ]}
         onPress={() => navigation.goBack()}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         activeOpacity={0.7}
@@ -196,17 +204,6 @@ const EmailVerifyForResetPass = ({ navigation }) => {
               disabled={loading || !email.trim()}
             />
           </View>
-
-          {/* ── Back to login ─────────────────────────────── */}
-          <View style={styles.backToLoginRow}>
-            <Text style={styles.backToLoginText}>Remember your password? </Text>
-            <Text
-              style={styles.backToLoginLink}
-              onPress={() => navigation.navigate('Login')}
-            >
-              Log In
-            </Text>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -227,7 +224,7 @@ const styles = StyleSheet.create({
   // ── Back button ─────────────────────────────────────────
   backBtn: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? scale(56) : scale(35),
+    top: Platform.OS === 'ios' ? scale(56) : scale(15),
     left: SPACING.screenPadding,
     width: scale(38),
     height: scale(38),
