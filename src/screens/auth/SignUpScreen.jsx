@@ -89,7 +89,7 @@ const SignUpScreen = ({ navigation }) => {
       Alert.alert(
         'Validation Failed',
         errors.map((err, idx) => `${idx + 1}. ${err}`).join('\n\n'),
-        [{ text: 'OK' }]
+        [{ text: 'OK' }],
       );
       return;
     }
@@ -108,26 +108,28 @@ const SignUpScreen = ({ navigation }) => {
         translucent={false}
       />
 
-      <Header
-        onBackPress={() => navigation.goBack()}
-        step={1}
-        totalSteps={4}
-      />
+      <Header onBackPress={() => navigation.goBack()} step={1} totalSteps={4} />
 
       <ProgressBar progress={25} />
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
       >
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingBottom: footerHeight + SPACING.lg },
+            {
+              paddingBottom: footerHeight + SPACING.xxxl,
+              flexGrow: 1,
+            },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={true}
           bounces={false}
         >
           <View style={styles.headlineContainer}>
@@ -146,7 +148,7 @@ const SignUpScreen = ({ navigation }) => {
               onChangeText={setFirstName}
               leftIcon="user"
               autoCapitalize="words"
-              validator={(val) => validateNameWithMessage(val, 'First name')}
+              validator={val => validateNameWithMessage(val, 'First name')}
               showValidationOnChange={true}
               containerStyle={styles.noMargin}
             />
@@ -215,10 +217,9 @@ const SignUpScreen = ({ navigation }) => {
           </View>
 
           {/* Role Selector - Mandatory */}
-          <RoleSelector
-            value={role}
-            onChange={setRole}
-          />
+          <View style={styles.roleWrapper}>
+            <RoleSelector value={role} onChange={setRole} />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -273,6 +274,9 @@ const styles = StyleSheet.create({
   noMargin: {
     marginBottom: SPACING.md,
   },
+  roleWrapper: {
+    marginBottom: SPACING.xxl,
+  },
   footer: {
     position: 'absolute',
     left: 0,
@@ -283,6 +287,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.border,
+
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 10,
   },
   buttonIcon: {
     marginLeft: SPACING.gapSm,

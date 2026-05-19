@@ -47,6 +47,7 @@ import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 import DonateScreen from '../screens/campaigns/DonateScreen';
 import CheckUser from '../screens/auth/CheckUser';
 import CreatorProfileScreen from '../screens/Profile/CreatorProfileScreen';
+import FeedbackScreen from '../screens/feedback/FeedbackScreen';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -262,6 +263,7 @@ const StackNavigator = () => (
       component={CreatorProfileScreen}
       options={{ headerShown: false }}
     />
+    <Stack.Screen name="FeedbackScreen" component={FeedbackScreen} />
   </Stack.Navigator>
 );
 

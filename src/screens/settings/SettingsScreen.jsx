@@ -421,7 +421,7 @@ const SettingsScreen = ({ navigation }) => {
             label="Change Password"
             onPress={go('NewPasswordScreen')}
           />
-          <NavRow label="Email Preferences" onPress={go('EmailPreferences')} />
+          <NavRow label="Email Preferences" onPress={go('FeedbackScreen')} />
           <NavRow
             icon="trash-2"
             iconColor={C.danger}

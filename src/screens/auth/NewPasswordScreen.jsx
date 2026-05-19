@@ -1,3 +1,15 @@
+// src/screens/auth/NewPasswordScreen.jsx
+// ─────────────────────────────────────────────────────────────
+//  Forgot Password — Step 3: Set New Password
+//  Validation matches SendResetCode + EmailVerifyForResetPass:
+//    • Shake animation on failure
+//    • Inline error per field
+//    • Weak password blocked (min score 2)
+//    • Both fields turn red border on their own errors
+//    • SafeAreaView added
+//    • Button disabled after successful submit (prevents double-tap)
+// ─────────────────────────────────────────────────────────────
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -9,17 +21,24 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  SafeAreaView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
+// ─────────────────────────────────────────────────────────────
+//  Colors — unchanged from original
+// ─────────────────────────────────────────────────────────────
 const COLORS = {
   bg: '#FFFFFF',
   teal: '#00B4CC',
   tealDark: '#0097AA',
   tealLight: 'rgba(0,180,204,0.12)',
   green: '#22C55E',
+  greenLight: 'rgba(34,197,94,0.10)',
   red: '#EF4444',
+  redLight: '#FEF2F2',
   amber: '#F59E0B',
   textDark: '#111827',
   textGray: '#6B7280',
@@ -27,30 +46,33 @@ const COLORS = {
   border: '#E5E7EB',
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Password strength — unchanged from original
+// ─────────────────────────────────────────────────────────────
 const getPasswordStrength = password => {
   if (!password) return { score: 0, label: '', color: COLORS.border };
-
   let score = 0;
   if (password.length >= 8) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
 
-  const strengthMap = [
+  const map = [
     { label: '', color: COLORS.border },
     { label: 'Weak', color: COLORS.red },
     { label: 'Fair', color: COLORS.amber },
     { label: 'Good', color: COLORS.teal },
     { label: 'Strong', color: COLORS.green },
   ];
-
-  return { score, ...strengthMap[score] };
+  return { score, ...map[score] };
 };
 
+// ─────────────────────────────────────────────────────────────
+//  StrengthBar — unchanged from original
+// ─────────────────────────────────────────────────────────────
 const StrengthBar = ({ password }) => {
   const { score, label, color } = getPasswordStrength(password);
   if (!password) return null;
-
   return (
     <View style={styles.strengthWrap}>
       <View style={styles.strengthTrack}>
@@ -69,6 +91,27 @@ const StrengthBar = ({ password }) => {
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Inline error row — same pattern as SendResetCode
+// ─────────────────────────────────────────────────────────────
+const ErrorMsg = ({ msg }) => {
+  if (!msg) return null;
+  return (
+    <View style={styles.errorRow}>
+      <Icons
+        name="alert-circle"
+        size={12}
+        color={COLORS.red}
+        style={{ marginRight: 4 }}
+      />
+      <Text style={styles.errorText}>{msg}</Text>
+    </View>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+//  NewPasswordScreen
+// ─────────────────────────────────────────────────────────────
 const NewPasswordScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -76,11 +119,21 @@ const NewPasswordScreen = ({ navigation }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const [confFocused, setConfFocused] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
+  // ── Per-field errors ──────────────────────────────────────
+  const [errors, setErrors] = useState({ password: '', confirm: '' });
+
+  const clearError = key => setErrors(prev => ({ ...prev, [key]: '' }));
+
+  // ── Animation refs ────────────────────────────────────────
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
   const iconScale = useRef(new Animated.Value(0.6)).current;
+  const shakePassAnim = useRef(new Animated.Value(0)).current; // password field shake
+  const shakeConfAnim = useRef(new Animated.Value(0)).current; // confirm field shake
 
+  // ── Mount animation — unchanged ───────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -104,15 +157,96 @@ const NewPasswordScreen = ({ navigation }) => {
     ]).start();
   }, [fadeAnim, slideAnim, iconScale]);
 
+  // ── Shake helper — same pattern as SendResetCode ──────────
+  const shake = useCallback(anim => {
+    Animated.sequence([
+      Animated.timing(anim, {
+        toValue: 10,
+        duration: 55,
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim, {
+        toValue: -10,
+        duration: 55,
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim, {
+        toValue: 7,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim, {
+        toValue: -7,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 35,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  // ── Derived state for live feedback (kept from original) ──
+  const { score: strengthScore } = getPasswordStrength(password);
   const passwordsMatch = confirm.length > 0 && password === confirm;
   const passwordMismatch = confirm.length > 0 && password !== confirm;
 
+  // ── Validation ────────────────────────────────────────────
+  const validate = useCallback(() => {
+    const e = { password: '', confirm: '' };
+    let valid = true;
+
+    // Password: required
+    if (!password) {
+      e.password = 'Password is required';
+      valid = false;
+    }
+    // Password: minimum length
+    else if (password.length < 8) {
+      e.password = 'Password must be at least 8 characters';
+      valid = false;
+    }
+    // Password: minimum strength (score must be ≥ 2 = "Fair")
+    else if (strengthScore < 2) {
+      e.password = 'Password is too weak — add uppercase letters or numbers';
+      valid = false;
+    }
+
+    // Confirm: required
+    if (!confirm) {
+      e.confirm = 'Please confirm your password';
+      valid = false;
+    }
+    // Confirm: must match
+    else if (password !== confirm) {
+      e.confirm = 'Passwords do not match';
+      valid = false;
+    }
+
+    setErrors(e);
+
+    // Shake the fields that have errors
+    if (e.password) shake(shakePassAnim);
+    if (e.confirm) shake(shakeConfAnim);
+
+    return valid;
+  }, [password, confirm, strengthScore, shake, shakePassAnim, shakeConfAnim]);
+
+  // ── Submit ────────────────────────────────────────────────
   const handleResetPassword = useCallback(() => {
-    navigation.navigate('Login');
-  }, [navigation]);
+    Keyboard.dismiss();
+    if (!validate()) return;
+
+    setSubmitted(true);
+    // TODO: Replace with your actual API call
+    // e.g. await authService.resetPassword({ password })
+    setTimeout(() => navigation.navigate('Login'), 1200);
+  }, [validate, navigation]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
 
       <KeyboardAvoidingView
@@ -126,111 +260,181 @@ const NewPasswordScreen = ({ navigation }) => {
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
+            {/* ── Icon circle ─────────────────────────────── */}
             <Animated.View
               style={[styles.iconCircle, { transform: [{ scale: iconScale }] }]}
             >
               <Icons name="lock" size={28} color={COLORS.teal} />
             </Animated.View>
 
+            {/* ── Heading ─────────────────────────────────── */}
             <Text style={styles.headline}>New Password</Text>
             <Text style={styles.subtitle}>
-              Your new password must be different from previous used passwords.
+              Your new password must be different from previously used
+              passwords.
             </Text>
 
+            {/* ── Password field ───────────────────────────── */}
             <View style={styles.fieldWrap}>
-              <View
-                style={[styles.inputRow, passFocused && styles.inputFocused]}
+              <Animated.View
+                style={{ transform: [{ translateX: shakePassAnim }] }}
               >
-                <Icons name="lock" size={16} color={COLORS.textGray} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••••••"
-                  placeholderTextColor={COLORS.textLight}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPass}
-                  autoCapitalize="none"
-                  onFocus={() => setPassFocused(true)}
-                  onBlur={() => setPassFocused(false)}
-                />
-                <TouchableOpacity onPress={() => setShowPass(!showPass)}>
+                <View
+                  style={[
+                    styles.inputRow,
+                    passFocused && styles.inputFocused,
+                    errors.password && styles.inputError,
+                  ]}
+                >
                   <Icons
-                    name={showPass ? 'eye-off' : 'eye'}
-                    size={18}
-                    color={COLORS.textGray}
+                    name="lock"
+                    size={16}
+                    color={errors.password ? COLORS.red : COLORS.textGray}
                   />
-                </TouchableOpacity>
-              </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="New password"
+                    placeholderTextColor={COLORS.textLight}
+                    value={password}
+                    onChangeText={text => {
+                      setPassword(text);
+                      if (errors.password) clearError('password');
+                    }}
+                    secureTextEntry={!showPass}
+                    autoCapitalize="none"
+                    onFocus={() => setPassFocused(true)}
+                    onBlur={() => setPassFocused(false)}
+                    returnKeyType="next"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPass(v => !v)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Icons
+                      name={showPass ? 'eye-off' : 'eye'}
+                      size={18}
+                      color={COLORS.textGray}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
 
-              <StrengthBar password={password} />
+              {/* Strength bar — shown while typing, hides on error */}
+              {!errors.password && <StrengthBar password={password} />}
+
+              {/* Password field error */}
+              <ErrorMsg msg={errors.password} />
             </View>
 
+            {/* ── Confirm password field ───────────────────── */}
             <View style={styles.fieldWrap}>
-              <View
-                style={[
-                  styles.inputRow,
-                  confFocused && styles.inputFocused,
-                  passwordMismatch && styles.inputError,
-                ]}
+              <Animated.View
+                style={{ transform: [{ translateX: shakeConfAnim }] }}
               >
-                <Icons name="lock" size={16} color={COLORS.textGray} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••••••"
-                  placeholderTextColor={COLORS.textLight}
-                  value={confirm}
-                  onChangeText={setConfirm}
-                  secureTextEntry={!showConfirm}
-                  autoCapitalize="none"
-                  onFocus={() => setConfFocused(true)}
-                  onBlur={() => setConfFocused(false)}
-                />
-                <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+                <View
+                  style={[
+                    styles.inputRow,
+                    confFocused && styles.inputFocused,
+                    (errors.confirm || passwordMismatch) && styles.inputError,
+                    passwordsMatch && styles.inputSuccess,
+                  ]}
+                >
                   <Icons
-                    name={showConfirm ? 'eye-off' : 'eye'}
-                    size={18}
-                    color={COLORS.textGray}
+                    name="lock"
+                    size={16}
+                    color={
+                      errors.confirm || passwordMismatch
+                        ? COLORS.red
+                        : passwordsMatch
+                        ? COLORS.green
+                        : COLORS.textGray
+                    }
                   />
-                </TouchableOpacity>
-              </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm new password"
+                    placeholderTextColor={COLORS.textLight}
+                    value={confirm}
+                    onChangeText={text => {
+                      setConfirm(text);
+                      if (errors.confirm) clearError('confirm');
+                    }}
+                    secureTextEntry={!showConfirm}
+                    autoCapitalize="none"
+                    onFocus={() => setConfFocused(true)}
+                    onBlur={() => setConfFocused(false)}
+                    returnKeyType="done"
+                    onSubmitEditing={handleResetPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirm(v => !v)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Icons
+                      name={showConfirm ? 'eye-off' : 'eye'}
+                      size={18}
+                      color={COLORS.textGray}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
 
-              {passwordsMatch && (
-                <Text style={styles.matchText}>✓ Passwords match</Text>
+              {/* Live match / mismatch feedback (from original) */}
+              {!errors.confirm && passwordsMatch && (
+                <View style={styles.matchRow}>
+                  <Icons name="check-circle" size={12} color={COLORS.green} />
+                  <Text style={styles.matchText}>Passwords match</Text>
+                </View>
               )}
-              {passwordMismatch && (
-                <Text style={styles.mismatchText}>
-                  ✗ Passwords do not match
-                </Text>
+              {!errors.confirm && passwordMismatch && (
+                <View style={styles.mismatchRow}>
+                  <Icons name="x-circle" size={12} color={COLORS.red} />
+                  <Text style={styles.mismatchText}>
+                    Passwords do not match
+                  </Text>
+                </View>
               )}
+
+              {/* Confirm field error (shown after submit attempt) */}
+              <ErrorMsg msg={errors.confirm} />
             </View>
 
+            {/* ── Reset button ─────────────────────────────── */}
             <TouchableOpacity
               onPress={handleResetPassword}
               activeOpacity={0.85}
               style={styles.buttonWrap}
+              disabled={submitted}
             >
               <LinearGradient
-                colors={[COLORS.teal, COLORS.tealDark]}
-                style={styles.resetBtn}
+                colors={
+                  submitted
+                    ? ['#9CA3AF', '#9CA3AF']
+                    : [COLORS.teal, COLORS.tealDark]
+                }
+                style={[styles.resetBtn, submitted && { opacity: 0.7 }]}
               >
-                <Text style={styles.resetBtnText}>Reset Password</Text>
+                <Text style={styles.resetBtnText}>
+                  {submitted ? 'Redirecting...' : 'Reset Password'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Styles — StyleSheets defined before they are referenced
+// ─────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-  keyboardView: {
-    flex: 1,
-  },
+  keyboardView: { flex: 1 },
   inner: {
     flex: 1,
     justifyContent: 'center',
@@ -245,6 +449,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignItems: 'center',
   },
+
+  // ── Icon ──────────────────────────────────────────────────
   iconCircle: {
     width: 76,
     height: 76,
@@ -254,6 +460,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 22,
   },
+
+  // ── Text ──────────────────────────────────────────────────
   headline: {
     fontSize: 24,
     fontWeight: '800',
@@ -269,10 +477,10 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-  fieldWrap: {
-    width: '100%',
-    marginBottom: 16,
-  },
+
+  // ── Fields ────────────────────────────────────────────────
+  fieldWrap: { width: '100%', marginBottom: 16 },
+
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -283,66 +491,74 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
   },
-  inputFocused: {
-    borderColor: COLORS.teal,
+  inputFocused: { borderColor: COLORS.teal },
+  inputError: { borderColor: COLORS.red, backgroundColor: COLORS.redLight },
+  inputSuccess: {
+    borderColor: COLORS.green,
+    backgroundColor: COLORS.greenLight,
   },
-  inputError: {
-    borderColor: COLORS.red,
-  },
+
   input: {
     flex: 1,
     fontSize: 15,
     color: COLORS.textDark,
     marginLeft: 10,
   },
-  strengthWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  strengthTrack: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  strengthSegment: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
+
+  // ── Strength bar — unchanged ───────────────────────────────
+  strengthWrap: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  strengthTrack: { flex: 1, flexDirection: 'row', gap: 4 },
+  strengthSegment: { flex: 1, height: 4, borderRadius: 2 },
   strengthLabel: {
     fontSize: 12,
     fontWeight: '700',
     minWidth: 50,
     textAlign: 'right',
   },
-  matchText: {
+
+  // ── Match / mismatch live feedback ────────────────────────
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 6,
-    fontSize: 12,
-    color: COLORS.green,
-    fontWeight: '600',
   },
-  mismatchText: {
+  mismatchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 6,
+  },
+  matchText: { fontSize: 12, color: COLORS.green, fontWeight: '600' },
+  mismatchText: { fontSize: 12, color: COLORS.red, fontWeight: '600' },
+
+  // ── Error row (same pattern as SendResetCode) ─────────────
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  errorText: {
     fontSize: 12,
     color: COLORS.red,
-    fontWeight: '600',
+    flexShrink: 1,
   },
-  buttonWrap: {
-    width: '100%',
-  },
+
+  // ── Button ────────────────────────────────────────────────
+  buttonWrap: { width: '100%' },
   resetBtn: {
     width: '100%',
     paddingVertical: 16,
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
+    elevation: 3,
+    shadowColor: COLORS.teal,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
   },
-  resetBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  resetBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
 
 export default NewPasswordScreen;
