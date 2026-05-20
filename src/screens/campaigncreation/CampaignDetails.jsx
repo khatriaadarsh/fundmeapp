@@ -647,7 +647,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     height: sp(50),
     borderRadius: sp(10),
-    backgroundColor: P.darkOcean,
+    backgroundColor: P.teal,
     gap: sp(6),
   },
   nextTxt: { fontSize: sp(15), fontWeight: '700', color: P.white },

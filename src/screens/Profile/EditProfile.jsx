@@ -46,6 +46,7 @@ const C = {
   overlay: 'rgba(10,20,40,0.60)',
   avatarBg: '#B0BEC5',
   stripBg: '#D6E8F7',
+  teal: '#00B4CC',
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -274,13 +275,6 @@ const Header = ({ onBack, onSave, saveDisabled }) => (
       <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
     </TouchableOpacity>
     <Text style={s.headerTitle}>Edit Profile</Text>
-    <TouchableOpacity
-      onPress={onSave}
-      disabled={saveDisabled}
-      style={s.headerBtn}
-    >
-      <Text style={[s.saveText, saveDisabled && s.saveTextDisabled]}>Save</Text>
-    </TouchableOpacity>
   </View>
 );
 
@@ -997,7 +991,6 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: scale(12),
     // paddingVertical: vscale(13),
     backgroundColor: C.bg,
@@ -1013,13 +1006,16 @@ const s = StyleSheet.create({
   headerTitle: {
     fontSize: scale(17),
     fontWeight: '700',
-    color: C.textDark,
+    color: C.teal,
     letterSpacing: -0.3,
+    position: 'absolute',
+    left: '60%',
+    transform: [{ translateX: -scale(60) }],
   },
   saveText: {
     fontSize: scale(15),
     fontWeight: '600',
-    color: C.primary,
+    color: C.teal,
     textAlign: 'right',
   },
   saveTextDisabled: { color: C.textLight },
@@ -1139,7 +1135,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: C.inputBg,
   },
-  genderPillActive: { backgroundColor: C.primary, borderColor: C.primary },
+  genderPillActive: { backgroundColor: C.teal, borderColor: C.teal },
   genderText: { fontSize: scale(14), fontWeight: '500', color: C.textGray },
   genderTextActive: { color: C.white, fontWeight: '600' },
 
@@ -1153,13 +1149,13 @@ const s = StyleSheet.create({
     borderTopColor: C.border,
   },
   saveBtn: {
-    backgroundColor: C.primary,
+    backgroundColor: C.teal,
     height: vscale(52),
     borderRadius: scale(12),
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
-    shadowColor: C.primary,
+    shadowColor: C.teal,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,

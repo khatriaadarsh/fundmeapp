@@ -201,7 +201,7 @@ const s = StyleSheet.create({
     borderTopColor: C.border,
   },
   nextBtn: {
-    backgroundColor: C.navy,
+    backgroundColor: C.teal,
     borderRadius: sp(10),
     height: sp(50),
     flexDirection: 'row',

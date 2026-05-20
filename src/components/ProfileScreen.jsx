@@ -436,7 +436,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: P.white,
     marginHorizontal: sp(16),
-    marginTop: sp(-1),
+    marginTop: sp(10),
     borderRadius: sp(14),
     elevation: 4,
     shadowColor: '#000',
