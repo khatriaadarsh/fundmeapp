@@ -1,8 +1,8 @@
+// src/screens/auth/CheckUser.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   StatusBar,
   Platform,
@@ -21,144 +21,122 @@ import {
   FooterLinks,
 } from './CheckUserComponents';
 
-const { width: SW, height: SH } = Dimensions.get('window');
+import { useAppContext }                  from '../../context/AppContext';
+import { useCheckUser, resolveAuthRoute } from '../../hooks/useAuth';
+import { FullScreenLoader }               from '../../components/common/Loader';
+
+const { width: SW } = Dimensions.get('window');
 const sp = n => Math.round((SW / 375) * n);
 
 const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 const CheckUser = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-  const [isValid, setIsValid] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [networkError, setNetworkError] = useState('');
+  const { saveUser } = useAppContext();
+  const { mutate: checkUser, isPending } = useCheckUser();
+
+  const [email,           setEmail]           = useState('');
+  const [isFocused,       setIsFocused]       = useState(false);
+  const [isValid,         setIsValid]         = useState(false);
+  const [hasError,        setHasError]        = useState(false);
+  const [errorMsg,        setErrorMsg]        = useState('');
+  const [networkError,    setNetworkError]    = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const showListener = Keyboard.addListener(
+    const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       () => setKeyboardVisible(true),
     );
-    const hideListener = Keyboard.addListener(
+    const hide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => setKeyboardVisible(false),
     );
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
+    return () => { show.remove(); hide.remove(); };
   }, []);
 
-  const clearError = () => {
-    setHasError(false);
-    setErrorMsg('');
-  };
-
-  const showError = (msg) => {
-    setHasError(true);
-    setErrorMsg(msg);
-    setIsValid(false);
-  };
+  const clearError = () => { setHasError(false); setErrorMsg(''); };
+  const showError  = (msg) => { setHasError(true); setErrorMsg(msg); setIsValid(false); };
 
   const handleChange = useCallback((text) => {
     setEmail(text);
     setNetworkError('');
-    if (text.length === 0) {
-      clearError();
-      setIsValid(false);
-      return;
-    }
+    if (text.length === 0) { clearError(); setIsValid(false); return; }
     const valid = EMAIL_RE.test(text);
     setIsValid(valid);
-    if (!valid && text.length > 5) {
-      showError('Please enter a valid email address');
-    } else {
-      clearError();
-    }
+    if (!valid && text.length > 5) showError('Please enter a valid email address');
+    else clearError();
   }, []);
 
   const handleBlur = useCallback(() => {
     setIsFocused(false);
-    if (email.trim() === '') {
-      showError('Email address is required');
-      return;
-    }
-    if (!EMAIL_RE.test(email)) {
-      showError('Please enter a valid email address');
-    }
+    if (email.trim() === '')    return showError('Email address is required');
+    if (!EMAIL_RE.test(email))  return showError('Please enter a valid email address');
   }, [email]);
 
-  const handleSubmit = useCallback(async () => {
-    if (email.trim() === '') {
-      showError('Email address is required');
-      return;
-    }
-    if (!EMAIL_RE.test(email)) {
-      showError('Please enter a valid email address');
-      return;
-    }
+  const handleSubmit = useCallback(() => {
+    if (email.trim() === '')   return showError('Email address is required');
+    if (!EMAIL_RE.test(email)) return showError('Please enter a valid email address');
 
-    setIsLoading(true);
     setNetworkError('');
+    Keyboard.dismiss();
 
-    try {
-      const userExists = true; // Mock
-      if (userExists === true) {
-        navigation.replace('Login', { email: email.trim() });
-      } else {
-        navigation.replace('SignupScreen', { email: email.trim() });
-      }
-    } catch (err) {
-      setNetworkError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [email, navigation]);
+    checkUser(email.trim(), {
+      onSuccess: async (result) => {
+        await saveUser({
+          email:      result.email,
+          userId:     result.userId,
+          exists:     result.exists,
+          step:       result.step,
+          stepStatus: result.stepStatus,
+          status:     result.registrationStatus,
+          profile:    result.profile,
+        });
 
-  const helperMsg = !hasError && !isLoading ? "We'll never share your email" : '';
+        const { screen, params } = resolveAuthRoute(result);
+        navigation.replace(screen, params);
+      },
+      onError: (err) => {
+        setNetworkError(err?.message || 'Something went wrong. Please try again.');
+      },
+    });
+  }, [email, checkUser, navigation, saveUser]);
+
+  const helperMsg = !hasError && !isPending ? "We'll never share your email" : '';
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0A3D62" />
 
-      <ScrollView 
-        bounces={false} 
+      <ScrollView
+        bounces={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
       >
-        {/* Hero is now part of the flow, not absolute, for better scrolling on Vivo */}
         <HeroSection />
 
-        {/* This card now uses a negative margin to overlap the hero exactly like Figma */}
         <View style={s.floatingCardWrapper}>
           <Text style={s.cardTitle}>Welcome to FundMe</Text>
           <Text style={s.cardSubtitle}>
-            Enter your email to continue. We'll check if you already have an
-            account.
+            Enter your email to continue. We'll check if you already have an account.
           </Text>
 
           <EmailInputField
             value={email}
             onChangeText={handleChange}
-            onFocus={() => {
-              setIsFocused(true);
-              setNetworkError('');
-            }}
+            onFocus={() => { setIsFocused(true); setNetworkError(''); }}
             onBlur={handleBlur}
             isFocused={isFocused}
             isValid={isValid}
             hasError={hasError}
-            isLoading={isLoading}
+            isLoading={isPending}
             errorMsg={errorMsg}
             helperMsg={helperMsg}
           />
 
           <ContinueButton
             onPress={handleSubmit}
-            isLoading={isLoading}
-            disabled={false}
+            isLoading={isPending}
+            disabled={isPending}
           />
         </View>
 
@@ -176,6 +154,8 @@ const CheckUser = ({ navigation }) => {
           <Text style={s.toastTxt}>{networkError}</Text>
         </View>
       ) : null}
+
+      <FullScreenLoader visible={isPending} message="Checking your email…" />
     </SafeAreaView>
   );
 };
@@ -183,15 +163,9 @@ const CheckUser = ({ navigation }) => {
 export default CheckUser;
 
 const s = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F4F5F7',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: sp(20),
-  },
-  floatingCardWrapper: {
+  safe:               { flex: 1, backgroundColor: '#F4F5F7' },
+  scrollContent:      { flexGrow: 1, paddingBottom: sp(20) },
+  floatingCardWrapper:{
     backgroundColor: '#FFFFFF',
     borderRadius: sp(24),
     padding: sp(24),
@@ -201,33 +175,13 @@ const s = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     marginHorizontal: sp(20),
-    
-    // ✅ THE FIGMA SECRET: Pull the card UP into the hero section
-    marginTop: -sp(50), 
+    marginTop: -sp(50),
     zIndex: 10,
   },
-  cardTitle: {
-    fontSize: sp(22),
-    fontWeight: '800',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: sp(8),
-    lineHeight: sp(28),
-  },
-  cardSubtitle: {
-    fontSize: sp(13),
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: sp(19),
-    marginBottom: sp(24),
-    paddingHorizontal: sp(4),
-  },
-  footerContainer: {
-    marginTop: 'auto', 
-    paddingHorizontal: sp(20),
-    paddingBottom: sp(8),
-  },
-  toast: {
+  cardTitle:       { fontSize: sp(22), fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: sp(8), lineHeight: sp(28) },
+  cardSubtitle:    { fontSize: sp(13), color: '#6B7280', textAlign: 'center', lineHeight: sp(19), marginBottom: sp(24), paddingHorizontal: sp(4) },
+  footerContainer: { marginTop: 'auto', paddingHorizontal: sp(20), paddingBottom: sp(8) },
+  toast:           {
     position: 'absolute',
     bottom: sp(28),
     left: sp(20),
@@ -241,10 +195,5 @@ const s = StyleSheet.create({
     zIndex: 1000,
   },
   toastIcon: { marginRight: sp(8) },
-  toastTxt: {
-    fontSize: sp(13),
-    color: '#FFFFFF',
-    flex: 1,
-    lineHeight: sp(18),
-  },
+  toastTxt:  { fontSize: sp(13), color: '#FFFFFF', flex: 1, lineHeight: sp(18) },
 });

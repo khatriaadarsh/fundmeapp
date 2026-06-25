@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "386619786970",
+    "project_id": "fundme-615fb",
+    "storage_bucket": "fundme-615fb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:386619786970:android:e8db868e108ece73bf87e3",
+        "android_client_info": {
+          "package_name": "com.fundmeapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVKbvUHKcrUFPo6uEdIgLCAY3zuAVRVNo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

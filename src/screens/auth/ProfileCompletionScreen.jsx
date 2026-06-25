@@ -1,3 +1,4 @@
+// src/screens/auth/ProfileCompletionScreen.js
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
@@ -8,133 +9,153 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 
-import Header from '../../components/common/Header';
-import ProgressBar from '../../components/common/ProgressBar';
-import InputField from '../../components/common/InputField';
-import PhotoPicker from '../../components/auth/PhotoPicker';
-import GenderToggle from '../../components/auth/GenderToggle';
-import Dropdown from '../../components/forms/Dropdown';
-import GradientButton from '../../components/common/GradientButton';
-import FieldLabel from '../../components/common/FieldLabel';
+import Header           from '../../components/common/Header';
+import ProgressBar      from '../../components/common/ProgressBar';
+import InputField       from '../../components/common/InputField';
+import PhotoPicker      from '../../components/auth/PhotoPicker';
+import GenderToggle     from '../../components/auth/GenderToggle';
+import Dropdown         from '../../components/forms/Dropdown';
+import GradientButton   from '../../components/common/GradientButton';
+import FieldLabel       from '../../components/common/FieldLabel';
+import { FullScreenLoader } from '../../components/common/Loader';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
-import { PROVINCES, CITIES_BY_PROVINCE } from '../../constants/data';
-import { formatDateOfBirth } from '../../utils/formatters';
-import { validateDOBWithMessage, validateGenderWithMessage } from '../../utils/validators';
+import { formatDateOfBirth, dobUiToApi } from '../../utils/formatters';
+import {
+  validateDOBWithMessage,
+  validateGenderWithMessage,
+} from '../../utils/validators';
+import { fileFromUri } from '../../utils/formData';
 
-const ProfileCompletionScreen = ({ navigation }) => {
+import { useRegisterStep4 }            from '../../hooks/useRegistration';
+import { useProvinces, useCities }     from '../../hooks/useLocation';
+import { useAppContext }               from '../../context/AppContext';
+import { useToast }                    from '../../components/common/Toast';
+
+const ProfileCompletionScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const toast  = useToast();
+  const { currentUser } = useAppContext();
+  const { mutate: submitStep4, isPending } = useRegisterStep4();
+
+  const email = route?.params?.email || currentUser?.email || '';
+
+  // Cached API data
+  const { data: provinces = [], isLoading: loadingProvinces } = useProvinces();
 
   // Form State
-  const [photoUri, setPhotoUri] = useState(null);
-  const [bio, setBio] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
-  const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  const [photoUri,   setPhotoUri]   = useState(null);
+  const [bio,        setBio]        = useState('');
+  const [dob,        setDob]        = useState('');
+  const [gender,     setGender]     = useState('');
+  const [provinceId, setProvinceId] = useState(null);
+  const [province,   setProvince]   = useState('');
+  const [cityId,     setCityId]     = useState(null);
+  const [city,       setCity]       = useState('');
+  const [errors,     setErrors]     = useState({});
 
-  // Error State
-  const [errors, setErrors] = useState({});
+  const { data: cities = [], isLoading: loadingCities } = useCities(provinceId);
+
+  // Convert backend list → Dropdown options
+  // Your existing Dropdown receives string[]. We'll pass names and look up IDs separately.
+  // 
+  const provinceNames = useMemo(
+  () => Array.isArray(provinces) ? provinces.map(p => p.name) : [],
+  [provinces]
+);
+
+  // const cityNames     = useMemo(() => cities.map(c => c.name), [cities]);
+  const cityNames = useMemo(
+  () => Array.isArray(cities) ? cities.map(c => c.name) : [],
+  [cities]
+);
 
   const handleDobChange = useCallback((text) => {
-    const formatted = formatDateOfBirth(text);
-    setDob(formatted);
+    setDob(formatDateOfBirth(text));
   }, []);
 
-  const handleProvinceChange = useCallback((value) => {
-    setProvince(value);
-    // Reset city when province changes
+  const handleProvinceChange = useCallback((name) => {
+    const found = provinces.find(p => p.name === name);
+    setProvinceId(found?.id ?? null);
+    setProvince(name);
     setCity('');
-    // Clear city error if exists
-    if (errors.city) {
-      setErrors({ ...errors, city: null });
-    }
-  }, [errors]);
+    setCityId(null);
+    if (errors.city) setErrors({ ...errors, city: null });
+  }, [provinces, errors]);
 
-  const handleCityChange = useCallback((value) => {
-    setCity(value);
-    if (errors.city) {
-      setErrors({ ...errors, city: null });
-    }
-  }, [errors]);
+  const handleCityChange = useCallback((name) => {
+    const found = cities.find(c => c.name === name);
+    setCityId(found?.id ?? null);
+    setCity(name);
+    if (errors.city) setErrors({ ...errors, city: null });
+  }, [cities, errors]);
 
-  // Handle when user tries to select city without province
   const handleCityDisabledPress = useCallback(() => {
     setErrors({ ...errors, city: 'Please select province first' });
   }, [errors]);
 
-  // Get cities based on selected province
-  const availableCities = useMemo(() => {
-    if (!province) return [];
-    return CITIES_BY_PROVINCE[province] || [];
-  }, [province]);
-
-  // Form validation
-  const isFormValid = useMemo(() => {
-    return (
-      dob.length === 14 && // DD / MM / YYYY
-      gender &&
-      province &&
-      city
-    );
-  }, [dob, gender, province, city]);
+  const isFormValid = useMemo(() => (
+    dob.length === 14 && gender && province && city
+  ), [dob, gender, province, city]);
 
   const handleComplete = useCallback(() => {
-    // Validate all fields
     const validationErrors = [];
 
-    const dobError = validateDOBWithMessage(dob);
-    if (dobError) validationErrors.push(dobError);
-
+    const dobError    = validateDOBWithMessage(dob);
     const genderError = validateGenderWithMessage(gender);
+    if (dobError)    validationErrors.push(dobError);
     if (genderError) validationErrors.push(genderError);
-
-    if (!province) {
-      validationErrors.push('Please select your province');
-    }
-
-    if (!city) {
-      validationErrors.push('Please select your city');
-    }
+    if (!province)   validationErrors.push('Please select your province');
+    if (!city)       validationErrors.push('Please select your city');
 
     if (validationErrors.length > 0) {
-      Alert.alert(
-        'Please Complete Required Fields',
-        validationErrors.map((err, idx) => `${idx + 1}. ${err}`).join('\n\n'),
-        [{ text: 'OK' }]
-      );
+      toast.error(validationErrors[0]);
       return;
     }
 
-    // Success - navigate to login
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
-  }, [dob, gender, province, city, navigation]);
+    if (!email) {
+      toast.error('Missing email. Please restart registration.');
+      return;
+    }
 
-  const footerPb = insets.bottom > 0 ? insets.bottom : SPACING.xl;
+    const photoUriValue = typeof photoUri === 'string' ? photoUri : photoUri?.uri;
+
+    submitStep4(
+      {
+        email,
+        profileImage: fileFromUri(photoUriValue, 'profile.jpg'),
+        bio,
+        dateOfBirth:  dobUiToApi(dob),
+        gender,
+        province,
+        city,
+      },
+      {
+        onSuccess: (body) => {
+          toast.success(body?.responseMessage || 'Profile completed successfully!');
+          setTimeout(() => {
+            navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          }, 1200);
+        },
+        onError: (err) => {
+          toast.error(err?.message || 'Submission failed.');
+        },
+      },
+    );
+  }, [dob, gender, province, city, email, photoUri, bio, submitStep4, navigation, toast]);
+
+  const footerPb     = insets.bottom > 0 ? insets.bottom : SPACING.xl;
   const footerHeight = SPACING.md + SPACING.buttonHeight + footerPb;
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-        translucent={false}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
 
-      <Header
-        onBackPress={() => navigation.goBack()}
-        step={4}
-        totalSteps={4}
-      />
-
+      <Header onBackPress={() => navigation.goBack()} step={4} totalSteps={4} />
       <ProgressBar progress={100} variant="success" />
 
       <KeyboardAvoidingView
@@ -143,10 +164,7 @@ const ProfileCompletionScreen = ({ navigation }) => {
       >
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: footerHeight + SPACING.lg },
-          ]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: footerHeight + SPACING.lg }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           bounces={false}
@@ -156,10 +174,8 @@ const ProfileCompletionScreen = ({ navigation }) => {
             <Text style={styles.subtitle}>Just a few more details!</Text>
           </View>
 
-          {/* Photo Picker - Optional */}
           <PhotoPicker uri={photoUri} onPick={setPhotoUri} />
 
-          {/* Bio - Optional */}
           <View>
             <FieldLabel label="Bio" optional />
             <InputField
@@ -172,7 +188,6 @@ const ProfileCompletionScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* Date of Birth - Mandatory */}
           <View>
             <FieldLabel label="Date of Birth" mandatory />
             <InputField
@@ -187,29 +202,22 @@ const ProfileCompletionScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* Gender - Mandatory */}
-          <GenderToggle
-            value={gender}
-            onChange={setGender}
-            mandatory
-          />
+          <GenderToggle value={gender} onChange={setGender} mandatory />
 
-          {/* Province - Mandatory */}
           <Dropdown
             label="Province"
-            placeholder="Select Province"
+            placeholder={loadingProvinces ? 'Loading provinces…' : 'Select Province'}
             value={province}
-            options={PROVINCES}
+            options={provinceNames}
             onSelect={handleProvinceChange}
             mandatory
           />
 
-          {/* City - Mandatory (depends on Province) */}
           <Dropdown
             label="City"
-            placeholder="Select City"
+            placeholder={loadingCities ? 'Loading cities…' : 'Select City'}
             value={city}
-            options={availableCities}
+            options={cityNames}
             onSelect={handleCityChange}
             disabled={!province}
             onDisabledPress={handleCityDisabledPress}
@@ -219,12 +227,11 @@ const ProfileCompletionScreen = ({ navigation }) => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Footer */}
       <View style={[styles.footer, { paddingBottom: footerPb }]}>
         <GradientButton
           title="Complete Signup"
           onPress={handleComplete}
-          disabled={!isFormValid}
+          disabled={!isFormValid || isPending}
           variant="success"
           icon={
             <Icon
@@ -236,55 +243,31 @@ const ProfileCompletionScreen = ({ navigation }) => {
           }
         />
       </View>
+
+      <FullScreenLoader visible={isPending} message="Completing your profile…" />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.screenPadding,
-  },
-  headlineContainer: {
-    marginBottom: SPACING.lg,
-  },
-  headline: {
-    fontSize: TYPOGRAPHY.fontSize.xxxl,
-    fontFamily: TYPOGRAPHY.fontFamily.extraBold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.textSecondary,
-  },
-  fieldMargin: {
-    marginBottom: SPACING.md,
-  },
+  safe:               { flex: 1, backgroundColor: COLORS.background },
+  keyboardView:       { flex: 1 },
+  scroll:             { flex: 1 },
+  scrollContent:      { paddingHorizontal: SPACING.screenPadding },
+  headlineContainer:  { marginBottom: SPACING.lg },
+  headline:           { fontSize: TYPOGRAPHY.fontSize.xxxl, fontFamily: TYPOGRAPHY.fontFamily.extraBold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
+  subtitle:           { fontSize: TYPOGRAPHY.fontSize.sm, fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary },
+  fieldMargin:        { marginBottom: SPACING.md },
   footer: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
+    left: 0, right: 0, bottom: 0,
     paddingHorizontal: SPACING.screenPadding,
     paddingTop: SPACING.md,
     backgroundColor: COLORS.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.border,
   },
-  buttonIcon: {
-    marginLeft: SPACING.gapSm,
-  },
+  buttonIcon: { marginLeft: SPACING.gapSm },
 });
 
 export default ProfileCompletionScreen;

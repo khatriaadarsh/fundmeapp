@@ -1,285 +1,311 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+// src/screens/auth/OTPVerificationScreen.js
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  StatusBar,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  TextInput,
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  StatusBar, Animated, KeyboardAvoidingView, Platform,
+  SafeAreaView, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
 
-import Header from '../../components/common/Header';
-import ProgressBar from '../../components/common/ProgressBar';
-import UploadSlot from '../../components/auth/UploadSlot';
-import SecurityBanner from '../../components/auth/SecurityBanner';
-import SuccessModal from '../../components/auth/SuccessModal';
-import GradientButton from '../../components/common/GradientButton';
-import FieldLabel from '../../components/common/FieldLabel';
+import { useRegisterStep2, useResendOtp } from '../../hooks/useRegistration';
+import { useAppContext }    from '../../context/AppContext';
+import { useToast }         from '../../components/common/Toast';
+import { FullScreenLoader } from '../../components/common/Loader';
 
-import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
-import { formatCNIC } from '../../utils/formatters';
-import { validateCNIC } from '../../utils/validators';
+const { width: SW } = Dimensions.get('window');
+const sp = n => (SW / 375) * n;
 
-const CNICUploadScreen = ({ navigation }) => {
+const C = {
+  bg:         '#F9FAFB',
+  white:      '#FFFFFF',
+  teal:       '#00B4CC',
+  tealDark:   '#0097AA',
+  amber:      '#F59E0B',
+  amberLight: '#FEF3C7',
+  textDark:   '#111827',
+  textGray:   '#6B7280',
+  border:     '#E5E7EB',
+  disabled:   '#9CA3AF',
+};
+
+const OTP_LENGTH = 5;
+const RESEND_SECONDS = 272;
+
+const OTPBox = ({ value, isFocused, inputRef, onChangeText, onKeyPress, editable }) => (
+  <TextInput
+    ref={inputRef}
+    style={[st.box, value && st.boxFilled, isFocused && st.boxFocused]}
+    value={value}
+    onChangeText={onChangeText}
+    onKeyPress={onKeyPress}
+    keyboardType="number-pad"
+    maxLength={1}
+    textAlign="center"
+    caretHidden
+    selectTextOnFocus
+    editable={editable}
+  />
+);
+
+const OTPVerificationScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const toast  = useToast();
+  const { currentUser } = useAppContext();
 
-  const [cnic, setCnic] = useState('');
-  const [frontUri, setFrontUri] = useState(null);
-  const [backUri, setBackUri] = useState(null);
-  const [focused, setFocused] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [errors, setErrors] = useState({});
+  const { mutate: verifyOtp, isPending: isVerifying } = useRegisterStep2();
+  const { mutate: resendOtp, isPending: isResending } = useResendOtp();
 
-  const modalShown = useRef(false);
+  // Email priority: navigation param (from step 1) → AppContext (draft resume)
+  const email = route?.params?.email || currentUser?.email || '';
 
-  // Show success modal when both images uploaded
+  const [otp,     setOtp    ] = useState(Array(OTP_LENGTH).fill(''));
+  const [seconds, setSeconds] = useState(RESEND_SECONDS);
+  const [focused, setFocused] = useState(0);
+
+  const inputRefs = useRef(Array(OTP_LENGTH).fill(null).map(() => React.createRef()));
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+
   useEffect(() => {
-    if (frontUri && backUri && !modalShown.current) {
-      modalShown.current = true;
-      setTimeout(() => {
-        setShowModal(true);
-      }, 300);
-    }
-  }, [frontUri, backUri]);
+    if (seconds <= 0) return;
+    const id = setInterval(() => setSeconds(s => s - 1), 1000);
+    return () => clearInterval(id);
+  }, [seconds]);
 
-  const handleCnicChange = useCallback((text) => {
-    const formatted = formatCNIC(text);
-    setCnic(formatted);
-    if (errors.cnic) {
-      setErrors({ ...errors, cnic: null });
-    }
-  }, [errors]);
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 450, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
+    ]).start();
+    setTimeout(() => inputRefs.current[0]?.current?.focus(), 400);
+  }, [fadeAnim, scaleAnim]);
 
-  // Form validation
-  const isFormValid = useMemo(() => {
-    return (
-      cnic.length === 15 && // Formatted CNIC: XXXXX-XXXXXXX-X
-      validateCNIC(cnic) &&
-      frontUri &&
-      backUri
+  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+  const handleChange = (text, idx) => {
+    if (text.length > 1) {
+      const digits = text.replace(/\D/g, '').slice(0, OTP_LENGTH).split('');
+      const next = Array(OTP_LENGTH).fill('');
+      digits.forEach((d, i) => { next[i] = d; });
+      setOtp(next);
+      const lastIdx = Math.min(digits.length, OTP_LENGTH) - 1;
+      inputRefs.current[lastIdx]?.current?.focus();
+      setFocused(lastIdx);
+      return;
+    }
+
+    const next = [...otp];
+    next[idx] = text;
+    setOtp(next);
+    if (text && idx < OTP_LENGTH - 1) {
+      inputRefs.current[idx + 1]?.current?.focus();
+      setFocused(idx + 1);
+    }
+  };
+
+  const handleKeyPress = ({ nativeEvent: { key } }, idx) => {
+    if (key === 'Backspace' && !otp[idx] && idx > 0) {
+      inputRefs.current[idx - 1]?.current?.focus();
+      setFocused(idx - 1);
+    }
+  };
+
+  const handleVerify = useCallback(() => {
+    const otpValue = otp.join('');
+    if (otpValue.length !== OTP_LENGTH) {
+      toast.error(`Please enter the ${OTP_LENGTH}-digit OTP.`);
+      return;
+    }
+    if (!email) {
+      toast.error('Missing email. Please restart registration.');
+      return;
+    }
+
+    verifyOtp(
+      { email, otp: otpValue },
+      {
+        onSuccess: (body) => {
+          toast.success(body?.responseMessage || 'OTP verified successfully.');
+          navigation.navigate('CNICUploadScreen', { email });
+        },
+        onError: (err) => {
+          toast.error(err?.message || 'Verification failed.');
+          setOtp(Array(OTP_LENGTH).fill(''));
+          inputRefs.current[0]?.current?.focus();
+          setFocused(0);
+        },
+      },
     );
-  }, [cnic, frontUri, backUri]);
+  }, [otp, email, verifyOtp, navigation, toast]);
 
-  const validateForm = useCallback(() => {
-    const newErrors = {};
-
-    if (!cnic.trim()) {
-      newErrors.cnic = 'CNIC number is required';
-    } else if (!validateCNIC(cnic)) {
-      newErrors.cnic = 'Invalid CNIC format';
+  // ─── Resend OTP ──────────────────────────────────────────
+  const handleResend = useCallback(() => {
+    if (!email) {
+      toast.error('Missing email. Please restart registration.');
+      return;
     }
+    if (seconds > 0) return; // safety — button is disabled too
 
-    if (!frontUri) {
-      newErrors.front = 'Please upload CNIC front side';
-    }
+    resendOtp(email, {
+      onSuccess: (body) => {
+        toast.success(body?.responseMessage || 'A new OTP has been sent to your email.');
+        setOtp(Array(OTP_LENGTH).fill(''));
+        setSeconds(RESEND_SECONDS);
+        inputRefs.current[0]?.current?.focus();
+        setFocused(0);
+      },
+      onError: (err) => {
+        toast.error(err?.message || 'Failed to resend OTP. Please try again.');
+      },
+    });
+  }, [email, seconds, resendOtp, toast]);
 
-    if (!backUri) {
-      newErrors.back = 'Please upload CNIC back side';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [cnic, frontUri, backUri]);
-
-  const handleContinue = useCallback(() => {
-    if (validateForm()) {
-      navigation.navigate('ProfileCompletionScreen');
-    }
-  }, [validateForm, navigation]);
-
-  const footerPb = insets.bottom > 0 ? insets.bottom : SPACING.xl;
-  const footerHeight = SPACING.md + SPACING.buttonHeight + footerPb;
+  const otpComplete  = otp.every(Boolean);
+  const isBusy       = isVerifying || isResending;
+  const canResend    = seconds <= 0 && !isBusy;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.background}
-        translucent={false}
-      />
+    <SafeAreaView style={s.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} translucent={false} />
 
-      <Header
-        onBackPress={() => navigation.goBack()}
-        step={3}
-        totalSteps={4}
-      />
+      <KeyboardAvoidingView style={s.kav} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[s.inner, { paddingTop: insets.top + sp(6) }]}>
 
-      <ProgressBar progress={75} />
-
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: footerHeight + SPACING.lg },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
-        >
-          <View style={styles.headlineContainer}>
-            <Text style={styles.headline}>Verify Your Identity</Text>
-            <Text style={styles.subtitle}>
-              Upload your CNIC for verification
-            </Text>
+          <View style={s.headerRow}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={s.backBtn}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={s.backArrow}>←</Text>
+            </TouchableOpacity>
+            <Text style={s.stepLabel}>Step 2 of 4</Text>
           </View>
 
-          {/* CNIC Number Input - NO ICON */}
-          <View style={styles.cnicFieldContainer}>
-            <FieldLabel label="CNIC Number" mandatory />
-            <TextInput
-              style={[
-                styles.cnicInput,
-                focused && styles.cnicInputFocused,
-                errors.cnic && styles.cnicInputError,
-              ]}
-              placeholder="XXXXX-XXXXXXX-X"
-              placeholderTextColor={COLORS.textPlaceholder}
-              value={cnic}
-              onChangeText={handleCnicChange}
-              keyboardType="number-pad"
-              maxLength={15}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-            />
-            {errors.cnic && (
-              <Text style={styles.errorText}>{errors.cnic}</Text>
-            )}
+          <View style={s.progressBg}>
+            <View style={s.progressFill} />
           </View>
 
-          {/* Front Side Upload */}
-          <UploadSlot
-            label="CNIC Front Side"
-            uri={frontUri}
-            onPick={setFrontUri}
-            mandatory
-          />
-          {errors.front && !frontUri && (
-            <Text style={styles.uploadError}>{errors.front}</Text>
-          )}
+          <Animated.View style={[s.card, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+            <View style={s.envelopeWrap}>
+              <View style={s.envelopeOuter}>
+                <View style={s.envelopeBody}>
+                  <View style={s.envFlapL} />
+                  <View style={s.envFlapR} />
+                </View>
+              </View>
+            </View>
 
-          {/* Back Side Upload */}
-          <UploadSlot
-            label="CNIC Back Side"
-            uri={backUri}
-            onPick={setBackUri}
-            mandatory
-          />
-          {errors.back && !backUri && (
-            <Text style={styles.uploadError}>{errors.back}</Text>
-          )}
+            <Text style={s.headline}>Verify Your Email</Text>
+            <Text style={s.subtitle}>We sent a {OTP_LENGTH}-digit code to</Text>
+            <Text style={s.emailText}>{email}</Text>
 
-          {/* Security Banner - NOT DISMISSIBLE */}
-          <SecurityBanner />
-        </ScrollView>
+            <View style={s.otpRow}>
+              {otp.map((val, idx) => (
+                <OTPBox
+                  key={idx}
+                  value={val}
+                  isFocused={focused === idx}
+                  inputRef={inputRefs.current[idx]}
+                  onChangeText={text => handleChange(text, idx)}
+                  onKeyPress={e => handleKeyPress(e, idx)}
+                  editable={!isBusy}
+                />
+              ))}
+            </View>
+
+            <View style={s.expiryBadge}>
+              <Text style={s.expiryIcon}>⏰</Text>
+              <Text style={s.expiryText}>
+                {seconds > 0 ? `Expires in ${formatTime(seconds)}` : 'Code expired'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleVerify}
+              activeOpacity={0.85}
+              style={s.verifyBtnWrap}
+              disabled={!otpComplete || isBusy}
+            >
+              <LinearGradient
+                colors={(!otpComplete || isBusy) ? [C.disabled, C.disabled] : [C.teal, C.tealDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.verifyBtn}
+              >
+                <Text style={s.verifyBtnText}>Verify</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <View style={s.resendRow}>
+              <Text style={s.resendText}>{"Didn't get the code? "}</Text>
+              <TouchableOpacity
+                onPress={handleResend}
+                activeOpacity={0.7}
+                disabled={!canResend}
+              >
+                <Text style={[s.resendLink, !canResend && { color: C.disabled }]}>
+                  {isResending ? 'Sending…' : 'Resend'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
       </KeyboardAvoidingView>
 
-      {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: footerPb }]}>
-        <GradientButton
-          title="Continue"
-          onPress={handleContinue}
-          disabled={!isFormValid}
-        />
-      </View>
-
-      {/* Success Modal */}
-      <SuccessModal
-        visible={showModal}
-        onClose={() => setShowModal(false)}
-        title="CNIC Uploaded Successfully!"
-        message="Both sides of your CNIC have been uploaded. Our team will verify your identity within 24 hours."
-        tips={[
-          'Images are clear and not blurry',
-          'All four corners are visible',
-          'No glare or shadows on the card',
-        ]}
+      <FullScreenLoader
+        visible={isVerifying || isResending}
+        message={isResending ? 'Sending new OTP…' : 'Verifying OTP…'}
       />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.screenPadding,
-  },
-  headlineContainer: {
-    marginBottom: SPACING.xl,
-  },
-  headline: {
-    fontSize: TYPOGRAPHY.fontSize.xxxl,
-    fontFamily: TYPOGRAPHY.fontFamily.extraBold,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.textSecondary,
-  },
-  cnicFieldContainer: {
-    marginBottom: SPACING.lg,
-  },
-  cnicInput: {
-    borderWidth: SPACING.borderWidth,
-    borderColor: COLORS.border,
-    borderRadius: SPACING.borderRadiusSm,
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.md,
-    minHeight: SPACING.inputHeight,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.textPrimary,
-  },
-  cnicInputFocused: {
-    borderColor: COLORS.success,
-  },
-  cnicInputError: {
-    borderColor: COLORS.error,
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.error,
-    marginTop: SPACING.xs,
-    marginLeft: SPACING.xs,
-  },
-  uploadError: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontFamily: TYPOGRAPHY.fontFamily.regular,
-    color: COLORS.error,
-    marginTop: -SPACING.sm,
-    marginBottom: SPACING.md,
-    marginLeft: SPACING.xs,
-  },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACING.screenPadding,
-    paddingTop: SPACING.md,
-    backgroundColor: COLORS.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
-  },
+export default OTPVerificationScreen;
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  kav:  { flex: 1 },
+
+  inner: { flex: 1, paddingHorizontal: sp(22), paddingBottom: sp(36) },
+
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: sp(10) },
+  backBtn:   { padding: sp(4) },
+  backArrow: { fontSize: sp(20), color: C.textDark, fontWeight: '600' },
+  stepLabel: { fontSize: sp(13), color: C.textGray, fontWeight: '500' },
+
+  progressBg:   { height: 4, backgroundColor: C.border, borderRadius: 2, marginBottom: sp(32) },
+  progressFill: { height: 4, width: '50%', backgroundColor: C.teal, borderRadius: 2 },
+
+  card: { flex: 1, alignItems: 'center', paddingHorizontal: sp(8) },
+
+  envelopeWrap:  { marginBottom: sp(24), width: sp(72), height: sp(72), borderRadius: sp(36), backgroundColor: 'rgba(0,180,204,0.10)', alignItems: 'center', justifyContent: 'center' },
+  envelopeOuter: { width: sp(38), height: sp(30), alignItems: 'center' },
+  envelopeBody:  { width: sp(38), height: sp(28), borderWidth: 2, borderColor: C.teal, borderRadius: sp(4), overflow: 'hidden', position: 'relative' },
+  envFlapL:      { position: 'absolute', width: sp(24), height: sp(24), borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.teal, top: -sp(12), left: -sp(2),  transform: [{ rotate: '45deg'  }] },
+  envFlapR:      { position: 'absolute', width: sp(24), height: sp(24), borderLeftWidth:  2, borderBottomWidth: 2, borderColor: C.teal, top: -sp(12), right: -sp(2), transform: [{ rotate: '-45deg' }] },
+
+  headline:  { fontSize: sp(22), fontWeight: '800', color: C.textDark, marginBottom: sp(8), textAlign: 'center' },
+  subtitle:  { fontSize: sp(14), color: C.textGray, marginBottom: sp(2), textAlign: 'center' },
+  emailText: { fontSize: sp(14), color: C.teal, fontWeight: '700', marginBottom: sp(28), textAlign: 'center' },
+
+  otpRow:      { flexDirection: 'row', gap: sp(8), marginBottom: sp(20) },
+  expiryBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderRadius: sp(20), paddingHorizontal: sp(14), paddingVertical: sp(7), marginBottom: sp(28), gap: sp(6) },
+  expiryIcon:  { fontSize: sp(14) },
+  expiryText:  { fontSize: sp(13), color: C.amber, fontWeight: '700' },
+
+  verifyBtnWrap: { width: '100%' },
+  verifyBtn:     { width: '100%', paddingVertical: sp(16), borderRadius: sp(10), alignItems: 'center', marginBottom: sp(20), elevation: 3, shadowColor: C.teal, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  verifyBtnText: { color: '#FFFFFF', fontSize: sp(16), fontWeight: '700' },
+
+  resendRow:  { flexDirection: 'row', alignItems: 'center' },
+  resendText: { fontSize: sp(13), color: C.textGray },
+  resendLink: { fontSize: sp(13), color: C.teal, fontWeight: '700' },
 });
 
-export default CNICUploadScreen;
+const st = StyleSheet.create({
+  box:        { width: sp(46), height: sp(56), borderRadius: sp(10), borderWidth: 1.5, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', fontSize: sp(22), fontWeight: '700', color: '#111827', textAlign: 'center' },
+  boxFilled:  { borderColor: '#00B4CC', backgroundColor: 'rgba(0,180,204,0.06)' },
+  boxFocused: { borderColor: '#00B4CC', borderWidth: 2 },
+});
