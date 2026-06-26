@@ -145,10 +145,6 @@ const SignUpScreen = ({ navigation, route }) => {
 
       <Header onBackPress={() => navigation.goBack()} step={1} totalSteps={4} />
 
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
-
-
-      <Header onBackPress={() => navigation.goBack()} step={1} totalSteps={4} />
       <ProgressBar progress={25} />
 
       <KeyboardAvoidingView
@@ -251,8 +247,6 @@ const SignUpScreen = ({ navigation, route }) => {
             <RoleSelector value={role} onChange={setRole} />
           </View>
 
-          <RoleSelector value={role} onChange={setRole} />
-
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -309,7 +303,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   roleWrapper: {
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.xs,
   },
 
   // safe:               { flex: 1, backgroundColor: COLORS.background },
