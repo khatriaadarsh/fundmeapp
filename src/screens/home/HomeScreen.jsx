@@ -1,130 +1,18 @@
-// // src/screens/home/HomeScreen.jsx
-
-// import React, { useState, useCallback } from 'react';
-// import { View, StyleSheet, ScrollView, StatusBar } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-
-// import { P, sp } from '../../theme/theme';
-// import { URGENT, FEATURED, CURRENT_USER } from '../../constants/mockData';
-
-// import TopBar from '../../components/TopBar';
-// import SearchBar from '../../components/SearchBar';
-// import HeroBanner from '../../components/HeroBanner';
-// import StatsRow from '../../components/StatsRow';
-// import SectionHeader from '../../components/SectionHeader';
-// import CategoryChips from '../../components/shared/CategoryChips';
-// import UrgentCard from '../../components/UrgentCard';
-// import FeaturedItem from '../../components/FeaturedItem';
-
-// const HomeScreen = ({ navigation }) => {
-//   const [activeCat, setActiveCat] = useState('all');
-//   const [search, setSearch] = useState('');
-
-//   const handleCatChange = useCallback(id => setActiveCat(id), []);
-//   const handleSearchChange = useCallback(text => setSearch(text), []);
-
-//   const openProfile = useCallback(() => {
-//     navigation?.navigate?.('ProfileTab');
-//   }, [navigation]);
-
-//   const handleSeeAll = () => {
-//     navigation.navigate('ExploreScreen');
-//   };
-
-//   return (
-//     <SafeAreaView style={styles.safe}>
-//       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
-//       <TopBar
-//         user={CURRENT_USER}
-//         onAvatarPress={openProfile}
-//         onBellPress={() => {
-//           /* Handle notification press */
-//         }}
-//       />
-//       <ScrollView
-//         style={styles.scroll}
-//         contentContainerStyle={styles.content}
-//         showsVerticalScrollIndicator={false}
-//         bounces={false}
-//         overScrollMode="never"
-//       >
-//         <SearchBar value={search} onChange={handleSearchChange} />
-//         <HeroBanner />
-//         <StatsRow />
-
-//         <SectionHeader
-//           title="Categories"
-//           linkText="See All"
-//           onPress={handleSeeAll}
-//         />
-//         <CategoryChips active={activeCat} onChange={handleCatChange} />
-
-//         {/* ✅ FIX: "linkText" is now identical to the one above, ensuring perfect alignment. */}
-//         <SectionHeader
-//           title="🔥 Urgent Campaigns"
-//           linkText="See All"
-//           onPress={() => {}}
-//         />
-//         <ScrollView
-//           horizontal
-//           showsHorizontalScrollIndicator={false}
-//           contentContainerStyle={styles.horizontalList}
-//         >
-//           {URGENT.map(item => (
-//             <UrgentCard key={item.id} item={item} />
-//           ))}
-//         </ScrollView>
-
-//         <SectionHeader
-//           title="⭐ Featured"
-//           linkText="See All"
-//           onPress={() => {}}
-//         />
-//         <View style={styles.featuredList}>
-//           {FEATURED.map(item => (
-//             <FeaturedItem key={item.id} item={item} />
-//           ))}
-//         </View>
-//       </ScrollView>
-//     </SafeAreaView>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   safe: {
-//     flex: 1,
-//     backgroundColor: P.white,
-//   },
-//   scroll: {
-//     flex: 1,
-//     backgroundColor: P.bg,
-//   },
-//   content: {
-//     paddingBottom: sp(28),
-//   },
-//   horizontalList: {
-//     paddingLeft: sp(16),
-//     paddingRight: sp(2),
-//   },
-//   featuredList: {
-//     paddingHorizontal: sp(16),
-//     backgroundColor: P.white,
-//     borderTopWidth: StyleSheet.hairlineWidth,
-//     borderTopColor: P.border,
-//   },
-// });
-
-// export default HomeScreen;
-
-
-
 // src/screens/home/HomeScreen.jsx
+
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { 
+  View, 
+  StyleSheet, 
+  ScrollView, 
+  StatusBar, 
+  Text,
+  ActivityIndicator 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { P, sp } from '../../theme/theme';
-import { URGENT, FEATURED } from '../../constants/mockData';
+import { FEATURED } from '../../constants/mockData';
 
 import TopBar          from '../../components/TopBar';
 import SearchBar       from '../../components/SearchBar';
@@ -136,6 +24,16 @@ import UrgentCard      from '../../components/UrgentCard';
 import FeaturedItem    from '../../components/FeaturedItem';
 
 import { useAppContext } from '../../context/AppContext';
+// import {
+//   URGENT_CAMPAIGN_LIMIT,
+//   useCategories,
+//   useUrgentCampaigns,
+// } from '../../hooks/useCampaigns';
+import {
+  URGENT_CAMPAIGN_LIMIT,
+  useCategories,
+  useUrgentCampaigns,
+} from '../../hooks/useCampaign';
 
 const HomeScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
@@ -143,7 +41,21 @@ const HomeScreen = ({ navigation }) => {
   const [activeCat, setActiveCat] = useState('all');
   const [search,    setSearch]    = useState('');
 
-  // ─── Build user object for TopBar from real API data ────
+  const {
+    data: categories = [{ id: 'all', name: 'All', label: 'All' }],
+    isLoading: categoriesLoading,
+  } = useCategories();
+
+  const {
+    data: urgentData = { campaigns: [], isNotFound: false, message: '' },
+    isLoading: urgentLoading,
+    isError: urgentError,
+  } = useUrgentCampaigns({
+    category: activeCat,
+    limit: URGENT_CAMPAIGN_LIMIT,
+  });
+
+  // Build user object for TopBar from real API data
   const user = useMemo(() => {
     const firstName = currentUser?.firstName || '';
     const lastName  = currentUser?.lastName  || '';
@@ -166,8 +78,6 @@ const HomeScreen = ({ navigation }) => {
   }, [navigation]);
 
   const openNotifications = useCallback(() => {
-    // Donor/User has Notifications in tabs → switch tab
-    // Creator doesn't → go to stack screen
     if (isCreator) {
       navigation?.navigate?.('NotificationsScreen');
     } else {
@@ -178,6 +88,65 @@ const HomeScreen = ({ navigation }) => {
   const handleSeeAll = useCallback(() => {
     navigation.navigate('ExploreScreen');
   }, [navigation]);
+
+  // Navigate to campaign details
+  const handleCampaignPress = useCallback((campaign) => {
+    navigation.navigate('CampaignDetailScreen', { 
+      campaignId: campaign.campaignId,
+      campaign: campaign.raw 
+    });
+  }, [navigation]);
+
+  // Render urgent campaigns section
+  const renderUrgentCampaigns = () => {
+    if (urgentLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={P.teal} />
+          <Text style={styles.loadingText}>Loading urgent campaigns...</Text>
+        </View>
+      );
+    }
+
+    if (urgentError) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Something went wrong</Text>
+          <Text style={styles.emptySubtitle}>Unable to load urgent campaigns</Text>
+        </View>
+      );
+    }
+
+    // Handle "Not Found" response code 023 or empty campaigns
+    if (urgentData?.isNotFound || urgentData?.campaigns?.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>Not Found</Text>
+          <Text style={styles.emptySubtitle}>
+            {urgentData?.message || 'Campaign not found'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalList}
+      >
+        {urgentData.campaigns.map((item) => (
+          <UrgentCard 
+            key={item.id} 
+            item={item} 
+            onPress={handleCampaignPress}
+          />
+        ))}
+      </ScrollView>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -199,7 +168,6 @@ const HomeScreen = ({ navigation }) => {
         <SearchBar value={search} onChange={handleSearchChange} />
         <HeroBanner />
 
-        {/* Static for now — will become real API later */}
         <StatsRow />
 
         <SectionHeader
@@ -207,28 +175,31 @@ const HomeScreen = ({ navigation }) => {
           linkText="See All"
           onPress={handleSeeAll}
         />
-        <CategoryChips active={activeCat} onChange={handleCatChange} />
+
+        {categoriesLoading ? (
+          <ActivityIndicator style={styles.catLoading} color={P.teal} />
+        ) : (
+          <CategoryChips
+            active={activeCat}
+            onChange={handleCatChange}
+            categories={categories}
+          />
+        )}
 
         <SectionHeader
           title="🔥 Urgent Campaigns"
           linkText="See All"
-          onPress={() => {}}
+          onPress={() => navigation.navigate('UrgentCampaignsScreen')}
         />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalList}
-        >
-          {URGENT.map((item) => (
-            <UrgentCard key={item.id} item={item} />
-          ))}
-        </ScrollView>
+
+        {renderUrgentCampaigns()}
 
         <SectionHeader
           title="⭐ Featured"
           linkText="See All"
           onPress={() => {}}
         />
+
         <View style={styles.featuredList}>
           {FEATURED.map((item) => (
             <FeaturedItem key={item.id} item={item} />
@@ -254,12 +225,50 @@ const styles = StyleSheet.create({
   horizontalList: {
     paddingLeft: sp(16),
     paddingRight: sp(2),
+    minHeight: sp(200),
+    paddingBottom: sp(13), 
   },
   featuredList: {
     paddingHorizontal: sp(16),
     backgroundColor: P.white,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: P.border,
+  },
+  catLoading: {
+    marginVertical: sp(12),
+  },
+  loadingContainer: {
+    paddingVertical: sp(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: sp(200),
+  },
+  loadingText: {
+    marginTop: sp(12),
+    fontSize: sp(14),
+    color: P.gray,
+  },
+  emptyContainer: {
+    paddingVertical: sp(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: sp(200),
+    paddingHorizontal: sp(20),
+  },
+  emptyIcon: {
+    fontSize: sp(48),
+    marginBottom: sp(12),
+  },
+  emptyTitle: {
+    fontSize: sp(16),
+    fontWeight: '700',
+    color: P.dark,
+    marginBottom: sp(6),
+  },
+  emptySubtitle: {
+    fontSize: sp(13),
+    color: P.light,
+    textAlign: 'center',
   },
 });
 

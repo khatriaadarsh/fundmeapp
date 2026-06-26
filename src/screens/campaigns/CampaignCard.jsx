@@ -26,7 +26,7 @@ const CampaignCard = memo(({ item, onAction }) => {
         <View style={styles.thumbWrap}>
           {item.image ? (
             <Image
-              source={{ uri: item.image }}
+              source={{ uri: item.coverImage}}
               style={styles.thumb}
               resizeMode="cover"
             />
