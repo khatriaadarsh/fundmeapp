@@ -18,12 +18,12 @@ export const ENDPOINTS = {
     CITIES:    (provinceId) => `/city/${provinceId}`,
   },
   
-  CAMPAIGN: {
-    LIST:         '/campaigns',
-    DETAILS:      (id) => `/campaigns/${id}`,
-    CREATE:       '/campaigns',
-    SAVE:         '/campaigns/save',
-    MY_CAMPAIGNS: '/campaigns/my',
+  CAMPAIGNS: {
+    URGENT: '/urgent-campaigns',
+  },
+
+  CATEGORY: {
+    LIST: '/category',
   },
   WITHDRAWAL: {
     CREATE: '/withdrawals',

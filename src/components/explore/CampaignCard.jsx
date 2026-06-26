@@ -23,7 +23,7 @@ const CampaignCard = memo(({ item, onPress }) => {
     >
       <View style={styles.imgWrap}>
         <Image
-          source={{ uri: item.imageUri }}
+          source={{ uri: item.image || item.coverImage }}
           style={styles.img}
           resizeMode="cover"
         />

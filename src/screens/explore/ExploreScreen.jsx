@@ -1,42 +1,67 @@
 // src/screens/explore/ExploreScreen.jsx
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, StatusBar } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  StatusBar,
+  ActivityIndicator 
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { P, sp } from '../../theme/theme';
-import { MOCK_CAMPAIGNS } from '../../constants/mockData';
 
-// Import all the new, reusable components
+// Import components
 import SearchBarHeader from '../../components/explore/SearchBarHeader';
-// import CategoryChips from '../../components/explore/CategoryChips';
 import CategoryChips from '../../components/shared/CategoryChips';
 import CampaignCard from '../../components/explore/CampaignCard';
 import EmptyState from '../../components/shared/EmptyState';
+
+// Import hooks
+// import {
+//   useCategories,
+//   useAllCampaigns,
+// } from '../../hooks/useCampaigns';
+import{useCategories, useAllCampaigns} from '../../hooks/useCampaign';
 
 const ExploreScreen = ({ navigation }) => {
   const [query, setQuery] = useState('');
   const [activeCat, setActiveCat] = useState('all');
 
-  // Memoized search results for performance
+  // Fetch categories from API
+  const {
+    data: categories = [{ id: 'all', name: 'All', label: 'All' }],
+    isLoading: categoriesLoading,
+  } = useCategories();
+
+  // Fetch all campaigns from API (same endpoint as urgent but without isUrgent param)
+  const {
+    data: campaignsData = { campaigns: [], isNotFound: false, message: '' },
+    isLoading: campaignsLoading,
+    isError: campaignsError,
+  } = useAllCampaigns({
+    category: activeCat,
+  });
+
+  // Client-side search on API results
   const filteredResults = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let results = MOCK_CAMPAIGNS;
+    let results = campaignsData?.campaigns || [];
 
-    // Filter by category first
-    if (activeCat !== 'all') {
-      results = results.filter(c => c.category === activeCat);
-    }
-
-    // Then filter by search query
+    // Filter by search query
     if (q) {
       results = results.filter(
-        c => c.title.toLowerCase().includes(q) || c.user.toLowerCase().includes(q)
+        c => 
+          c.title.toLowerCase().includes(q) || 
+          c.user.toLowerCase().includes(q) ||
+          c.category.toLowerCase().includes(q)
       );
     }
     return results;
-  }, [query, activeCat]);
+  }, [query, campaignsData]);
 
-  // Handlers are kept in the container component
+  // Handlers
   const handleQueryChange = useCallback(text => {
     setQuery(text);
   }, []);
@@ -51,17 +76,66 @@ const ExploreScreen = ({ navigation }) => {
   }, []);
 
   const handleCardPress = useCallback(item => {
-    navigation?.navigate?.('CampaignDetail', { id: item.id });
+    navigation?.navigate?.('CampaignDetailScreen', { 
+      campaignId: item.campaignId,
+      campaign: item.raw 
+    });
   }, [navigation]);
 
+  // Render List Header with Category Chips
   const ListHeader = useCallback(() => (
     <View>
-      <CategoryChips active={activeCat} onChange={handleCatChange} />
+      {categoriesLoading ? (
+        <ActivityIndicator style={styles.catLoading} color={P.teal} />
+      ) : (
+        <CategoryChips 
+          active={activeCat} 
+          onChange={handleCatChange} 
+          categories={categories}
+        />
+      )}
       <Text style={styles.resultCount}>
         {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''} found
       </Text>
     </View>
-  ), [activeCat, handleCatChange, filteredResults.length]);
+  ), [activeCat, handleCatChange, categories, categoriesLoading, filteredResults.length]);
+
+  // Render Empty State
+  const renderEmptyState = useCallback(() => {
+    if (campaignsLoading) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={P.teal} />
+          <Text style={styles.loadingText}>Loading campaigns...</Text>
+        </View>
+      );
+    }
+
+    if (campaignsError) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyIcon}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Something went wrong</Text>
+          <Text style={styles.emptySubtitle}>Unable to load campaigns</Text>
+        </View>
+      );
+    }
+
+    // Show "Not Found" for response code 023 or empty results
+    if (campaignsData?.isNotFound || filteredResults.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>Not Found</Text>
+          <Text style={styles.emptySubtitle}>
+            {campaignsData?.message || 'No campaigns found'}
+          </Text>
+        </View>
+      );
+    }
+
+    return <EmptyState query={query} />;
+  }, [campaignsLoading, campaignsError, campaignsData, filteredResults.length, query]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -71,7 +145,7 @@ const ExploreScreen = ({ navigation }) => {
         query={query}
         onQueryChange={handleQueryChange}
         onCancel={handleCancel}
-        onSearch={() => {}} // onSearch can be used for API calls in the future
+        onSearch={() => {}}
       />
 
       <FlatList
@@ -79,11 +153,14 @@ const ExploreScreen = ({ navigation }) => {
         keyExtractor={item => item.id}
         renderItem={({ item }) => <CampaignCard item={item} onPress={handleCardPress} />}
         ListHeaderComponent={ListHeader}
-        ListEmptyComponent={<EmptyState query={query} />}
+        ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredResults.length === 0 && styles.emptyListContent
+        ]}
         bounces={false}
         overScrollMode="never"
       />
@@ -96,6 +173,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: P.bg,
   },
+  catLoading: {
+    marginVertical: sp(12),
+  },
   resultCount: {
     fontSize: sp(12),
     color: P.gray,
@@ -105,6 +185,36 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: sp(16),
+  },
+  emptyListContent: {
+    flexGrow: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: sp(60),
+    paddingHorizontal: sp(20),
+  },
+  loadingText: {
+    marginTop: sp(12),
+    fontSize: sp(14),
+    color: P.gray,
+  },
+  emptyIcon: {
+    fontSize: sp(48),
+    marginBottom: sp(12),
+  },
+  emptyTitle: {
+    fontSize: sp(16),
+    fontWeight: '700',
+    color: P.dark,
+    marginBottom: sp(6),
+  },
+  emptySubtitle: {
+    fontSize: sp(13),
+    color: P.light,
+    textAlign: 'center',
   },
 });
 
