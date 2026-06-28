@@ -7,10 +7,13 @@ import { P, sp } from '../../theme/theme';
 const SavedScreenHeader = memo(({ count }) => (
   <View style={styles.header}>
     <Text style={styles.headerTitle}>Saved</Text>
-    <View style={styles.countBadge}>
-      <Icons name="heart" size={sp(12)} color={P.red} />
-      <Text style={styles.countText}>{count} saved</Text>
-    </View>
+    {/* ✅ FIX: only show badge when count > 0 */}
+    {count > 0 && (
+      <View style={styles.countBadge}>
+        <Icons name="heart" size={sp(12)} color={P.red} />
+        <Text style={styles.countText}>{count} saved</Text>
+      </View>
+    )}
   </View>
 ));
 

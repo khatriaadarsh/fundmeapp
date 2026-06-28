@@ -25,6 +25,10 @@ export const ENDPOINTS = {
   CATEGORY: {
     LIST: '/category',
   },
+  SAVED_CAMPAIGNS: {
+    LIST: (userId) => `/saved/campaign/${userId}`,
+    UNSAVE: (favouriteId) => `/unsaved/campaign/${favouriteId}`,
+  },
   WITHDRAWAL: {
     CREATE: '/withdrawals',
     LIST:   '/withdrawals',
