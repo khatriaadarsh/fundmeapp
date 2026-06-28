@@ -12,6 +12,13 @@ export const ENDPOINTS = {
   },
   USER: {
     PROFILE: '/users/profile',
+    PROFILE_DETAILS: '/profileDetails',        // POST - Get profile
+    UPDATE_PROFILE: '/update/profileDetails',  // POST - Update profile
+ 
+  },
+  PROFILE: {
+    DETAILS: '/profileDetails',
+    UPDATE:  '/update/profileDetails',
   },
    LOCATION: {
     PROVINCES: '/province',

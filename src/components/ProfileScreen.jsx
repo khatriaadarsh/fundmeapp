@@ -1,5 +1,5 @@
-// src/components/ProfileScreen.jsx
-import React, { useCallback, memo } from 'react';
+// src/screens/profile/ProfileScreen.jsx
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   StatusBar,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
+import { useAppContext } from '../context/AppContext';
+import { useProfileDetails } from '../hooks/useProfile';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -36,22 +39,14 @@ const P = {
   orangeLight: 'rgba(245,158,11,0.10)',
 };
 
-const USER = {
-  name: 'Ahmed Khan',
-  email: 'ahmed@gmail.com',
-  avatarUri: null,
-  donated: 'PKR 75,000',
-  donations: 15,
-  verified: true,
-};
-
-const MENU_ITEMS = [
+const ALL_MENU_ITEMS = [
   {
     id: 'edit',
     label: 'Edit Profile',
     icon: 'user',
     color: P.teal,
     bg: 'rgba(0,180,204,0.10)',
+    roles: ['donor', 'creator'],
   },
   {
     id: 'donate',
@@ -59,6 +54,7 @@ const MENU_ITEMS = [
     icon: 'heart',
     color: P.green,
     bg: P.greenLight,
+    roles: ['donor', 'creator'],
   },
   {
     id: 'camp',
@@ -66,6 +62,7 @@ const MENU_ITEMS = [
     icon: 'target',
     color: P.teal,
     bg: 'rgba(0,180,204,0.10)',
+    roles: ['creator'],
   },
   {
     id: 'with',
@@ -73,6 +70,7 @@ const MENU_ITEMS = [
     icon: 'refresh-cw',
     color: P.orange,
     bg: P.orangeLight,
+    roles: ['creator'],
   },
   {
     id: 'notif',
@@ -81,6 +79,7 @@ const MENU_ITEMS = [
     color: P.teal,
     bg: 'rgba(0,180,204,0.10)',
     badge: 3,
+    roles: ['donor', 'creator'],
   },
   {
     id: 'faq',
@@ -88,6 +87,7 @@ const MENU_ITEMS = [
     icon: 'help-circle',
     color: P.gray,
     bg: 'rgba(107,114,128,0.10)',
+    roles: ['donor', 'creator'],
   },
   {
     id: 'terms',
@@ -95,31 +95,351 @@ const MENU_ITEMS = [
     icon: 'file-text',
     color: P.gray,
     bg: 'rgba(107,114,128,0.10)',
+    roles: ['donor', 'creator'],
   },
 ];
 
-const MenuItem = memo(({ item, onPress, isLast }) => (
+const MenuItem = ({ item, onPress, isLast }) => (
   <TouchableOpacity
-    style={[miSt.row, isLast && miSt.rowLast]}
+    style={[styles.row, isLast && styles.rowLast]}
     onPress={() => onPress(item.id)}
     activeOpacity={0.7}
   >
-    <View style={[miSt.iconCircle, { backgroundColor: item.bg }]}>
+    <View style={[styles.iconCircle, { backgroundColor: item.bg }]}>
       <Icons name={item.icon} size={sp(16)} color={item.color} />
     </View>
-    <Text style={miSt.label}>{item.label}</Text>
-    <View style={miSt.right}>
+    <Text style={styles.label}>{item.label}</Text>
+    <View style={styles.right}>
       {item.badge ? (
-        <View style={miSt.badge}>
-          <Text style={miSt.badgeTxt}>{item.badge}</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeTxt}>{item.badge}</Text>
         </View>
       ) : null}
       <Icons name="chevron-right" size={sp(16)} color={P.light} />
     </View>
   </TouchableOpacity>
-));
+);
 
-const miSt = StyleSheet.create({
+const ProfileScreen = ({ navigation }) => {
+  const { currentUser } = useAppContext();
+  
+  const userRole = currentUser?.role || 'donor';
+  const userId = currentUser?.id;
+  
+  // Get user data from login response
+  const firstName = currentUser?.firstName || '';
+  const lastName = currentUser?.lastName || '';
+  const email = currentUser?.email || '';
+  
+  // Check nicVerified status
+  const isVerified = currentUser?.nicVerified === true;
+  
+  const profileImage = currentUser?.profileImage || null;
+  
+  // Fetch full profile details
+  const { data: profileData, isLoading } = useProfileDetails(userId);
+
+  const menuItems = useMemo(() => {
+    return ALL_MENU_ITEMS.filter(item => item.roles.includes(userRole));
+  }, [userRole]);
+
+  const handleBack = useCallback(() => {
+    navigation?.goBack?.();
+  }, [navigation]);
+
+  const handleMenu = useCallback(id => {
+    switch(id) {
+      case 'edit':
+        navigation.navigate('EditProfile', { 
+          profileData: profileData || currentUser,
+          userId: userId 
+        });
+        break;
+      case 'donate':
+        navigation.navigate('MyDonationScreen');
+        break;
+      case 'camp':
+        navigation.navigate('MyCampaignsScreen');
+        break;
+      case 'with':
+        navigation.navigate('MyWithdrawalsScreen');
+        break;
+      case 'notif':
+        navigation.navigate('NotificationsScreen');
+        break;
+      case 'faq':
+        navigation.navigate('FAQScreen');
+        break;
+      case 'terms':
+        navigation.navigate('TermsConditions');
+        break;
+      default:
+        console.log('Menu:', id);
+    }
+  }, [navigation, profileData, currentUser, userId]);
+
+  const handleLogout = useCallback(() => {
+    navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });
+  }, [navigation]);
+
+  const displayName = `${firstName} ${lastName}`.trim() || 'User';
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="#0A3D62" />
+
+      <LinearGradient
+        colors={['#0A3D62', '#15AABF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={handleBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
+        >
+          <Icons name="arrow-left" size={sp(20)} color={P.white} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.settingsBtn}
+          onPress={() => handleMenu('settings')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+        >
+          <Icons name="settings" size={sp(20)} color={P.white} />
+        </TouchableOpacity>
+
+        <View style={styles.avatarRing}>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitial}>
+                {firstName?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.userName}>{displayName}</Text>
+        <Text style={styles.userEmail}>{email}</Text>
+
+        {/* 🔥 FIX: Show badge for both verified and not verified states */}
+        {isVerified ? (
+          <View style={styles.verifiedBadge}>
+            <Icons name="check-circle" size={sp(11)} color={P.teal} />
+            <Text style={styles.verifiedTxt}>CNIC Verified</Text>
+          </View>
+        ) : (
+          <View style={[styles.verifiedBadge, styles.notVerifiedBadge]}>
+            <Icons name="x-circle" size={sp(11)} color={P.red} />
+            <Text style={[styles.verifiedTxt, styles.notVerifiedTxt]}>CNIC Not Verified</Text>
+          </View>
+        )}
+        
+        {isLoading && (
+          <ActivityIndicator size="small" color={P.white} style={styles.loader} />
+        )}
+      </LinearGradient>
+
+      <View style={styles.statsCard}>
+        <View style={styles.statItem}>
+          <View style={styles.statTopRow}>
+            <Text style={styles.statVal}>PKR 75,000</Text>
+            <Icons name="copy" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+          </View>
+          <Text style={styles.statLbl}>Donated</Text>
+        </View>
+
+        <View style={styles.statDivider} />
+
+        <View style={styles.statItem}>
+          <View style={styles.statTopRow}>
+            <Text style={styles.statVal}>15</Text>
+            <Icons name="heart" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+          </View>
+          <Text style={styles.statLbl}>Donations</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+      >
+        <View style={styles.menuCard}>
+          {menuItems.map((item, idx) => (
+            <MenuItem
+              key={item.id}
+              item={item}
+              onPress={handleMenu}
+              isLast={idx === menuItems.length - 1}
+            />
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={handleLogout}
+          activeOpacity={0.8}
+        >
+          <Icons name="log-out" size={sp(16)} color={P.red} />
+          <Text style={styles.logoutTxt}>Log Out</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: sp(24) }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: P.bg,
+  },
+  header: {
+    paddingTop: sp(16),
+    paddingBottom: sp(26),
+    paddingHorizontal: sp(22),
+    alignItems: 'center',
+  },
+  backBtn: {
+    position: 'absolute',
+    top: sp(14),
+    left: sp(16),
+    width: sp(36),
+    height: sp(36),
+    borderRadius: sp(18),
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsBtn: {
+    position: 'absolute',
+    top: sp(14),
+    right: sp(16),
+    width: sp(36),
+    height: sp(36),
+    borderRadius: sp(18),
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarRing: {
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: sp(46),
+    marginBottom: sp(12),
+  },
+  avatar: {
+    width: sp(84),
+    height: sp(84),
+    borderRadius: sp(42),
+  },
+  avatarFallback: {
+    width: sp(84),
+    height: sp(84),
+    borderRadius: sp(42),
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: sp(34),
+    fontWeight: '800',
+    color: P.white,
+  },
+  userName: {
+    fontSize: sp(18),
+    fontWeight: '800',
+    color: P.white,
+    marginBottom: sp(3),
+  },
+  userEmail: {
+    fontSize: sp(12),
+    color: 'rgba(255,255,255,0.75)',
+    marginBottom: sp(10),
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: P.white,
+    borderRadius: sp(20),
+    paddingHorizontal: sp(12),
+    paddingVertical: sp(5),
+    gap: sp(5),
+  },
+  notVerifiedBadge: {
+    backgroundColor: P.redLight,
+  },
+  verifiedTxt: {
+    fontSize: sp(11),
+    fontWeight: '700',
+    color: P.teal,
+  },
+  notVerifiedTxt: {
+    color: P.red,
+  },
+  loader: {
+    marginTop: sp(10),
+  },
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: P.white,
+    marginHorizontal: sp(16),
+    marginTop: sp(10),
+    borderRadius: sp(14),
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    marginBottom: sp(16),
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: sp(16),
+    paddingHorizontal: sp(8),
+  },
+  statTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: sp(3),
+  },
+  statVal: {
+    fontSize: sp(15),
+    fontWeight: '800',
+    color: P.dark,
+  },
+  statLbl: {
+    fontSize: sp(11),
+    color: P.light,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: P.border,
+    marginVertical: sp(14),
+  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: sp(16) },
+  menuCard: {
+    backgroundColor: P.white,
+    borderRadius: sp(14),
+    overflow: 'hidden',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    marginBottom: sp(16),
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -167,325 +487,6 @@ const miSt = StyleSheet.create({
     fontSize: sp(10),
     fontWeight: '800',
   },
-});
-
-const ProfileScreen = ({ navigation }) => {
-  const handleBack = useCallback(() => {
-    navigation?.goBack?.();
-  }, [navigation]);
-
-  // const handleMenu = useCallback(id => {
-  //   console.log('Menu:', id);
-  // }, []);
-
-  const handleMenu = useCallback(
-    id => {
-      if (id === 'edit') {
-        navigation.navigate('EditProfile'); // or whatever your screen name is in navigator
-        return;
-      }
-      if (id === 'donate') {
-        navigation.navigate('MyDonationScreen');
-        return;
-      }
-
-      if (id === 'camp') {
-        navigation.navigate('MyCampaignsScreen');
-        return;
-      }
-
-      if (id === 'with') {
-        navigation.navigate('MyWithdrawalsScreen');
-        return;
-      }
-      if (id === 'notif') {
-        navigation.navigate('NotificationsScreen');
-        return;
-      }
-
-      if (id === 'settings') {
-        navigation.navigate('SettingsScreen');
-        return;
-      }
-
-      if (id === 'terms') {
-        navigation.navigate('TermsConditions');
-        return;
-      }
-
-      if (id === 'faq') {
-        navigation.navigate('FAQScreen');
-        return;
-      }
-
-      // Handle other menu items...
-      console.log('Menu:', id);
-    },
-    [navigation],
-  );
-
-  const handleLogout = useCallback(() => {
-    navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });
-  }, [navigation]);
-
-  return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#0A3D62" />
-
-      <LinearGradient
-        colors={['#0A3D62', '#15AABF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={s.header}
-      >
-        <TouchableOpacity
-          style={s.backBtn}
-          onPress={handleBack}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          activeOpacity={0.7}
-        >
-          <Icons name="arrow-left" size={sp(20)} color={P.white} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={s.settingsBtn}
-          onPress={() => handleMenu('settings')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          activeOpacity={0.7}
-        >
-          <Icons name="settings" size={sp(20)} color={P.white} />
-        </TouchableOpacity>
-
-        <View style={s.avatarRing}>
-          {USER.avatarUri ? (
-            <Image source={{ uri: USER.avatarUri }} style={s.avatar} />
-          ) : (
-            <View style={s.avatarFallback}>
-              <Text style={s.avatarInitial}>
-                {USER.name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={s.userName}>{USER.name}</Text>
-        <Text style={s.userEmail}>{USER.email}</Text>
-
-        {USER.verified && (
-          <View style={s.verifiedBadge}>
-            <Icons name="check-circle" size={sp(11)} color={P.teal} />
-            <Text style={s.verifiedTxt}>CNIC Verified</Text>
-          </View>
-        )}
-      </LinearGradient>
-
-      <View style={s.statsCard}>
-        <View style={s.statItem}>
-          <View style={s.statTopRow}>
-            <Text style={s.statVal}>{USER.donated}</Text>
-            <Icons
-              name="copy"
-              size={sp(13)}
-              color={P.light}
-              style={{ marginLeft: sp(4) }}
-            />
-          </View>
-          <Text style={s.statLbl}>Donated</Text>
-        </View>
-
-        <View style={s.statDivider} />
-
-        <View style={s.statItem}>
-          <View style={s.statTopRow}>
-            <Text style={s.statVal}>{USER.donations}</Text>
-            <Icons
-              name="heart"
-              size={sp(13)}
-              color={P.light}
-              style={{ marginLeft: sp(4) }}
-            />
-          </View>
-          <Text style={s.statLbl}>Donations</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
-      >
-        <View style={s.menuCard}>
-          {MENU_ITEMS.map((item, idx) => (
-            <MenuItem
-              key={item.id}
-              item={item}
-              onPress={handleMenu}
-              isLast={idx === MENU_ITEMS.length - 1}
-            />
-          ))}
-        </View>
-
-        <TouchableOpacity
-          style={s.logoutBtn}
-          onPress={handleLogout}
-          activeOpacity={0.8}
-        >
-          <Icons name="log-out" size={sp(16)} color={P.red} />
-          <Text style={s.logoutTxt}>Log Out</Text>
-        </TouchableOpacity>
-
-        <View style={{ height: sp(24) }} />
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
-
-export default ProfileScreen;
-
-const s = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: P.bg,
-  },
-
-  header: {
-    paddingTop: sp(16),
-    paddingBottom: sp(26),
-    paddingHorizontal: sp(22),
-    alignItems: 'center',
-  },
-
-  backBtn: {
-    position: 'absolute',
-    top: sp(14),
-    left: sp(16),
-    width: sp(36),
-    height: sp(36),
-    borderRadius: sp(18),
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsBtn: {
-    position: 'absolute',
-    top: sp(14),
-    right: sp(16),
-    width: sp(36),
-    height: sp(36),
-    borderRadius: sp(18),
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  avatarRing: {
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.35)',
-    borderRadius: sp(46),
-    marginBottom: sp(12),
-  },
-  avatar: {
-    width: sp(84),
-    height: sp(84),
-    borderRadius: sp(42),
-  },
-  avatarFallback: {
-    width: sp(84),
-    height: sp(84),
-    borderRadius: sp(42),
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontSize: sp(34),
-    fontWeight: '800',
-    color: P.white,
-  },
-
-  userName: {
-    fontSize: sp(18),
-    fontWeight: '800',
-    color: P.white,
-    marginBottom: sp(3),
-  },
-  userEmail: {
-    fontSize: sp(12),
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: sp(10),
-  },
-
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: P.white,
-    borderRadius: sp(20),
-    paddingHorizontal: sp(12),
-    paddingVertical: sp(5),
-    gap: sp(5),
-  },
-  verifiedTxt: {
-    fontSize: sp(11),
-    fontWeight: '700',
-    color: P.teal,
-  },
-
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: P.white,
-    marginHorizontal: sp(16),
-    marginTop: sp(10),
-    borderRadius: sp(14),
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    marginBottom: sp(16),
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: sp(16),
-    paddingHorizontal: sp(8),
-  },
-  statTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: sp(3),
-  },
-  statVal: {
-    fontSize: sp(15),
-    fontWeight: '800',
-    color: P.dark,
-  },
-  statLbl: {
-    fontSize: sp(11),
-    color: P.light,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: P.border,
-    marginVertical: sp(14),
-  },
-
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: sp(16) },
-
-  menuCard: {
-    backgroundColor: P.white,
-    borderRadius: sp(14),
-    overflow: 'hidden',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    marginBottom: sp(16),
-  },
-
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -503,3 +504,5 @@ const s = StyleSheet.create({
     color: P.red,
   },
 });
+
+export default ProfileScreen;
