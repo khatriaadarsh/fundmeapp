@@ -1,10 +1,4 @@
 // src/screens/donations/MyDonationsScreen.jsx
-// ─────────────────────────────────────────────────────────────
-//  My Donations — pixel-accurate match to screenshot
-//  Self-contained: SummaryBanner, FilterTabs, DonationCard
-//  all live here so alignment is guaranteed consistent.
-//  Swap mock data for real API data without changing layout.
-// ─────────────────────────────────────────────────────────────
 
 import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
@@ -14,7 +8,6 @@ import {
   StyleSheet,
   StatusBar,
   FlatList,
-  Image,
   Dimensions,
   Platform,
 } from 'react-native';
@@ -31,7 +24,7 @@ const { width: SW } = Dimensions.get('window');
 const scale = n => (SW / 390) * n; // 390 = design base width
 
 // ─────────────────────────────────────────────────────────────
-//  Design tokens
+//  Design tokens — UNCHANGED from the original screen
 // ─────────────────────────────────────────────────────────────
 const C = {
   pageBg: '#F4F6F9',
@@ -41,25 +34,20 @@ const C = {
   lightGray: '#9CA3AF',
   border: '#E5E7EB',
 
-  // Banner gradient colours (replicated with views since no LinearGradient dep guaranteed)
   bannerStart: '#0D4F6B',
   bannerMid: '#0B7B8A',
   bannerEnd: '#00B4CC',
 
-  // Filter tab active
   tabActive: '#0D4F6B',
   tabInactive: '#6B7280',
 
-  // Amounts
   amountGreen: '#16A34A',
 
-  // Status badges
   completedBg: '#DCFCE7',
   completedFg: '#15803D',
   pendingBg: '#FEF9C3',
   pendingFg: '#B45309',
 
-  // Payment badge
   paymentBg: '#F3F4F6',
   paymentFg: '#374151',
 };
@@ -74,10 +62,9 @@ const DONATION_HISTORY = [
     amount: 5000,
     status: 'Completed',
     paymentMethod: 'EasyPaisa',
-    message: 'Get well soon little angel!',
+    transactionId: '564925374920',
     date: 'Jan 15, 2025',
     time: '2:30 PM',
-    imageUri: null, // replace with real URI or require()
   },
   {
     id: '2',
@@ -85,10 +72,9 @@ const DONATION_HISTORY = [
     amount: 2500,
     status: 'Completed',
     paymentMethod: 'Visa ••42',
-    message: null,
+    transactionId: '685746354219',
     date: 'Jan 10, 2025',
     time: '10:15 AM',
-    imageUri: null,
   },
   {
     id: '3',
@@ -96,51 +82,55 @@ const DONATION_HISTORY = [
     amount: 10000,
     status: 'Pending',
     paymentMethod: 'JazzCash',
-    message: 'Praying for safe delivery.',
+    transactionId: '098754354317',
     date: 'Dec 28, 2024',
     time: '9:45 PM',
-    imageUri: null,
   },
 ];
 
 const TABS = ['All', 'Completed', 'Pending'];
 
 // ─────────────────────────────────────────────────────────────
-//  SummaryBanner
-//  Dark teal gradient card with decorative circle top-right
+//  SummaryCard
+//  Same gradient/colours as before. Now shows Total Donated amount
+//  plus 3 stat boxes: Total, Completed, Pending — matching the
+//  "Total Balance + action row" layout from the reference image.
 // ─────────────────────────────────────────────────────────────
-const SummaryBanner = memo(({ totalAmount, totalCount }) => (
-  <View style={banner.outer}>
-    {/* Gradient simulation via layered views */}
-    <View style={banner.layerDark} />
-    <View style={banner.layerMid} />
-    {/* Decorative circle — top right */}
-    <View style={banner.circle} />
+const SummaryCard = memo(({ totalAmount, totalCount, completedCount, pendingCount }) => (
+  <View style={summary.outer}>
+    <View style={summary.layerDark} />
+    <View style={summary.layerMid} />
+    <View style={summary.circle} />
 
-    {/* Content */}
-    <View style={banner.content}>
-      <Text style={banner.label}>Total Donated</Text>
-      <Text style={banner.amount}>
+    <View style={summary.content}>
+      <Text style={summary.label}>Total Donated</Text>
+      <Text style={summary.amount}>
         PKR {totalAmount.toLocaleString('en-PK')}
       </Text>
-      <View style={banner.countRow}>
-        <MCIcons
-          name="heart-outline"
-          size={scale(14)}
-          color="rgba(255,255,255,0.85)"
-        />
-        <Text style={banner.countText}>
-          {totalCount} {totalCount === 1 ? 'donation' : 'donations'}
-        </Text>
+
+      <View style={summary.statsRow}>
+        <StatBox icon="layers" label="Total" value={totalCount} />
+        <StatBox icon="check" label="Complete" value={completedCount} />
+        <StatBox icon="clock" label="Pending" value={pendingCount} />
       </View>
     </View>
   </View>
 ));
 
-const BANNER_H = scale(130);
+const StatBox = memo(({ icon, label, value }) => (
+  <View style={summary.statBox}>
+    <View style={summary.statIconWrap}>
+      <Icons name={icon} size={scale(12)} color={C.white} />
+    </View>
+    <Text style={summary.statValue}>{value}</Text>
+    <Text style={summary.statLabel}>{label}</Text>
+  </View>
+));
+
+const BANNER_H = scale(172);
 const CIRCLE_SIZE = scale(160);
 
-const banner = StyleSheet.create({
+const summary = StyleSheet.create({
   outer: {
     marginHorizontal: sp(16),
     marginTop: sp(16),
@@ -155,7 +145,6 @@ const banner = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
   },
-  // Gradient layers (left dark → right teal)
   layerDark: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: C.bannerStart,
@@ -171,7 +160,6 @@ const banner = StyleSheet.create({
     borderTopLeftRadius: BANNER_H,
     borderBottomLeftRadius: BANNER_H * 0.4,
   },
-  // Decorative circle — top right corner
   circle: {
     position: 'absolute',
     top: -CIRCLE_SIZE * 0.35,
@@ -182,43 +170,61 @@ const banner = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   content: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     paddingHorizontal: sp(20),
-    paddingVertical: sp(18),
+    paddingTop: sp(18),
+    paddingBottom: sp(18),
     justifyContent: 'space-between',
   },
   label: {
     fontSize: sp(13),
     color: 'rgba(255,255,255,0.80)',
-    fontWeight: '500',
+    fontWeight: '800',
+    // fontWeight: 
   },
   amount: {
-    fontSize: sp(32),
+    fontSize: sp(30),
     fontWeight: '800',
     color: C.white,
     letterSpacing: -0.5,
     marginTop: sp(2),
   },
-  countRow: {
+
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: sp(5),
+    gap: sp(8),
   },
-  countText: {
-    fontSize: sp(13),
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: scale(10),
+    paddingVertical: sp(8),
+  },
+  statIconWrap: {
+    width: scale(22),
+    height: scale(22),
+    borderRadius: scale(11),
+    backgroundColor: 'rgba(255,255,255,0.20)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: sp(5),
+  },
+  statValue: {
+    fontSize: sp(14),
+    fontWeight: '800',
+    color: C.white,
+  },
+  statLabel: {
+    fontSize: sp(10),
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '500',
+    marginTop: sp(1),
   },
 });
 
 // ─────────────────────────────────────────────────────────────
-//  FilterTabs
-//  Active tab = dark navy filled pill, inactive = plain text
-//  Left-aligned row — NOT equal-width buttons
+//  FilterTabs — unchanged
 // ─────────────────────────────────────────────────────────────
 const FilterTabs = memo(({ tabs, active, onChange }) => (
   <View style={ft.row}>
@@ -245,10 +251,11 @@ const ft = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: sp(16),
     marginBottom: sp(14),
-    gap: sp(4),
+    gap: sp(8),
   },
   tab: {
-    paddingHorizontal: sp(20),
+    flex: 1,
+    alignItems: 'center',
     paddingVertical: sp(10),
     borderRadius: sp(50),
   },
@@ -256,7 +263,7 @@ const ft = StyleSheet.create({
     backgroundColor: C.tabActive,
   },
   label: {
-    fontSize: sp(15),
+    fontSize: sp(14),
     fontWeight: '500',
     color: C.tabInactive,
   },
@@ -267,136 +274,91 @@ const ft = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────
-//  StatusBadge
+//  StatusBadge — same colours, pill shape to match reference
 // ─────────────────────────────────────────────────────────────
 const StatusBadge = memo(({ status }) => {
   const isCompleted = status === 'Completed';
   return (
     <View
       style={[
-        badge.wrap,
+        badge.statusWrap,
         { backgroundColor: isCompleted ? C.completedBg : C.pendingBg },
       ]}
     >
       <Text
         style={[
-          badge.text,
+          badge.statusText,
           { color: isCompleted ? C.completedFg : C.pendingFg },
         ]}
       >
-        {status.toUpperCase()}
+        {status}
       </Text>
     </View>
   );
 });
 
-// ─────────────────────────────────────────────────────────────
-//  PaymentBadge
-// ─────────────────────────────────────────────────────────────
-const PaymentBadge = memo(({ method }) => (
-  <View style={badge.payWrap}>
-    <Text style={badge.payText}>{method}</Text>
-  </View>
-));
-
 const badge = StyleSheet.create({
-  wrap: {
+  statusWrap: {
     alignSelf: 'flex-start',
     paddingHorizontal: sp(10),
-    paddingVertical: sp(4),
-    borderRadius: sp(6),
+    paddingVertical: sp(3),
+    borderRadius: sp(20),
   },
-  text: {
+  statusText: {
     fontSize: sp(11),
     fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  payWrap: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: sp(12),
-    paddingVertical: sp(4),
-    borderRadius: sp(20),
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.white,
-  },
-  payText: {
-    fontSize: sp(12),
-    fontWeight: '500',
-    color: C.paymentFg,
   },
 });
 
 // ─────────────────────────────────────────────────────────────
-//  DonationCard
-//
-//  Two layouts from screenshot:
-//    WITH image  → thumbnail left, content right
-//    WITHOUT img → no thumbnail, full-width content
-//
-//  Both share: status badge + payment badge row,
-//  optional italic quote, date·time right-aligned
+//  DonationCard — redesigned to match the reference:
+//  icon box · title · amount
+//  payment method ......... status pill
+//  "Transaction ID" label
+//  id value ......... date · time
 // ─────────────────────────────────────────────────────────────
-const THUMB_SIZE = scale(72);
+const ICON_BOX = scale(38);
 
-const DonationCard = memo(({ item }) => {
-  const hasImage = !!item.imageUri;
-
-  return (
-    <View style={card.outer}>
-      {/* ── Top row: [thumbnail?] + title + amount ──────── */}
-      <View style={card.topRow}>
-        {/* Thumbnail — only when imageUri exists */}
-        {hasImage && (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={card.thumb}
-            resizeMode="cover"
-          />
-        )}
-
-        {/* Title + amount block */}
-        <View style={[card.titleBlock, !hasImage && { paddingLeft: 0 }]}>
-          <Text
-            style={[card.title, hasImage && { flex: 1, marginRight: sp(8) }]}
-            numberOfLines={2}
-          >
-            {item.title}
-          </Text>
-          <View style={card.amountBlock}>
-            <Text style={card.amountCurrency}>PKR</Text>
-            <Text style={card.amountValue}>
-              {item.amount.toLocaleString('en-PK')}
-            </Text>
-          </View>
-        </View>
+const DonationCard = memo(({ item }) => (
+  <View style={card.outer}>
+    {/* Top row: icon + title + amount */}
+    <View style={card.topRow}>
+      <View style={card.iconBox}>
+        <MCIcons name="hand-heart-outline" size={scale(18)} color={C.bannerStart} />
       </View>
 
-      {/* ── Badge row ───────────────────────────────────── */}
-      <View style={[card.badgeRow, hasImage && { paddingLeft: 0 }]}>
+      <View style={card.titleCol}>
+        <Text style={card.title} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={card.paymentMethod} numberOfLines={1}>
+          {item.paymentMethod}
+        </Text>
+      </View>
+
+      <View style={card.rightCol}>
+        <Text style={card.amount}>PKR {item.amount.toLocaleString('en-PK')}</Text>
         <StatusBadge status={item.status} />
-        <PaymentBadge method={item.paymentMethod} />
       </View>
+    </View>
 
-      {/* ── Optional italic message ──────────────────────── */}
-      {!!item.message && <Text style={card.message}>"{item.message}"</Text>}
-
-      {/* ── Date · Time — right-aligned ──────────────────── */}
+    {/* Transaction ID + date/time */}
+    <Text style={card.txnLabel}>Transaction ID</Text>
+    <View style={card.txnRow}>
+      <Text style={card.txnId}>{item.transactionId}</Text>
       <Text style={card.dateTime}>
         {item.date} · {item.time}
       </Text>
     </View>
-  );
-});
+  </View>
+));
 
 const card = StyleSheet.create({
   outer: {
     backgroundColor: C.white,
     marginHorizontal: sp(16),
     borderRadius: scale(14),
-    paddingHorizontal: sp(14),
-    paddingTop: sp(14),
-    paddingBottom: sp(12),
+    padding: sp(12),
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -404,74 +366,66 @@ const card = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  // Top row: thumbnail (optional) + title/amount
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: sp(10),
   },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
+  iconBox: {
+    width: ICON_BOX,
+    height: ICON_BOX,
     borderRadius: scale(10),
-    marginRight: sp(12),
+    backgroundColor: 'rgba(13,79,107,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: sp(10),
     flexShrink: 0,
   },
 
-  // Title + amount sit side by side
-  titleBlock: {
+  titleCol: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: sp(15),
-    fontWeight: '700',
-    color: C.dark,
-    lineHeight: sp(21),
-    flexShrink: 1,
     marginRight: sp(8),
   },
-  amountBlock: {
+  title: {
+    fontSize: sp(14),
+    fontWeight: '700',
+    color: C.dark,
+  },
+  paymentMethod: {
+    fontSize: sp(12),
+    color: C.gray,
+    marginTop: sp(2),
+  },
+
+  rightCol: {
     alignItems: 'flex-end',
     flexShrink: 0,
+    gap: sp(4),
   },
-  amountCurrency: {
-    fontSize: sp(11),
-    fontWeight: '600',
-    color: C.amountGreen,
-    lineHeight: sp(15),
-  },
-  amountValue: {
-    fontSize: sp(20),
+  amount: {
+    fontSize: sp(14),
     fontWeight: '700',
     color: C.amountGreen,
-    lineHeight: sp(26),
   },
 
-  // Badge row
-  badgeRow: {
+  txnLabel: {
+    fontSize: sp(10.5),
+    color: C.lightGray,
+    marginBottom: sp(3),
+  },
+  txnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: sp(8),
-    marginBottom: sp(10),
+    justifyContent: 'space-between',
   },
-
-  // Italic message
-  message: {
-    fontSize: sp(13),
-    fontStyle: 'italic',
-    color: C.gray,
-    lineHeight: sp(19),
-    marginBottom: sp(8),
+  txnId: {
+    fontSize: sp(12.5),
+    fontWeight: '600',
+    color: C.dark,
   },
-
-  // Date·time
   dateTime: {
-    fontSize: sp(12),
+    fontSize: sp(11),
     color: C.lightGray,
-    textAlign: 'right',
   },
 });
 
@@ -521,14 +475,19 @@ const Separator = () => <View style={{ height: sp(12) }} />;
 const MyDonationsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('All');
 
-  // Stats: count + total of COMPLETED only (matches screenshot)
+  // Stats: total (all), completed count, pending count, total amount (all)
   const stats = useMemo(() => {
     const completed = DONATION_HISTORY.filter(d => d.status === 'Completed');
-    const total = completed.reduce((sum, d) => sum + d.amount, 0);
-    return { count: completed.length, total };
+    const pending = DONATION_HISTORY.filter(d => d.status === 'Pending');
+    const total = DONATION_HISTORY.reduce((sum, d) => sum + d.amount, 0);
+    return {
+      total,
+      totalCount: DONATION_HISTORY.length,
+      completedCount: completed.length,
+      pendingCount: pending.length,
+    };
   }, []);
 
-  // Filtered list
   const filteredData = useMemo(() => {
     if (activeTab === 'All') return DONATION_HISTORY;
     return DONATION_HISTORY.filter(d => d.status === activeTab);
@@ -536,17 +495,19 @@ const MyDonationsScreen = ({ navigation }) => {
 
   const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
 
-  const renderItem = useCallback(
-    ({ item }) => <DonationCard item={item} />,
-    [],
-  );
+  const renderItem = useCallback(({ item }) => <DonationCard item={item} />, []);
 
   const keyExtractor = useCallback(item => item.id, []);
 
   const ListHeader = useMemo(
     () => (
       <>
-        <SummaryBanner totalAmount={stats.total} totalCount={stats.count} />
+        <SummaryCard
+          totalAmount={stats.total}
+          totalCount={stats.totalCount}
+          completedCount={stats.completedCount}
+          pendingCount={stats.pendingCount}
+        />
         <FilterTabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
       </>
     ),
@@ -559,7 +520,6 @@ const MyDonationsScreen = ({ navigation }) => {
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
 
-      {/* ── Header ─────────────────────────────────────────── */}
       <View style={s.header}>
         <TouchableOpacity
           onPress={handleBack}
@@ -572,11 +532,9 @@ const MyDonationsScreen = ({ navigation }) => {
 
         <Text style={s.headerTitle}>My Donations</Text>
 
-        {/* Spacer — same width as back button for perfect centering */}
         <View style={s.headerSpacer} />
       </View>
 
-      {/* ── List ───────────────────────────────────────────── */}
       <FlatList
         data={filteredData}
         keyExtractor={keyExtractor}
@@ -586,7 +544,6 @@ const MyDonationsScreen = ({ navigation }) => {
         ListEmptyComponent={ListEmpty}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.listContent}
-        // Performance
         removeClippedSubviews={Platform.OS === 'android'}
         maxToRenderPerBatch={8}
         windowSize={10}
@@ -607,8 +564,6 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: C.pageBg,
   },
-
-  // Header — back arrow + centred title + invisible spacer
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -629,12 +584,11 @@ const s = StyleSheet.create({
     color: C.dark,
     letterSpacing: -0.2,
     textAlign: 'center',
-    flex: 1, // ← takes remaining space, centres between two spacers
+    flex: 1,
   },
   headerSpacer: {
-    width: BACK_BTN_W, // mirrors back button width exactly
+    width: BACK_BTN_W,
   },
-
   listContent: {
     paddingBottom: sp(32),
     flexGrow: 1,

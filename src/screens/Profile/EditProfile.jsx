@@ -325,10 +325,10 @@ const EditProfile = ({ navigation, route }) => {
     };
 
     try {
-      const result = type === 'camera' 
+      const result = type === 'camera'
         ? await launchCamera(options)
         : await launchImageLibrary(options);
-        
+
       if (!result.didCancel && result.assets?.[0]?.uri) {
         updateField('avatar', result.assets[0].uri);
       }
@@ -348,10 +348,12 @@ const EditProfile = ({ navigation, route }) => {
       return;
     }
 
-    // Prepare payload with all required fields
+    // Complete payload — every field is always sent (updated or not),
+    // matching the backend's multipart/form-data update endpoint.
+    // email & mobileNumber are intentionally excluded — backend doesn't
+    // need them and they're locked/uneditable fields on this screen anyway.
     const payload = {
       userId: Number(userId),
-      email: formData.email,
       profileImageUrl: formData.avatar || '',
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -360,7 +362,6 @@ const EditProfile = ({ navigation, route }) => {
       gender: formData.gender,
       city: formData.city,
       province: formData.province,
-      mobileNumber: formData.mobileNumber || '',
     };
 
     console.log('🔵 [EditProfile] Sending payload:', JSON.stringify(payload, null, 2));
@@ -389,7 +390,7 @@ const EditProfile = ({ navigation, route }) => {
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      
+
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
@@ -405,9 +406,9 @@ const EditProfile = ({ navigation, route }) => {
           <View style={s.avatarSection}>
             <View style={s.avatarContainer}>
               {formData.avatar ? (
-                <Image 
-                  source={{ uri: formData.avatar }} 
-                  style={s.avatar} 
+                <Image
+                  source={{ uri: formData.avatar }}
+                  style={s.avatar}
                   resizeMode="cover"
                 />
               ) : (
@@ -432,7 +433,7 @@ const EditProfile = ({ navigation, route }) => {
             placeholder="Enter first name"
             autoCapitalize="words"
           />
-          
+
           <InputField
             label="Last Name"
             value={formData.lastName}
@@ -440,21 +441,21 @@ const EditProfile = ({ navigation, route }) => {
             placeholder="Enter last name"
             autoCapitalize="words"
           />
-          
+
           <TextAreaField
             label="Bio"
             value={formData.bio}
             onChangeText={t => updateField('bio', t)}
             placeholder="Tell us about yourself..."
           />
-          
+
           <DateField
             label="Date of Birth"
             value={formData.dateOfBirth}
             onPress={() => {}}
             placeholder="DD / MM / YYYY"
           />
-          
+
           {/* Gender Selector with proper active state */}
           <View style={s.fieldContainer}>
             <Text style={s.label}>Gender</Text>
@@ -483,7 +484,7 @@ const EditProfile = ({ navigation, route }) => {
             onPress={() => setShowProvincePicker(true)}
             placeholder="Select Province"
           />
-          
+
           <DropdownField
             label="City"
             value={formData.city}
@@ -496,7 +497,7 @@ const EditProfile = ({ navigation, route }) => {
             }}
             placeholder={formData.province ? 'Select City' : 'Select Province First'}
           />
-          
+
           <LockedField label="Email Address" value={formData.email} />
           <LockedField label="Phone Number" value={formData.mobileNumber} />
         </ScrollView>
@@ -518,14 +519,14 @@ const EditProfile = ({ navigation, route }) => {
 
       {/* Modals */}
       <SuccessModal visible={showSuccess} onClose={handleSuccessClose} />
-      
-      <ImagePickerModal 
-        visible={showImagePicker} 
+
+      <ImagePickerModal
+        visible={showImagePicker}
         onCamera={() => handleImagePicker('camera')}
         onGallery={() => handleImagePicker('gallery')}
-        onClose={() => setShowImagePicker(false)} 
+        onClose={() => setShowImagePicker(false)}
       />
-      
+
       <PickerModal
         visible={showProvincePicker}
         title="Select Province"
@@ -534,7 +535,7 @@ const EditProfile = ({ navigation, route }) => {
         onSelect={handleProvinceSelect}
         onClose={() => setShowProvincePicker(false)}
       />
-      
+
       <PickerModal
         visible={showCityPicker}
         title="Select City"
@@ -813,7 +814,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePickerCancelText: { fontSize: scale(15), fontWeight: '600', color: C.textGray },
-  
+
   // Success Modal Styles - Original
   successOverlay: {
     flex: 1,

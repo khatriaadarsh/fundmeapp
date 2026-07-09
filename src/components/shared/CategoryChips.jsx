@@ -1,80 +1,16 @@
-// // src/components/shared/CategoryChips.jsx
-// import React, { memo } from 'react';
-// import { ScrollView, Text, StyleSheet, TouchableOpacity } from 'react-native';
-// import { P, sp } from '../../theme/theme';
-// import { CATEGORIES } from '../../constants/mockData'; // Make sure path is correct
-
-// const CategoryChips = memo(({ active, onChange, showIcons = false }) => (
-//   <ScrollView
-//     horizontal
-//     showsHorizontalScrollIndicator={false}
-//     contentContainerStyle={styles.list}
-//   >
-//     {CATEGORIES.map(cat => {
-//       const isActive = active === cat.id;
-//       return (
-//         <TouchableOpacity
-//           key={cat.id}
-//           style={[styles.chip, isActive && styles.chipActive]}
-//           onPress={() => onChange(cat.id)}
-//           activeOpacity={0.8}
-//         >
-//           {/* ✅ DYNAMIC ICON: Only render if showIcons is true AND icon exists */}
-//           {showIcons && cat.icon && (
-//             <Text style={styles.icon}>{cat.icon}</Text>
-//           )}
-//           <Text style={[styles.label, isActive && styles.labelActive]}>
-//             {cat.label}
-//           </Text>
-//         </TouchableOpacity>
-//       );
-//     })}
-//   </ScrollView>
-// ));
-
-// const styles = StyleSheet.create({
-//   list: { 
-//     paddingHorizontal: sp(16), 
-//     paddingVertical: sp(8), // Slight vertical padding prevents sticking to borders
-//     gap: sp(8) 
-//   },
-//   chip: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     paddingHorizontal: sp(14),
-//     paddingVertical: sp(7),
-//     borderRadius: sp(20),
-//     borderWidth: 1.5,
-//     borderColor: P.border,
-//     backgroundColor: P.white,
-//     marginRight: sp(8),
-//     gap: sp(5),
-//   },
-//   chipActive: {
-//     backgroundColor: P.darkOcean,
-//     borderColor: P.darkOcean,
-//   },
-//   icon: { fontSize: sp(13) },
-//   label: { fontSize: sp(13), fontWeight: '600', color: P.gray },
-//   labelActive: { color: P.white },
-// });
-
-// export default CategoryChips;
-
-
 // src/components/shared/CategoryChips.jsx
 
 import React, { memo } from 'react';
-import { ScrollView, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { P, sp } from '../../theme/theme';
+import { getCategoryIcon } from '../../utils/categoryIcons';
 
 const DEFAULT_CATEGORIES = [
-  {
-    id: 'all',
-    name: 'All',
-    label: 'All',
-  },
+  { id: 'all', name: 'All', label: 'All' },
 ];
+
+const CIRCLE_SIZE = sp(52);
 
 const CategoryChips = memo(({
   active,
@@ -91,15 +27,26 @@ const CategoryChips = memo(({
         const id = cat.id || cat.name;
         const label = cat.label || cat.name;
         const isActive = active === id;
+        const iconName = getCategoryIcon(cat.name || cat.label || id);
 
         return (
           <TouchableOpacity
             key={id}
             activeOpacity={0.85}
             onPress={() => onChange?.(id)}
-            style={[styles.chip, isActive && styles.activeChip]}
+            style={styles.item}
           >
-            <Text style={[styles.text, isActive && styles.activeText]}>
+            <View style={[styles.circle, isActive && styles.circleActive]}>
+              <MCIcons
+                name={iconName}
+                size={sp(20)}
+                color={isActive ? P.white : P.teal}
+              />
+            </View>
+            <Text
+              style={[styles.label, isActive && styles.labelActive]}
+              numberOfLines={1}
+            >
               {label}
             </Text>
           </TouchableOpacity>
@@ -112,28 +59,34 @@ const CategoryChips = memo(({
 const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: sp(16),
-    paddingBottom: sp(12),
-    gap: sp(8),
+    paddingBottom: sp(14),
+    gap: sp(16),
   },
-  chip: {
-    paddingHorizontal: sp(14),
-    paddingVertical: sp(8),
-    borderRadius: sp(18),
-    backgroundColor: P.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: P.border,
+  item: {
+    alignItems: 'center',
+    width: sp(64),
   },
-  activeChip: {
+  circle: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    backgroundColor: 'rgba(0,180,204,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: sp(6),
+  },
+  circleActive: {
     backgroundColor: P.teal,
-    borderColor: P.teal,
   },
-  text: {
+  label: {
+    fontSize: sp(11.5),
+    fontWeight: '600',
     color: P.gray,
-    fontSize: sp(12),
-    fontWeight: '700',
+    textAlign: 'center',
   },
-  activeText: {
-    color: P.white,
+  labelActive: {
+    color: P.dark,
+    fontWeight: '700',
   },
 });
 

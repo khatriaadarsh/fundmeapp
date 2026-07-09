@@ -8,7 +8,7 @@ import { isSuccessCode } from './responseCodes';
 
 const BASE_URL =
   Platform.OS === 'android'
-    ? 'http://192.168.0.105:8082/api/v1'
+    ? 'http://192.168.18.16:8082/api/v1'
     : 'http://localhost:8082/api/v1';
 
 const apiClient = axios.create({

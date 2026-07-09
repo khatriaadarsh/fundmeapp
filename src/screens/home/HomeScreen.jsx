@@ -24,11 +24,6 @@ import UrgentCard      from '../../components/UrgentCard';
 import FeaturedItem    from '../../components/FeaturedItem';
 
 import { useAppContext } from '../../context/AppContext';
-// import {
-//   URGENT_CAMPAIGN_LIMIT,
-//   useCategories,
-//   useUrgentCampaigns,
-// } from '../../hooks/useCampaigns';
 import {
   URGENT_CAMPAIGN_LIMIT,
   useCategories,
@@ -97,7 +92,7 @@ const HomeScreen = ({ navigation }) => {
     });
   }, [navigation]);
 
-  // Render urgent campaigns section
+  // Render urgent campaigns section — vertical stacked list (image-left cards)
   const renderUrgentCampaigns = () => {
     if (urgentLoading) {
       return (
@@ -132,11 +127,7 @@ const HomeScreen = ({ navigation }) => {
     }
 
     return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.horizontalList}
-      >
+      <View style={styles.urgentList}>
         {urgentData.campaigns.map((item) => (
           <UrgentCard 
             key={item.id} 
@@ -144,7 +135,7 @@ const HomeScreen = ({ navigation }) => {
             onPress={handleCampaignPress}
           />
         ))}
-      </ScrollView>
+      </View>
     );
   };
 
@@ -222,11 +213,9 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: sp(28),
   },
-  horizontalList: {
-    paddingLeft: sp(16),
-    paddingRight: sp(2),
-    minHeight: sp(200),
-    paddingBottom: sp(13), 
+  urgentList: {
+    paddingHorizontal: sp(16),
+    paddingBottom: sp(4),
   },
   featuredList: {
     paddingHorizontal: sp(16),

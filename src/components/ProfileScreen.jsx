@@ -122,22 +122,26 @@ const MenuItem = ({ item, onPress, isLast }) => (
 
 const ProfileScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
-  
+
   const userRole = currentUser?.role || 'donor';
   const userId = currentUser?.id;
-  
-  // Get user data from login response
-  const firstName = currentUser?.firstName || '';
-  const lastName = currentUser?.lastName || '';
-  const email = currentUser?.email || '';
-  
-  // Check nicVerified status
-  const isVerified = currentUser?.nicVerified === true;
-  
-  const profileImage = currentUser?.profileImage || null;
-  
-  // Fetch full profile details
+
+  // Fetch full profile details — this is now the source of truth for the
+  // header (image, name, verified badge), not just the login response.
   const { data: profileData, isLoading } = useProfileDetails(userId);
+
+  // Prefer live API data, fall back to currentUser (login response) only
+  // while the profile details request is still in flight / hasn't resolved.
+  const firstName = profileData?.firstName ?? currentUser?.firstName ?? '';
+  const lastName = profileData?.lastName ?? currentUser?.lastName ?? '';
+  const email = profileData?.email ?? currentUser?.email ?? '';
+
+  // cnicVerified comes from the profileDetails API response
+  const isVerified =
+    profileData?.cnicVerified === true || currentUser?.nicVerified === true;
+
+  const profileImage =
+    profileData?.profileImageUrl ?? currentUser?.profileImage ?? null;
 
   const menuItems = useMemo(() => {
     return ALL_MENU_ITEMS.filter(item => item.roles.includes(userRole));
@@ -150,9 +154,9 @@ const ProfileScreen = ({ navigation }) => {
   const handleMenu = useCallback(id => {
     switch(id) {
       case 'edit':
-        navigation.navigate('EditProfile', { 
+        navigation.navigate('EditProfile', {
           profileData: profileData || currentUser,
-          userId: userId 
+          userId: userId,
         });
         break;
       case 'donate':
@@ -227,7 +231,6 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.userName}>{displayName}</Text>
         <Text style={styles.userEmail}>{email}</Text>
 
-        {/* 🔥 FIX: Show badge for both verified and not verified states */}
         {isVerified ? (
           <View style={styles.verifiedBadge}>
             <Icons name="check-circle" size={sp(11)} color={P.teal} />
@@ -239,7 +242,7 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={[styles.verifiedTxt, styles.notVerifiedTxt]}>CNIC Not Verified</Text>
           </View>
         )}
-        
+
         {isLoading && (
           <ActivityIndicator size="small" color={P.white} style={styles.loader} />
         )}
