@@ -2,6 +2,7 @@
 
 import apiClient from '../api/client';
 import { ENDPOINTS } from '../api/endpoints';
+import { getUserId } from '../config/session';
 
 export const getUrgentCampaigns = async ({ category } = {}) => {
   const params = {
@@ -42,6 +43,20 @@ export const getAllCampaigns = async ({ category } = {}) => {
   });
 
   console.log('🟢 all campaigns response:', res.data);
+
+  return res.data;
+};
+
+export const getMyCampaigns = async () => {
+  const userId = getUserId();
+
+  console.log('🟠 My Campaigns UserId:', userId);
+
+  const res = await apiClient.get(
+    `${ENDPOINTS.CAMPAIGNS.MY_CAMPAIGNS}/${userId}`,
+  );
+
+  console.log('🟢 My Campaigns Response:', res.data);
 
   return res.data;
 };

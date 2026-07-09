@@ -27,6 +27,7 @@ export const ENDPOINTS = {
   
   CAMPAIGNS: {
     URGENT: '/urgent-campaigns',
+    MY_CAMPAIGNS: '/my/campaigns',
   },
 
   CATEGORY: {

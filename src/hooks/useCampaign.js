@@ -5,6 +5,7 @@ import {
   getCategories,
   getUrgentCampaigns,
   getAllCampaigns,
+  getMyCampaigns,
 } from '../services/campaignService';
 
 // Change this number to 8 if you want 8 urgent campaigns on home.
@@ -84,6 +85,40 @@ export const useAllCampaigns = ({ category = 'all' } = {}) => {
         isNotFound: true,
         message: body?.responseMessage || 'Campaign not found',
         responseCode: body?.responseCode || '023',
+      };
+    },
+  });
+};
+
+
+export const useMyCampaigns = () => {
+  return useQuery({
+    queryKey: ['my-campaigns'],
+    queryFn: getMyCampaigns,
+
+    select: (body) => {
+      if (body?.responseCode === '023') {
+        return {
+          campaigns: [],
+          isNotFound: true,
+          message: body?.responseMessage || 'Campaign not found',
+        };
+      }
+
+      if (body?.responseCode === '000') {
+        const campaigns = Array.isArray(body?.data) ? body.data : [];
+
+        return {
+          campaigns: campaigns.map(mapMyCampaignToCard),
+          isNotFound: false,
+          message: body?.responseMessage || 'Success',
+        };
+      }
+
+      return {
+        campaigns: [],
+        isNotFound: true,
+        message: body?.responseMessage || 'Campaign not found',
       };
     },
   });
@@ -185,7 +220,59 @@ const mapAllCampaignToCard = (item) => {
   };
 };
 
+const mapMyCampaignToCard = (item) => {
+  const raisedAmount = Number(item?.totalRaised || 0);
+  const goalAmount = Number(item?.fundingGoal || 0);
 
+  const statusMap = {
+    APPROVED: 'Active',
+    PENDING: 'Pending',
+    REJECTED: 'Rejected',
+    DRAFT: 'Draft',
+  };
+
+  const status = statusMap[item?.campaignStatus] || 'Draft';
+
+  const actionsMap = {
+    Active: ['View', 'Withdraw'],
+    Pending: ['View'],
+    Draft: ['Edit', 'Delete'],
+    Rejected: ['Edit & Resubmit', 'Delete'],
+  };
+
+  return {
+    id: String(item?.campaignId),
+    campaignId: item?.campaignId,
+
+    title: item?.shortDescription || 'Campaign',
+
+    image: item?.coverImage,
+    coverImage: item?.coverImage,
+
+    status,
+
+    raised: raisedAmount,
+    goal: goalAmount,
+
+    daysLeft: 30,
+
+    submittedOn: item?.createdDate
+      ? new Date(item.createdDate).toLocaleDateString()
+      : '',
+
+    lastEdited: item?.createdDate
+      ? new Date(item.createdDate).toLocaleDateString()
+      : '',
+
+    note: 'Awaiting admin approval',
+
+    reason: item?.rejectionReason || '',
+
+    actions: actionsMap[status] || [],
+
+    raw: item,
+  };
+};
 
 
 const formatCurrency = (value) => {
