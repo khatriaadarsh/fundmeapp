@@ -28,7 +28,7 @@ const CampaignCard = memo(({ item, onAction }) => {
             <Image
               source={{ uri: item.coverImage}}
               style={styles.thumb}
-              resizeMode="cover"
+               resizeMode="contain"
             />
           ) : (
             <View style={[styles.thumb, styles.thumbFallback]}>
@@ -148,12 +148,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
+  // thumbWrap: {
+  //   width: sp(82),
+  //   height: sp(82),
+  //   borderRadius: sp(12),
+  //   overflow: 'hidden',
+  // },
+
   thumbWrap: {
-    width: sp(82),
-    height: sp(82),
-    borderRadius: sp(12),
-    overflow: 'hidden',
-  },
+  width: sp(82),
+  height: sp(82),
+  borderRadius: sp(12),
+  overflow: 'hidden',
+  backgroundColor: '#F8FAFC',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
 
   thumb: {
     width: '100%',

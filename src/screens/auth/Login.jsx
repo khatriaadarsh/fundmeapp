@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
   Image,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -35,6 +37,29 @@ const LoginScreen = ({ navigation, route }) => {
   const { saveUser, currentUser } = useAppContext();
   const { mutate: doLogin, isPending } = useLogin();
 
+  // ── Responsive metrics ──────────────────────────────────────
+  // IMPORTANT: we deliberately use Dimensions.get('screen') here, NOT
+  // useWindowDimensions()/Dimensions.get('window'). On Android with
+  // windowSoftInputMode="adjustResize", the "window" height itself
+  // shrinks by the keyboard's height while it's open — so breakpoints
+  // driven by window height (e.g. isCompactHeight) would silently
+  // flip mid-typing and resize the logo/fonts, which is an extra
+  // source of the "blink" being reported. "screen" is the physical
+  // device size and never changes when the keyboard shows/hides —
+  // only on a real orientation change — so our spacing/sizing stays
+  // 100% stable regardless of keyboard state.
+  const [screenDims, setScreenDims] = useState(() => Dimensions.get('screen'));
+
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ screen }) => {
+      setScreenDims(screen);
+    });
+    return () => sub?.remove?.();
+  }, []);
+
+  const isCompactHeight = screenDims.height < 700; // small/short phones (e.g. SE-class)
+  const isNarrowWidth   = screenDims.width < 360;
+
   // Prefill email from CheckUser/SignUp flow, then from saved user
   const prefilledEmail =
     route?.params?.email || currentUser?.email || '';
@@ -54,6 +79,33 @@ const LoginScreen = ({ navigation, route }) => {
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const scrollRef = useRef(null);
+
+  // ── Scroll-only-when-needed ──────────────────────────────────
+  // An enterprise-grade form screen should NOT be swipeable/scrollable
+  // when its content already fits on screen, and should NEVER visibly
+  // reposition itself in response to the keyboard opening/closing —
+  // that reposition (a second, JS-driven layout change layered on top
+  // of the OS's own smooth keyboard-resize animation) is exactly what
+  // caused the "blink". So this screen's layout style is now 100%
+  // static — it never changes based on keyboard state. The ONLY thing
+  // we control in JS is whether touch-scrolling is permitted, which we
+  // derive by measuring the ScrollView's real visible height against
+  // its real content height. Toggling `scrollEnabled` has no visual
+  // effect on its own (it doesn't move anything), so it can't blink.
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const canScroll = contentHeight > containerHeight + 1; // +1 guards float rounding
+
+  // If content stops overflowing (e.g. keyboard closed, freeing up
+  // space), silently snap back to the top with NO animation — this
+  // only fires on the true→false transition, so it never fights with
+  // the keyboard's own close animation.
+  useEffect(() => {
+    if (!canScroll) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [canScroll]);
 
   useEffect(() => {
     Animated.parallel([
@@ -170,13 +222,37 @@ const LoginScreen = ({ navigation, route }) => {
 
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // "padding" on iOS lifts content correctly above the keyboard.
+          // On Android we deliberately do NOT set a behavior — Android's
+          // own windowSoftInputMode="adjustResize" (set in
+          // AndroidManifest.xml) already resizes the view when the
+          // keyboard opens. Layering KeyboardAvoidingView's "height"
+          // behavior on TOP of that native resize is what caused the
+          // double-adjustment / jumpy-scroll/blink bug on Android OEM
+          // skins like vivo's FuntouchOS. Letting Android's native
+          // resize be the ONLY thing that moves the layout — with no
+          // JS-driven repositioning of our own — is what keeps this
+          // smooth across devices.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? scale(12) : 0}
         >
           <ScrollView
-            contentContainerStyle={styles.scrollContent}
+            ref={scrollRef}
+            onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+            onContentSizeChange={(_w, h) => setContentHeight(h)}
+            scrollEnabled={canScroll}
+            overScrollMode="never"
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: isCompactHeight ? SPACING.lg : SPACING.xxxl,
+              },
+            ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
             bounces={false}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
             <Animated.View
               style={[
@@ -184,12 +260,35 @@ const LoginScreen = ({ navigation, route }) => {
                 { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
               ]}
             >
-              <View style={styles.logoContainer}>
-                <Image source={LogoImg} style={styles.logo} />
+              <View
+                style={[
+                  styles.logoContainer,
+                  { marginBottom: isCompactHeight ? SPACING.lg : SPACING.xl },
+                ]}
+              >
+                <Image
+                  source={LogoImg}
+                  style={[
+                    styles.logo,
+                    isCompactHeight && { width: scale(58), height: scale(58) },
+                  ]}
+                />
               </View>
 
-              <View style={styles.headlineContainer}>
-                <Text style={styles.headline}>Welcome Back</Text>
+              <View
+                style={[
+                  styles.headlineContainer,
+                  { marginBottom: isCompactHeight ? SPACING.lg : SPACING.xxl },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.headline,
+                    isNarrowWidth && { fontSize: TYPOGRAPHY.fontSize.xl },
+                  ]}
+                >
+                  Welcome Back
+                </Text>
                 <Text style={styles.subtitle}>Log in to your account</Text>
               </View>
 
@@ -203,6 +302,7 @@ const LoginScreen = ({ navigation, route }) => {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   editable={!isPending}
+                  returnKeyType="next"
                 />
 
                 <InputField
@@ -214,6 +314,8 @@ const LoginScreen = ({ navigation, route }) => {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   editable={!isPending}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
                   rightElement={
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
@@ -286,12 +388,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: SPACING.screenPadding,
-    paddingVertical: SPACING.xxxl,
+    paddingBottom: SPACING.xxxl,
   },
   contentContainer: { width: '100%' },
-  logoContainer:    { alignItems: 'center', marginBottom: SPACING.xl },
+  logoContainer:    { alignItems: 'center' },
   logo:             { width: scale(72), height: scale(72), resizeMode: 'contain' },
-  headlineContainer:{ alignItems: 'center', marginBottom: SPACING.xxl },
+  headlineContainer:{ alignItems: 'center' },
   headline: {
     fontSize: TYPOGRAPHY.fontSize.display,
     fontFamily: TYPOGRAPHY.fontFamily.extraBold,
