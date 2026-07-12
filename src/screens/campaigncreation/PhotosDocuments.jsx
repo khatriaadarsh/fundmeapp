@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   ActionSheetIOS,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -28,6 +29,9 @@ import {
 // ── Shared Imports ──────────────────────────────────────────
 import { StepHeader } from '../../components/shared/StepHeader';
 import { P, sp, SW } from '../../theme/theme';
+
+// ── API wiring ──────────────────────────────────────────────
+import { useCreateCampaignStep3 } from '../../hooks/useCreateCampaign';
 
 // ── Constants ───────────────────────────────────────────────
 const THUMB_SIZE = Math.floor((SW - sp(18) * 2 - sp(8) * 3) / 4);
@@ -199,12 +203,36 @@ const dc = StyleSheet.create({
 //  Main Screen
 // ════════════════════════════════════════════════════════════
 const PhotosDocuments = ({ navigation, route }) => {
-  const params = route?.params || {};
+  const params = useMemo(() => route?.params || {}, [route?.params]);
+  const campaignId = params.campaignId ? String(params.campaignId) : null;
 
-  const [coverUri, setCoverUri] = useState(null);
-  const [images, setImages] = useState([]);
-  const [docs, setDocs] = useState([]);
+  // campaignId is mandatory from Step 1 onward
+  useEffect(() => {
+    if (!campaignId) {
+      Alert.alert(
+        'Error',
+        'Missing campaign reference. Please start again from Step 1.',
+        [{ text: 'OK', onPress: () => navigation.navigate('CreateCampaign') }],
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── State — PREFILLED from params so a remount (e.g. after
+  //    editing an earlier step from Review and pressing Next again)
+  //    doesn't wipe out previously picked photos/documents. ──────
+  const [coverUri, setCoverUri] = useState(params.coverUri || null);
+  const [coverFile, setCoverFile] = useState(
+    params.coverFile ||
+      (params.coverUri
+        ? { uri: params.coverUri, name: 'cover.jpg', type: 'image/jpeg' }
+        : null),
+  );
+  const [images, setImages] = useState(params.images || []);
+  const [docs, setDocs] = useState(params.docs || []);
   const [errors, setErrors] = useState({});
+
+  const submitStep3 = useCreateCampaignStep3();
 
   // ── Image picker ────────────────────────────────────────
   const showImagePicker = onSelect => {
@@ -238,11 +266,21 @@ const PhotosDocuments = ({ navigation, route }) => {
 
       if (target === 'cover') {
         setCoverUri(asset.uri);
+        setCoverFile({
+          uri: asset.uri,
+          name: asset.fileName || `cover_${Date.now()}.jpg`,
+          type: asset.type || 'image/jpeg',
+        });
         setErrors(prev => ({ ...prev, coverUri: undefined }));
       } else if (images.length < MAX_IMAGES) {
         setImages(prev => [
           ...prev,
-          { id: Date.now().toString(), uri: asset.uri },
+          {
+            id: Date.now().toString(),
+            uri: asset.uri,
+            name: asset.fileName || `image_${Date.now()}.jpg`,
+            type: asset.type || 'image/jpeg',
+          },
         ]);
       }
     } catch (err) {
@@ -319,10 +357,47 @@ const PhotosDocuments = ({ navigation, route }) => {
     return Object.keys(e).length === 0;
   }, [coverUri, docs]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(async () => {
     if (!validate()) return;
-    navigation.navigate('ReviewSubmit', { ...params, coverUri, images, docs });
-  };
+    if (submitStep3.isPending) return;
+
+    if (!campaignId) {
+      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      return;
+    }
+
+    try {
+      const response = await submitStep3.mutateAsync({
+        campaignId,
+        coverPhoto: coverFile,
+        additionalImages: images,
+        campaignDocuments: docs,
+      });
+
+      if (response?.responseCode && response.responseCode !== '000') {
+        Alert.alert('Error', response?.responseMessage || 'Could not upload files. Please try again.');
+        return;
+      }
+
+      navigation.navigate('ReviewSubmit', {
+        ...params,
+        campaignId,
+        coverUri,
+        // ✅ forwarded so a later edit round-trip back to this screen
+        // can restore the actual re-uploadable file reference, not
+        // just its display uri.
+        coverFile,
+        images,
+        docs,
+      });
+    } catch (error) {
+      console.error('🔴 [PhotosDocuments] Step3 submit error:', error?.message);
+      Alert.alert(
+        'Error',
+        'Could not upload your files. Please check your connection and try again.',
+      );
+    }
+  }, [validate, campaignId, coverFile, coverUri, images, docs, navigation, params, submitStep3]);
 
   // ── Render ───────────────────────────────────────────────
   return (
@@ -456,12 +531,19 @@ const PhotosDocuments = ({ navigation, route }) => {
       {/* ── Footer ─────────────────────────────────────────── */}
       <View style={s.footer}>
         <TouchableOpacity
-          style={s.nextBtn}
+          style={[s.nextBtn, submitStep3.isPending && s.nextBtnDisabled]}
           onPress={handleNext}
           activeOpacity={0.85}
+          disabled={submitStep3.isPending}
         >
-          <Text style={s.nextTxt}>Next</Text>
-          <Icons name="arrow-right" size={sp(16)} color={P.white} />
+          {submitStep3.isPending ? (
+            <ActivityIndicator size="small" color={P.white} />
+          ) : (
+            <>
+              <Text style={s.nextTxt}>Next</Text>
+              <Icons name="arrow-right" size={sp(16)} color={P.white} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -578,5 +660,6 @@ const s = StyleSheet.create({
     backgroundColor: P.teal,
     gap: sp(6),
   },
+  nextBtnDisabled: { opacity: 0.6 },
   nextTxt: { fontSize: sp(15), fontWeight: '700', color: P.white },
 });

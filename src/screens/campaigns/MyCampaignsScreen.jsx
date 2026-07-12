@@ -65,8 +65,12 @@ const MyCampaignsScreen = ({ navigation }) => {
           break;
 
         case 'Withdraw':
+          // campaignId comes straight from the campaign list item (item.id),
+          // exactly as returned by the campaign service — RequestWithdrawalScreen
+          // uses this to fetch the withdrawal summary and submit the request.
           navigation.navigate('RequestWithdrawalScreen', {
-            campaign: item,
+            campaignId: item.id,
+            campaignTitle: item.title,
           });
           break;
 

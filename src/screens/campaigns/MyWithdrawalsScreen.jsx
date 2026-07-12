@@ -10,12 +10,23 @@ import {
   FlatList,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { sp } from '../../theme/theme';
+import {
+  useUserWithdrawalSummary,
+  useMyWithdrawals,
+} from '../../hooks/useWithdrawal';
+
+// ⚠️ ADJUST THIS IMPORT to match your actual auth hook/store.
+// It just needs to return the logged-in user's id.
+// import { useAppContext } from '../context/AppContext';
+import{useAppContext} from '../../context/AppContext';
 
 // ─────────────────────────────────────────────────────────────
 //  Responsive helpers — SAME as MyDonationsScreen
@@ -55,36 +66,6 @@ const C = {
   paymentFg: '#374151',
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Mock data — SAME fields as your original withdrawal screen
-// ─────────────────────────────────────────────────────────────
-const withdrawalsData = [
-  {
-    id: '1',
-    title: 'School supplies for children in underserved areas',
-    amount: '150,000',
-    status: 'pending',
-    date: 'Requested: Oct 28, 2025',
-    note: 'Under Review by Admin',
-  },
-  {
-    id: '2',
-    title: 'Flood relief for displaced families',
-    amount: '320,000',
-    status: 'approved',
-    date: 'Processed: Oct 14, 2025',
-    trx: 'Ref: TXN-98234-A',
-  },
-  {
-    id: '3',
-    title: 'Emergency medical fund for heart surgery',
-    amount: '25,000',
-    status: 'rejected',
-    date: 'Requested: Nov 02, 2025',
-    reason: 'Incomplete hospital bill provided. Please upload the full document.',
-  },
-];
-
 const TABS = ['All', 'Pending', 'Approved', 'Rejected'];
 
 const STATUS = {
@@ -93,6 +74,71 @@ const STATUS = {
   rejected: { label: 'Rejected', bg: C.rejectedBg, fg: C.rejectedFg },
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Helpers
+// ─────────────────────────────────────────────────────────────
+const formatDate = isoString => {
+  if (!isoString) return '';
+  try {
+    return new Date(isoString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+};
+
+const formatAmount = value => {
+  const num = Number(value) || 0;
+  return num.toLocaleString('en-PK', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
+
+// Maps a raw API withdrawal item -> the shape WithdrawalCard expects
+const mapWithdrawal = item => {
+  const status = String(item.status || '').toLowerCase(); // PENDING -> pending
+
+  const mapped = {
+    id: String(item.id),
+    title: item.campaignTitle || 'Withdrawal Request',
+    amount: formatAmount(item.amount),
+    status,
+  };
+
+  if (status === 'pending') {
+    mapped.date = `Requested: ${formatDate(item.requestedDate)}`;
+    mapped.note = 'Under Review by Admin';
+  } else if (status === 'approved') {
+    mapped.date = `Processed: ${formatDate(item.processedDate || item.requestedDate)}`;
+    mapped.trx = `Ref: WD-${item.id}`;
+  } else if (status === 'rejected') {
+    mapped.date = `Requested: ${formatDate(item.requestedDate)}`;
+
+    // Backend field name for the rejection reason isn't fixed yet on our
+    // side — check every common variant the API might send, take the
+    // first non-empty one, and only attach it if it's a real string.
+    const rejectionReason =
+      item.rejectedReason ??
+      item.rejectionReason ??
+      item.rejectReason ??
+      item.reasonForRejection ??
+      item.remarks ??
+      item.reason ??
+      item.adminRemarks ??
+      item.rejectRemarks ??
+      null;
+
+    if (rejectionReason && String(rejectionReason).trim().length > 0) {
+      mapped.reason = String(rejectionReason).trim();
+    }
+  }
+
+  return mapped;
+};
 // ─────────────────────────────────────────────────────────────
 //  SummaryCard — SAME gradient/layout as MyDonationsScreen,
 //  fields swapped for Total Withdrawn + Approved/Pending/Rejected
@@ -276,6 +322,7 @@ const ft = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────
 const StatusBadge = memo(({ status }) => {
   const cfg = STATUS[status];
+  if (!cfg) return null;
   return (
     <View style={[badge.statusWrap, { backgroundColor: cfg.bg }]}>
       <Text style={[badge.statusText, { color: cfg.fg }]}>{cfg.label}</Text>
@@ -466,14 +513,18 @@ const card = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────
-//  EmptyState — SAME as MyDonationsScreen
+//  EmptyState — used for both "no data at all" and "no results for filter"
 // ─────────────────────────────────────────────────────────────
-const EmptyState = memo(({ tab }) => (
+const EmptyState = memo(({ tab, hasAnyData }) => (
   <View style={empty.wrap}>
     <Icons name="inbox" size={scale(44)} color={C.lightGray} />
-    <Text style={empty.title}>No {tab} Withdrawals</Text>
+    <Text style={empty.title}>
+      {hasAnyData ? `No ${tab} Withdrawals` : 'No Withdrawal Requests Yet'}
+    </Text>
     <Text style={empty.sub}>
-      We couldn't find any withdrawals matching this filter.
+      {hasAnyData
+        ? "We couldn't find any withdrawals matching this filter."
+        : "You haven't made any withdrawal requests yet. Once you do, they'll show up here."}
     </Text>
   </View>
 ));
@@ -501,6 +552,44 @@ const empty = StyleSheet.create({
 });
 
 // ─────────────────────────────────────────────────────────────
+//  Loading / Error states
+// ─────────────────────────────────────────────────────────────
+const LoadingState = memo(() => (
+  <View style={empty.wrap}>
+    <ActivityIndicator size="large" color={C.bannerStart} />
+    <Text style={[empty.sub, { marginTop: sp(14) }]}>Loading your withdrawals...</Text>
+  </View>
+));
+
+const ErrorState = memo(({ message, onRetry }) => (
+  <View style={empty.wrap}>
+    <Icons name="alert-triangle" size={scale(40)} color={C.rejectedFg} />
+    <Text style={empty.title}>Something went wrong</Text>
+    <Text style={empty.sub}>{message || 'Failed to load withdrawal data.'}</Text>
+    {!!onRetry && (
+      <TouchableOpacity onPress={onRetry} style={retryStyles.btn} activeOpacity={0.8}>
+        <Text style={retryStyles.btnText}>Retry</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+));
+
+const retryStyles = StyleSheet.create({
+  btn: {
+    marginTop: sp(16),
+    paddingHorizontal: sp(20),
+    paddingVertical: sp(10),
+    backgroundColor: C.bannerStart,
+    borderRadius: sp(50),
+  },
+  btnText: {
+    color: C.white,
+    fontWeight: '700',
+    fontSize: sp(13),
+  },
+});
+
+// ─────────────────────────────────────────────────────────────
 //  Card separator
 // ─────────────────────────────────────────────────────────────
 const Separator = () => <View style={{ height: sp(12) }} />;
@@ -511,27 +600,64 @@ const Separator = () => <View style={{ height: sp(12) }} />;
 // ─────────────────────────────────────────────────────────────
 const MyWithdrawalsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('All');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { currentUser } = useAppContext();
+  const userId = currentUser?.id;
+
+  const {
+    data: summaryData,
+    isLoading: summaryLoading,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = useUserWithdrawalSummary(userId);
+
+  const {
+    data: historyData,
+    isLoading: historyLoading,
+    isError: historyError,
+    error: historyErrorObj,
+    refetch: refetchHistory,
+  } = useMyWithdrawals(userId);
+
+  const isLoading = summaryLoading || historyLoading;
+  const isError = summaryError || historyError;
+
+  const handleRetry = useCallback(() => {
+    refetchSummary();
+    refetchHistory();
+  }, [refetchSummary, refetchHistory]);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchSummary(), refetchHistory()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetchSummary, refetchHistory]);
 
   const stats = useMemo(() => {
-    const approved = withdrawalsData.filter(d => d.status === 'approved');
-    const pending = withdrawalsData.filter(d => d.status === 'pending');
-    const rejected = withdrawalsData.filter(d => d.status === 'rejected');
-    const total = withdrawalsData.reduce((sum, d) => {
-      const num = parseInt(String(d.amount).replace(/,/g, ''), 10) || 0;
-      return sum + num;
-    }, 0);
+    if (!summaryData) {
+      return { total: '0', approvedCount: 0, pendingCount: 0, rejectedCount: 0 };
+    }
     return {
-      total: total.toLocaleString('en-PK'),
-      approvedCount: approved.length,
-      pendingCount: pending.length,
-      rejectedCount: rejected.length,
+      total: formatAmount(summaryData.withdrawalAmount),
+      approvedCount: summaryData.totalApprovedWithdrawal || 0,
+      pendingCount: summaryData.totalPendingWithdrawals || 0,
+      rejectedCount: summaryData.totalRejectWithdrawal || 0,
     };
-  }, []);
+  }, [summaryData]);
+
+  const allWithdrawals = useMemo(() => {
+    if (!Array.isArray(historyData)) return [];
+    return historyData.map(mapWithdrawal);
+  }, [historyData]);
 
   const filteredData = useMemo(() => {
-    if (activeTab === 'All') return withdrawalsData;
-    return withdrawalsData.filter(d => d.status === activeTab.toLowerCase());
-  }, [activeTab]);
+    if (activeTab === 'All') return allWithdrawals;
+    return allWithdrawals.filter(d => d.status === activeTab.toLowerCase());
+  }, [activeTab, allWithdrawals]);
 
   const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
 
@@ -554,7 +680,18 @@ const MyWithdrawalsScreen = ({ navigation }) => {
     [stats, activeTab],
   );
 
-  const ListEmpty = useMemo(() => <EmptyState tab={activeTab} />, [activeTab]);
+  const ListEmpty = useMemo(() => {
+    if (isLoading) return <LoadingState />;
+    if (isError) {
+      return (
+        <ErrorState
+          message={historyErrorObj?.message}
+          onRetry={handleRetry}
+        />
+      );
+    }
+    return <EmptyState tab={activeTab} hasAnyData={allWithdrawals.length > 0} />;
+  }, [isLoading, isError, historyErrorObj, handleRetry, activeTab, allWithdrawals.length]);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -576,7 +713,7 @@ const MyWithdrawalsScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={filteredData}
+        data={isLoading || isError ? [] : filteredData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ItemSeparatorComponent={Separator}
@@ -587,11 +724,18 @@ const MyWithdrawalsScreen = ({ navigation }) => {
         removeClippedSubviews={Platform.OS === 'android'}
         maxToRenderPerBatch={8}
         windowSize={10}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[C.bannerStart]}
+            tintColor={C.bannerStart}
+          />
+        }
       />
     </SafeAreaView>
   );
 };
-
 export default MyWithdrawalsScreen;
 
 // ─────────────────────────────────────────────────────────────

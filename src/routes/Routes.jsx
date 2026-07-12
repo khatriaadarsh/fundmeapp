@@ -338,6 +338,8 @@ import DonateScreen from '../screens/campaigns/DonateScreen';
 import CheckUser from '../screens/auth/CheckUser';
 import CreatorProfileScreen from '../screens/Profile/CreatorProfileScreen';
 import FeedbackScreen from '../screens/feedback/FeedbackScreen';
+// import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
+import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 
 const { width: SW } = Dimensions.get('window');
 const sp = (n) => (SW / 375) * n;
@@ -371,7 +373,7 @@ const CustomTabBar = ({ state, navigation }) => {
           return (
             <View key={route.key} style={tabSt.fabSlot}>
               <TouchableOpacity
-                onPress={() => navigation.navigate('ReviewSubmit')}
+                onPress={() => navigation.navigate('CreateCampaign')}
                 activeOpacity={0.85}
               >
                 <LinearGradient colors={[GRAD_START, GRAD_END]} style={tabSt.fab}>
@@ -530,19 +532,14 @@ const StackNavigator = () => (
     <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
     <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} />
     <Stack.Screen name="MyWithdrawalsScreen" component={MyWithdrawalsScreen} />
-    <Stack.Screen
-      name="RequestWithdrawalScreen"
-      component={RequestWithdrawalScreen}
-    />
+    <Stack.Screen name="RequestWithdrawalScreen" component={RequestWithdrawalScreen}/>
     <Stack.Screen name="TermsConditions" component={TermsConditions} />
     <Stack.Screen name="FAQScreen" component={FAQScreen} />
     <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
     <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
     <Stack.Screen name="CampaignDetail" component={CampaignDetail} />
-    {/* <Stack.Screen name="CreateCampaign" component={CreateCampaign} /> */}
-    {/* <Stack.Screen name="CampaignDetails" component={CampaignDetails}  /> */}
+    <Stack.Screen name="CreateCampaign" component={CreateCampaign} />
     <Stack.Screen name="DonateScreen" component={DonateScreen} />
-    {/* <Stack.Navigator initialRouteName="CheckUser"> */}
     <Stack.Screen
       name="CheckUser"
       component={CheckUser}

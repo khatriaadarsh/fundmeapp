@@ -14,12 +14,17 @@ import {
   StatusBar,
   Animated,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StepHeader } from '../../components/shared/StepHeader';
 import { P } from '../../theme/theme';
 import { C } from './Shared';
+
+// ── API wiring ──────────────────────────────────────────────
+import { useCreateCampaignStep4 } from '../../hooks/useCreateCampaign';
 
 // ── Section card ───────────────────────────────────────────
 const SectionCard = ({ label, onEdit, children }) => (
@@ -112,12 +117,17 @@ const bdg = StyleSheet.create({
   txt: { fontSize: 11, fontWeight: '700' },
 });
 
-// ── Thumbnail ──────────────────────────────────────────────
-const Thumb = ({ bg, icon, label }) => (
+// ── Thumbnail — renders the real picked image when a uri is
+//    available, falling back to an icon placeholder otherwise ──
+const Thumb = ({ uri, bg, icon, label }) => (
   <View style={th.wrap}>
-    <View style={[th.box, { backgroundColor: bg }]}>
-      <Icon name={icon} size={18} color="#fff" />
-    </View>
+    {uri ? (
+      <Image source={{ uri }} style={th.img} resizeMode="cover" />
+    ) : (
+      <View style={[th.box, { backgroundColor: bg || '#CBD5E1' }]}>
+        <Icon name={icon || 'image-outline'} size={18} color="#fff" />
+      </View>
+    )}
     {label ? <Text style={th.lbl}>{label}</Text> : null}
   </View>
 );
@@ -130,6 +140,7 @@ const th = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  img: { width: 52, height: 52, borderRadius: 8 },
   lbl: { fontSize: 10, color: C.textLight, marginTop: 2 },
 });
 
@@ -164,26 +175,19 @@ const plSt = StyleSheet.create({
 const ReviewSubmit = ({ navigation, route }) => {
   const p = route?.params || {};
 
-  // Preview data — falls back to Figma sample values
-  const title = p.title || "Help Fatima's Heart Surgery";
-  const category = p.category || 'Medical';
-  const urgent = p.urgent ?? true;
-  const goal = p.goal || '500,000';
-  const endDate = p.endDate || 'Feb 28, 2025';
-  const shortDesc =
-    p.shortDesc ||
-    'Fatima is a 5-year-old suffering from a congenital heart defect. She needs urgent surgery to survive.';
-  const fullDesc =
-    p.fullDesc ||
-    "We are raising funds for Fatima's open-heart surgery. The procedure is scheduled for next month at National Hospital. Her family cannot...";
-  const images = p.images || [
-    { id: '1', bgColor: '#7B9BBF', iconName: 'image' },
-    { id: '2', bgColor: '#6B9E7A', iconName: 'camera' },
-  ];
-  const docs = p.docs || [
-    { id: '1', name: 'Medical_Report_Final.pdf' },
-    { id: '2', name: 'Hospital_Bill_Estimate.pdf' },
-  ];
+  const campaignId = p.campaignId;
+  const title = p.title || '';
+  const category = p.category || '';
+  const urgent = !!p.urgent;
+  const goal = p.goal || '';
+  const endDate = p.endDate || '';
+  const shortDesc = p.shortDesc || '';
+  const fullDesc = p.fullDesc || '';
+  const coverUri = p.coverUri || null;
+  const images = p.images || [];
+  const docs = p.docs || [];
+
+  const submitStep4 = useCreateCampaignStep4();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -194,21 +198,48 @@ const ReviewSubmit = ({ navigation, route }) => {
     }).start();
   }, [fadeAnim]);
 
-  const goStep = screen => navigation.navigate(screen);
+  const goStep = screen => navigation.navigate(screen, p);
 
-  const handleSubmit = () => {
-    Alert.alert(
-      'Submitted',
-      'Your application is submitted for review.\nYou will receive a notification.',
-      [
+  const handleSubmit = useCallback(async () => {
+    if (submitStep4.isPending) return;
+
+    if (!campaignId) {
+      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      return;
+    }
+
+    try {
+      const response = await submitStep4.mutateAsync({ campaignId });
+
+      if (response?.responseCode && response.responseCode !== '000') {
+        Alert.alert(
+          'Error',
+          response?.responseMessage || 'Could not submit your campaign. Please try again.',
+        );
+        return;
+      }
+
+      const status = response?.data?.campaignStatus;
+      const statusNote =
+        status === 'PENDING'
+          ? 'Your application is submitted for review.\nYou will receive a notification.'
+          : `Campaign status: ${status || 'submitted'}.`;
+
+      Alert.alert('Submitted', statusNote, [
         {
           text: 'OK',
           onPress: () =>
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }),
         },
-      ],
-    );
-  };
+      ]);
+    } catch (error) {
+      console.error('🔴 [ReviewSubmit] Step4 submit error:', error?.message);
+      Alert.alert(
+        'Error',
+        'Could not submit your campaign. Please check your connection and try again.',
+      );
+    }
+  }, [campaignId, navigation, submitStep4]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -291,11 +322,11 @@ const ReviewSubmit = ({ navigation, route }) => {
           {/* ── MEDIA ── */}
           <SectionCard label="MEDIA" onEdit={() => goStep('PhotosDocuments')}>
             <View style={s.mediaRow}>
-              {/* Cover placeholder */}
-              <Thumb bg="#CBD5E1" icon="image-outline" label="Cover" />
+              {/* Cover photo */}
+              <Thumb uri={coverUri} icon="image-outline" label="Cover" />
               {/* Additional images */}
               {images.map(img => (
-                <Thumb key={img.id} bg={img.bgColor} icon={img.iconName} />
+                <Thumb key={img.id} uri={img.uri} />
               ))}
             </View>
           </SectionCard>
@@ -324,18 +355,26 @@ const ReviewSubmit = ({ navigation, route }) => {
               style={s.draftBtn}
               onPress={() => navigation.goBack()}
               activeOpacity={0.8}
+              disabled={submitStep4.isPending}
             >
               <Text style={s.draftTxt}>Save Draft</Text>
             </TouchableOpacity>
 
             {/* Submit for Review */}
             <TouchableOpacity
-              style={s.submitBtn}
+              style={[s.submitBtn, submitStep4.isPending && s.submitBtnDisabled]}
               onPress={handleSubmit}
               activeOpacity={0.85}
+              disabled={submitStep4.isPending}
             >
-              <Text style={s.submitTxt}>Submit for Review</Text>
-              <Icon name="check" size={15} color={C.white} />
+              {submitStep4.isPending ? (
+                <ActivityIndicator size="small" color={C.white} />
+              ) : (
+                <>
+                  <Text style={s.submitTxt}>Submit for Review</Text>
+                  <Icon name="check" size={15} color={C.white} />
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -354,7 +393,6 @@ const s = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4 },
 
-  /* ── Review notice ── */
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -367,7 +405,6 @@ const s = StyleSheet.create({
   },
   noticeTxt: { fontSize: 13, color: C.greenDark, fontWeight: '600', flex: 1 },
 
-  /* ── Basic info ── */
   campaignTitle: {
     fontSize: 16,
     fontWeight: '800',
@@ -376,7 +413,6 @@ const s = StyleSheet.create({
   },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4 },
 
-  /* ── Description ── */
   descLabel: {
     fontSize: 12,
     color: C.textLight,
@@ -385,14 +421,12 @@ const s = StyleSheet.create({
   },
   descBody: { fontSize: 13, color: C.dark, lineHeight: 19 },
 
-  /* ── Media ── */
   mediaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
 
-  /* ── Bottom area ── */
   btnArea: {
     backgroundColor: C.white,
     borderTopWidth: 1,
@@ -424,6 +458,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 13,
   },
+  submitBtnDisabled: { opacity: 0.7 },
   submitTxt: { fontSize: 14, fontWeight: '700', color: C.white },
 
   footerNote: {

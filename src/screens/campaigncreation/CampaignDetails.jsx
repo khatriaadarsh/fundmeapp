@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, memo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Dimensions,
   Modal,
   FlatList,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -20,25 +22,13 @@ import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StepHeader } from '../../components/shared/StepHeader';
 // ── Import from Shared Theme ──────────────────────────────────
 import { P, sp } from '../../theme/theme'; // Using shared theme file
-// ── Static options & Location Data ────────────────────────────
+
+// ── API wiring ──────────────────────────────────────────────
+import { useProvinces, useCities } from '../../hooks/useLocation';
+import { useCreateCampaignStep2 } from '../../hooks/useCreateCampaign';
+
+// ── Static options (not covered by an API) ────────────────────
 const RELATIONSHIPS = ['Family', 'Friend', 'Self', 'Community', 'NGO', 'Other'];
-// New nested structure for Province-dependent Cities
-const LOCATIONS = {
-  Punjab: [
-    'Lahore',
-    'Rawalpindi',
-    'Faisalabad',
-    'Multan',
-    'Gujranwala',
-    'Sialkot',
-  ],
-  Sindh: ['Karachi', 'Hyderabad', 'Sukkur', 'Larkana'],
-  KPK: ['Peshawar', 'Mardan', 'Abbottabad', 'Swat'],
-  Balochistan: ['Quetta', 'Gwadar', 'Turbat'],
-  'Gilgit-Baltistan': ['Gilgit', 'Skardu', 'Hunza'],
-  AJK: ['Muzaffarabad', 'Mirpur'],
-};
-const PROVINCES = Object.keys(LOCATIONS);
 
 // ════════════════════════════════════════════════════════════
 //  FieldLabel — label + mandatory star + optional counter
@@ -128,7 +118,7 @@ const tbSt = StyleSheet.create({
     borderBottomColor: P.border,
     paddingHorizontal: sp(10),
     paddingVertical: sp(7),
-    backgroundColor: P.searchBg, // Updated color from theme
+    backgroundColor: P.searchBg,
   },
   btn: {
     paddingHorizontal: sp(8),
@@ -136,7 +126,7 @@ const tbSt = StyleSheet.create({
     borderRadius: sp(4),
     marginHorizontal: sp(2),
   },
-  btnActive: { backgroundColor: P.tealLight }, // Updated color from theme
+  btnActive: { backgroundColor: P.tealLight },
   divider: { flex: 1 },
   hint: { fontSize: sp(11), color: P.light, marginRight: sp(4) },
 });
@@ -257,7 +247,7 @@ const dpSt = StyleSheet.create({
   triggerDisabled: { backgroundColor: P.bg },
   leftIcon: { marginRight: sp(8) },
   val: { flex: 1, fontSize: sp(14), color: P.dark },
-  ph: { color: P.light }, // placeholder color from theme
+  ph: { color: P.light },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -323,17 +313,32 @@ const plSt = StyleSheet.create({
 //  CampaignDetails — main screen
 // ════════════════════════════════════════════════════════════
 const CampaignDetails = ({ navigation, route }) => {
-  const params = route?.params || {};
+  const params = useMemo(() => route?.params || {}, [route?.params]);
+  const campaignId = params.campaignId ? String(params.campaignId) : null;
 
-  // Form state
-  const [shortDesc, setShortDesc] = useState('');
-  const [fullDesc, setFullDesc] = useState('');
-  const [beneficiary, setBeneficiary] = useState('');
-  const [relationship, setRelationship] = useState('');
-  const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
+  // campaignId is mandatory from Step 1 onward — if it's missing,
+  // send the user back rather than letting Step 2 fail silently.
+  useEffect(() => {
+    if (!campaignId) {
+      Alert.alert(
+        'Error',
+        'Missing campaign reference. Please start again from Step 1.',
+        [{ text: 'OK', onPress: () => navigation.navigate('CreateCampaign') }],
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const [availableCities, setAvailableCities] = useState([]);
+  // ── Form state — PREFILLED from params so that whenever this
+  //    screen remounts (e.g. after editing Step 1 from the Review
+  //    screen and pressing Next again, which drops and recreates
+  //    this screen), previously-entered data isn't lost. ────────
+  const [shortDesc, setShortDesc] = useState(params.shortDesc || '');
+  const [fullDesc, setFullDesc] = useState(params.fullDesc || '');
+  const [beneficiary, setBeneficiary] = useState(params.beneficiary || '');
+  const [relationship, setRelationship] = useState(params.relationship || '');
+  const [province, setProvince] = useState(params.province || '');
+  const [city, setCity] = useState(params.city || '');
 
   // UI State
   const [errors, setErrors] = useState({});
@@ -347,16 +352,44 @@ const CampaignDetails = ({ navigation, route }) => {
   const setFocused = key => setFocus(f => ({ ...f, [key]: true }));
   const setBlurred = key => setFocus(f => ({ ...f, [key]: false }));
 
-  // Update available cities when province changes
+  // ── Provinces / Cities — already-integrated location APIs ─────
+  const { data: provincesData = [], isLoading: provincesLoading } = useProvinces();
+
+  const provinceOptions = useMemo(
+    // ⚠️ Adjust `name` below if your API returns a different field
+    () => provincesData.map(p => p.name ?? p.provinceName ?? String(p)),
+    [provincesData],
+  );
+
+  const selectedProvinceObj = useMemo(
+    () => provincesData.find(p => (p.name ?? p.provinceName) === province),
+    [provincesData, province],
+  );
+  // ⚠️ Adjust `id` below if your API returns a different field
+  const provinceId = selectedProvinceObj?.id ?? selectedProvinceObj?.provinceId ?? null;
+
+  const { data: citiesData = [], isLoading: citiesLoading } = useCities(provinceId);
+
+  const cityOptions = useMemo(
+    () => citiesData.map(c => c.name ?? c.cityName ?? String(c)),
+    [citiesData],
+  );
+
+  // ✅ Reset city whenever the user CHANGES province — but skip the
+  // very first run on mount, otherwise a prefilled city (from params,
+  // when editing) gets wiped out immediately before the user ever
+  // sees it.
+  const isFirstProvinceRender = useRef(true);
   useEffect(() => {
-    if (province) {
-      setAvailableCities(LOCATIONS[province] || []);
-      setCity(''); // Reset city when province changes
-      setErrors(prev => ({ ...prev, city: undefined }));
-    } else {
-      setAvailableCities([]);
+    if (isFirstProvinceRender.current) {
+      isFirstProvinceRender.current = false;
+      return;
     }
+    setCity('');
+    setErrors(prev => ({ ...prev, city: undefined }));
   }, [province]);
+
+  const submitStep2 = useCreateCampaignStep2();
 
   const validate = useCallback(() => {
     const e = {};
@@ -374,27 +407,60 @@ const CampaignDetails = ({ navigation, route }) => {
     return Object.keys(e).length === 0;
   }, [shortDesc, fullDesc, beneficiary, relationship, city, province]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (!validate()) return;
-    navigation.navigate('PhotosDocuments', {
-      ...params,
-      shortDesc,
-      fullDesc,
-      beneficiary,
-      relationship,
-      city,
-      province,
-    });
+    if (submitStep2.isPending) return;
+
+    if (!campaignId) {
+      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      return;
+    }
+
+    try {
+      const response = await submitStep2.mutateAsync({
+        campaignId,
+        shortDescription: shortDesc.trim(),
+        description: fullDesc.trim(),
+        beneficiaryName: beneficiary.trim(),
+        relationships: relationship,
+        city,
+        province,
+      });
+
+      if (response?.responseCode && response.responseCode !== '000') {
+        Alert.alert('Error', response?.responseMessage || 'Could not save details. Please try again.');
+        return;
+      }
+
+      navigation.navigate('PhotosDocuments', {
+        ...params,
+        campaignId,
+        shortDesc,
+        fullDesc,
+        beneficiary,
+        relationship,
+        city,
+        province,
+      });
+    } catch (error) {
+      console.error('🔴 [CampaignDetails] Step2 submit error:', error?.message);
+      Alert.alert(
+        'Error',
+        'Could not save campaign details. Please check your connection and try again.',
+      );
+    }
   }, [
     validate,
     navigation,
     params,
+    campaignId,
     shortDesc,
     fullDesc,
     beneficiary,
     relationship,
     city,
     province,
+    submitStep2,
   ]);
 
   const handleFormatChange = useCallback(type => {
@@ -524,32 +590,39 @@ const CampaignDetails = ({ navigation, route }) => {
           error={errors.relationship}
         />
 
-        {/* ── Province (now first) ─────────────────────────────────── */}
+        {/* ── Province (from location API) ────────────────────── */}
         <DropdownSheet
           label="Province"
           value={province}
-          options={PROVINCES}
+          options={provinceOptions}
           onSelect={v => {
             setProvince(v);
             setErrors(prev => ({ ...prev, province: undefined }));
           }}
-          placeholder="Select province"
+          placeholder={provincesLoading ? 'Loading provinces...' : 'Select province'}
           error={errors.province}
+          disabled={provincesLoading}
         />
 
-        {/* ── City (now dependent on Province) ─────────────────── */}
+        {/* ── City (dependent on Province, from location API) ─── */}
         <DropdownSheet
           label="City"
           value={city}
-          options={availableCities}
+          options={cityOptions}
           onSelect={v => {
             setCity(v);
             setErrors(prev => ({ ...prev, city: undefined }));
           }}
-          placeholder={!province ? 'Select a province first' : 'Select city'}
+          placeholder={
+            !province
+              ? 'Select a province first'
+              : citiesLoading
+              ? 'Loading cities...'
+              : 'Select city'
+          }
           leftIcon="map-marker-outline"
           error={errors.city}
-          disabled={!province}
+          disabled={!province || citiesLoading}
         />
 
         <View style={{ height: sp(8) }} />
@@ -557,12 +630,19 @@ const CampaignDetails = ({ navigation, route }) => {
 
       <View style={s.footer}>
         <TouchableOpacity
-          style={s.nextBtn}
+          style={[s.nextBtn, submitStep2.isPending && s.nextBtnDisabled]}
           onPress={handleNext}
           activeOpacity={0.85}
+          disabled={submitStep2.isPending}
         >
-          <Text style={s.nextTxt}>Next</Text>
-          <Icons name="arrow-right" size={sp(16)} color={P.white} />
+          {submitStep2.isPending ? (
+            <ActivityIndicator size="small" color={P.white} />
+          ) : (
+            <>
+              <Text style={s.nextTxt}>Next</Text>
+              <Icons name="arrow-right" size={sp(16)} color={P.white} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -650,5 +730,6 @@ const s = StyleSheet.create({
     backgroundColor: P.teal,
     gap: sp(6),
   },
+  nextBtnDisabled: { opacity: 0.6 },
   nextTxt: { fontSize: sp(15), fontWeight: '700', color: P.white },
 });

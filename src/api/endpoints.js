@@ -28,6 +28,7 @@ export const ENDPOINTS = {
   CAMPAIGNS: {
     URGENT: '/urgent-campaigns',
     MY_CAMPAIGNS: '/my/campaigns',
+     CREATE: '/create-campaign',
   },
 
   CATEGORY: {
@@ -37,10 +38,12 @@ export const ENDPOINTS = {
     LIST: (userId) => `/saved/campaign/${userId}`,
     UNSAVE: (favouriteId) => `/unsaved/campaign/${favouriteId}`,
   },
-  WITHDRAWAL: {
-    CREATE: '/withdrawals',
-    LIST:   '/withdrawals',
-  },
+ WITHDRAWAL: {
+  CAMPAIGN_SUMMARY: (campaignId) => `/withdrawal/campaign/summary/${campaignId}`,
+  REQUEST: '/withdrawal/request',
+  USER_SUMMARY: (userId) => `/withdrawal/user/summary/${userId}`,
+  MY_WITHDRAWALS: (userId) => `/my/withdrawals/${userId}`,
+},
   NOTIFICATION: {
     LIST:      '/notifications',
     MARK_READ: (id) => `/notifications/${id}/read`,
