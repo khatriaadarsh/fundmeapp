@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
-import DocumentPicker from 'react-native-document-picker';
+import DocumentPicker from '@react-native-documents/picker';
 
 // THEME & DATA IMPORTS
 import { P, sp } from '../../theme/theme';
@@ -187,7 +187,11 @@ const SubmitButton = ({ state, onPress }) => {
         </Animated.View>
 
         <Animated.View
-          style={[styles.absoluteCenter, styles.successRow, { opacity: successOpacity }]}
+          style={[
+            styles.absoluteCenter,
+            styles.successRow,
+            { opacity: successOpacity },
+          ]}
           pointerEvents="none"
         >
           <Icons name="check-circle" size={scale(20)} color={P.white} />
@@ -295,12 +299,11 @@ const RequestWithdrawalScreen = ({ navigation, route }) => {
   const userId = currentUser?.id;
 
   const campaignId = route?.params?.campaignId ?? route?.params?.campaign?.id;
-  const fallbackTitle = route?.params?.campaignTitle ?? route?.params?.campaign?.title;
+  const fallbackTitle =
+    route?.params?.campaignTitle ?? route?.params?.campaign?.title;
 
-  const {
-    data: summary,
-    isLoading: isSummaryLoading,
-  } = useCampaignWithdrawalSummary(campaignId);
+  const { data: summary, isLoading: isSummaryLoading } =
+    useCampaignWithdrawalSummary(campaignId);
 
   const { mutate: submitWithdrawal, isPending: isSubmitting } =
     useSubmitWithdrawalRequest();
@@ -468,7 +471,7 @@ const RequestWithdrawalScreen = ({ navigation, route }) => {
         document,
       },
       {
-        onSuccess: (response) => {
+        onSuccess: response => {
           if (response?.responseCode === '000') {
             setBtnState('success');
             setTimeout(() => {
@@ -476,10 +479,13 @@ const RequestWithdrawalScreen = ({ navigation, route }) => {
             }, 2200);
           } else {
             setBtnState('idle');
-            Alert.alert('Error', response?.responseMessage || 'Withdrawal request failed');
+            Alert.alert(
+              'Error',
+              response?.responseMessage || 'Withdrawal request failed',
+            );
           }
         },
-        onError: (error) => {
+        onError: error => {
           setBtnState('idle');
           Alert.alert(
             'Error',

@@ -18,14 +18,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 
-import InputField           from '../../components/common/InputField';
-import GradientButton       from '../../components/common/GradientButton';
+import InputField from '../../components/common/InputField';
+import GradientButton from '../../components/common/GradientButton';
 import { FullScreenLoader } from '../../components/common/Loader';
-import { useToast }         from '../../components/common/Toast';
-import StatusPopup          from '../../components/common/StatusPopup';
+import { useToast } from '../../components/common/Toast';
+import StatusPopup from '../../components/common/StatusPopup';
 
-import { useLogin }         from '../../hooks/useAuth';
-import { useAppContext }    from '../../context/AppContext';
+import { useLogin } from '../../hooks/useAuth';
+import { useAppContext } from '../../context/AppContext';
 
 import { COLORS, SPACING, TYPOGRAPHY, scale } from '../../theme';
 import LogoImg from '../../assets/logo.png';
@@ -58,26 +58,25 @@ const LoginScreen = ({ navigation, route }) => {
   }, []);
 
   const isCompactHeight = screenDims.height < 700; // small/short phones (e.g. SE-class)
-  const isNarrowWidth   = screenDims.width < 360;
+  const isNarrowWidth = screenDims.width < 360;
 
   // Prefill email from CheckUser/SignUp flow, then from saved user
-  const prefilledEmail =
-    route?.params?.email || currentUser?.email || '';
+  const prefilledEmail = route?.params?.email || currentUser?.email || '';
 
-  const [email,        setEmail]        = useState(prefilledEmail);
-  const [password,     setPassword]     = useState('');
+  const [email, setEmail] = useState(prefilledEmail);
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Popup state
   const [popup, setPopup] = useState({
     visible: false,
-    title:   '',
+    title: '',
     message: '',
-    code:    '',
+    code: '',
     variant: 'warning',
   });
 
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scrollRef = useRef(null);
 
@@ -109,8 +108,16 @@ const LoginScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, [fadeAnim, slideAnim]);
 
@@ -118,7 +125,7 @@ const LoginScreen = ({ navigation, route }) => {
     if (prefilledEmail) setEmail(prefilledEmail);
   }, [prefilledEmail]);
 
-  const closePopup = () => setPopup((p) => ({ ...p, visible: false }));
+  const closePopup = () => setPopup(p => ({ ...p, visible: false }));
 
   const handleLogin = useCallback(() => {
     if (!email.trim()) {
@@ -137,32 +144,32 @@ const LoginScreen = ({ navigation, route }) => {
     doLogin(
       { email: email.trim(), password },
       {
-        onSuccess: async (body) => {
-          const data       = body?.data || {};
-          const status     = data.accountStatus;  // ACTIVE | PENDING | …
-          const respCode   = body?.responseCode;
-          const respMsg    = body?.responseMessage;
+        onSuccess: async body => {
+          const data = body?.data || {};
+          const status = data.accountStatus; // ACTIVE | PENDING | …
+          const respCode = body?.responseCode;
+          const respMsg = body?.responseMessage;
 
           // Persist user
           await saveUser({
-            id:                 data.id,
-            userId:             data.id,
-            email:              data.email,
-            firstName:          data.firstName,
-            lastName:           data.lastName,
-            mobileNumber:       data.mobileNumber,
-            role:               data.role,
-            profileImage:       data.profileImage,
-            bio:                data.bio,
-            dateOfBirth:        data.dateOfBirth,
-            gender:             data.gender,
-            province:           data.province,
-            city:               data.city,
-            accountStatus:      data.accountStatus,
+            id: data.id,
+            userId: data.id,
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            mobileNumber: data.mobileNumber,
+            role: data.role,
+            profileImage: data.profileImage,
+            bio: data.bio,
+            dateOfBirth: data.dateOfBirth,
+            gender: data.gender,
+            province: data.province,
+            city: data.city,
+            accountStatus: data.accountStatus,
             registrationStatus: data.registrationStatus,
-            emailVerified:      data.emailVerified,
-            nicVerified:        data.nicVerified,
-            profile:            data,
+            emailVerified: data.emailVerified,
+            nicVerified: data.nicVerified,
+            profile: data,
           });
 
           // ── Route based on accountStatus ─────────────────
@@ -175,20 +182,20 @@ const LoginScreen = ({ navigation, route }) => {
           // Non-active → show themed popup with backend message + code
           setPopup({
             visible: true,
-            title:   status === 'PENDING' ? 'Account Pending' : 'Account Notice',
+            title: status === 'PENDING' ? 'Account Pending' : 'Account Notice',
             message: respMsg || 'Your account is not active yet.',
-            code:    respCode || '',
+            code: respCode || '',
             variant: status === 'PENDING' ? 'warning' : 'info',
           });
         },
-        onError: (err) => {
+        onError: err => {
           // Show popup for known status codes; toast for generic errors
           if (err?.code && err?.message) {
             setPopup({
               visible: true,
-              title:   'Login Failed',
+              title: 'Login Failed',
               message: err.message,
-              code:    err.code,
+              code: err.code,
               variant: 'error',
             });
           } else {
@@ -238,7 +245,7 @@ const LoginScreen = ({ navigation, route }) => {
         >
           <ScrollView
             ref={scrollRef}
-            onLayout={(e) => setContainerHeight(e.nativeEvent.layout.height)}
+            onLayout={e => setContainerHeight(e.nativeEvent.layout.height)}
             onContentSizeChange={(_w, h) => setContentHeight(h)}
             scrollEnabled={canScroll}
             overScrollMode="never"
@@ -381,8 +388,8 @@ const LoginScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  safe:         { flex: 1 },
-  gradient:     { flex: 1 },
+  safe: { flex: 1 },
+  gradient: { flex: 1 },
   keyboardView: { flex: 1 },
   scrollContent: {
     flexGrow: 1,
@@ -391,9 +398,9 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxxl,
   },
   contentContainer: { width: '100%' },
-  logoContainer:    { alignItems: 'center' },
-  logo:             { width: scale(72), height: scale(72), resizeMode: 'contain' },
-  headlineContainer:{ alignItems: 'center' },
+  logoContainer: { alignItems: 'center' },
+  logo: { width: scale(72), height: scale(72), resizeMode: 'contain' },
+  headlineContainer: { alignItems: 'center' },
   headline: {
     fontSize: TYPOGRAPHY.fontSize.display,
     fontFamily: TYPOGRAPHY.fontFamily.extraBold,
@@ -407,14 +414,16 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   inputsContainer: { marginBottom: SPACING.xs },
-  forgotButton:    { alignSelf: 'flex-end', marginBottom: SPACING.xl },
+  forgotButton: { alignSelf: 'flex-end', marginBottom: SPACING.xl },
   forgotText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: TYPOGRAPHY.fontFamily.semiBold,
     color: COLORS.primary,
   },
   divider: {
-    flexDirection: 'row', alignItems: 'center', marginVertical: SPACING.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.xl,
   },
   dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
   dividerText: {
@@ -423,7 +432,11 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily.regular,
     color: COLORS.textSecondary,
   },
-  signUpContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  signUpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   signUpText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontFamily: TYPOGRAPHY.fontFamily.regular,
