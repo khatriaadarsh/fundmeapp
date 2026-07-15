@@ -185,6 +185,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: sp(16),
+    marginTop: sp(10),
   },
   emptyListContent: {
     flexGrow: 1,
