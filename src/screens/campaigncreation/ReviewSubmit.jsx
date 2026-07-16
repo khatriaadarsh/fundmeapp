@@ -2,6 +2,14 @@
 // ─────────────────────────────────────────────────────────────
 //  Review & Submit — Step 4 of 4
 //  FundMe App  ·  React Native CLI  ·  100% responsive
+//
+//  NOTE: This screen makes NO API call of its own. Steps 1-3 each
+//  persist their data to the backend individually via their own
+//  Next buttons. By the time the user reaches this screen, the
+//  campaign is already fully saved server-side. This screen exists
+//  purely so the user can review everything in one place and jump
+//  back to any step to correct it (via the "Edit" links) before
+//  finishing. "Submit for Review" is a local confirmation only.
 // ─────────────────────────────────────────────────────────────
 
 import React, { useRef, useEffect, memo, useCallback } from 'react';
@@ -15,16 +23,12 @@ import {
   Animated,
   Alert,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StepHeader } from '../../components/shared/StepHeader';
 import { P } from '../../theme/theme';
 import { C } from './Shared';
-
-// ── API wiring ──────────────────────────────────────────────
-import { useCreateCampaignStep4 } from '../../hooks/useCreateCampaign';
 
 // ── Section card ───────────────────────────────────────────
 const SectionCard = ({ label, onEdit, children }) => (
@@ -187,8 +191,6 @@ const ReviewSubmit = ({ navigation, route }) => {
   const images = p.images || [];
   const docs = p.docs || [];
 
-  const submitStep4 = useCreateCampaignStep4();
-
   const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -200,46 +202,27 @@ const ReviewSubmit = ({ navigation, route }) => {
 
   const goStep = screen => navigation.navigate(screen, p);
 
-  const handleSubmit = useCallback(async () => {
-    if (submitStep4.isPending) return;
-
+  // No API call here — steps 1-3 already saved everything to the
+  // backend. This is a local confirmation that closes out the
+  // creation flow and takes the user back to the main app.
+  const handleSubmit = useCallback(() => {
     if (!campaignId) {
       Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
       return;
     }
 
-    try {
-      const response = await submitStep4.mutateAsync({ campaignId });
-
-      if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert(
-          'Error',
-          response?.responseMessage || 'Could not submit your campaign. Please try again.',
-        );
-        return;
-      }
-
-      const status = response?.data?.campaignStatus;
-      const statusNote =
-        status === 'PENDING'
-          ? 'Your application is submitted for review.\nYou will receive a notification.'
-          : `Campaign status: ${status || 'submitted'}.`;
-
-      Alert.alert('Submitted', statusNote, [
+    Alert.alert(
+      'Submitted',
+      'Your application is submitted for review.\nYou will receive a notification.',
+      [
         {
           text: 'OK',
           onPress: () =>
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }),
         },
-      ]);
-    } catch (error) {
-      console.error('🔴 [ReviewSubmit] Step4 submit error:', error?.message);
-      Alert.alert(
-        'Error',
-        'Could not submit your campaign. Please check your connection and try again.',
-      );
-    }
-  }, [campaignId, navigation, submitStep4]);
+      ],
+    );
+  }, [campaignId, navigation]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -355,26 +338,18 @@ const ReviewSubmit = ({ navigation, route }) => {
               style={s.draftBtn}
               onPress={() => navigation.goBack()}
               activeOpacity={0.8}
-              disabled={submitStep4.isPending}
             >
               <Text style={s.draftTxt}>Save Draft</Text>
             </TouchableOpacity>
 
             {/* Submit for Review */}
             <TouchableOpacity
-              style={[s.submitBtn, submitStep4.isPending && s.submitBtnDisabled]}
+              style={s.submitBtn}
               onPress={handleSubmit}
               activeOpacity={0.85}
-              disabled={submitStep4.isPending}
             >
-              {submitStep4.isPending ? (
-                <ActivityIndicator size="small" color={C.white} />
-              ) : (
-                <>
-                  <Text style={s.submitTxt}>Submit for Review</Text>
-                  <Icon name="check" size={15} color={C.white} />
-                </>
-              )}
+              <Text style={s.submitTxt}>Submit for Review</Text>
+              <Icon name="check" size={15} color={C.white} />
             </TouchableOpacity>
           </View>
 
@@ -458,7 +433,6 @@ const s = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 13,
   },
-  submitBtnDisabled: { opacity: 0.7 },
   submitTxt: { fontSize: 14, fontWeight: '700', color: C.white },
 
   footerNote: {

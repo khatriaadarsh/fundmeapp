@@ -231,3 +231,24 @@ export const createCampaignStep4 = async (payload) => {
     throw error;
   }
 };
+
+/**
+ * Get Campaign Detail
+ * GET /campaign/detail/{campaignId}
+ */
+export const getCampaignDetail = async (campaignId) => {
+  if (!campaignId) {
+    throw new Error('campaignId is required');
+  }
+
+  console.log('🔵 [campaignService] Getting campaign detail for campaignId:', campaignId);
+
+  try {
+    const res = await apiClient.get(ENDPOINTS.CAMPAIGNS.DETAIL(campaignId));
+    console.log('🟢 [campaignService] Campaign detail response:', res.data);
+    return res.data;
+  } catch (error) {
+    console.error('🔴 [campaignService] Get campaign detail error:', error.message);
+    throw error;
+  }
+};

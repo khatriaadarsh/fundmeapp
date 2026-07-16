@@ -29,6 +29,7 @@ export const ENDPOINTS = {
     URGENT: '/urgent-campaigns',
     MY_CAMPAIGNS: '/my/campaigns',
      CREATE: '/create-campaign',
+     DETAIL: (campaignId) => `/campaign/detail/${campaignId}`,
   },
 
   CATEGORY: {

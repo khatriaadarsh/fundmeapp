@@ -12,11 +12,17 @@ import {
   StatusBar,
   Platform,
   FlatList,
+  Modal,
+  Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
-// Add this import alongside your other imports
 import DonorInfoModal from './DonorInfoModal';
+
+// ── API wiring ──────────────────────────────────────────────
+import { useCampaignDetail } from '../../hooks/useCampaign';
 
 // ═══════════════════════════════════════════════════════════
 // Scale
@@ -52,46 +58,16 @@ const C = {
 const HERO_H = scale(340);
 const SHEET_R = scale(24);
 
+const fmtPK = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
+
 // ═══════════════════════════════════════════════════════════
-// Mock Data
+// ⚠️ DEMO / HARDCODED DATA — Recent Donors & Recent Updates are
+// not covered by the campaign-detail API yet, per instructions.
+// Swap this out for a real hook/endpoint once that's available.
 // ═══════════════════════════════════════════════════════════
-const CAMPAIGN = {
-  title: 'Rebuilding Homes, Restoring Lives After Floods',
-  category: 'Emergency Relief',
-  image: 'https://picsum.photos/800/600?random=77',
-  raised: 75000,
-  goal: 150000,
+const DEMO = {
   donors: 123,
   hoursLeft: 19,
-  creator: {
-    name: 'Ali Hassan',
-    location: 'Karachi, Pakistan',
-    avatar: 'https://picsum.photos/100/100?random=20',
-  },
-  story:
-    'The devastating floods that struck our region left thousands of families without shelter, food, or clean water. Entire villages were submerged within hours.\n\nFamilies who had spent generations building their homes lost everything overnight. Children are sleeping in makeshift tents without adequate protection from the elements.\n\nYour donation will directly fund emergency shelter kits, clean water supplies, and food packages for the most vulnerable families.',
-  media: [
-    {
-      id: '1',
-      uri: 'https://picsum.photos/200/200?random=31',
-      label: 'Relief efforts',
-    },
-    {
-      id: '2',
-      uri: 'https://picsum.photos/200/200?random=32',
-      label: 'Distribution',
-    },
-    {
-      id: '3',
-      uri: 'https://picsum.photos/200/200?random=33',
-      label: 'Shelter',
-    },
-    {
-      id: '4',
-      uri: 'https://picsum.photos/200/200?random=34',
-      label: 'Supplies',
-    },
-  ],
   donors_list: [
     {
       id: '1',
@@ -100,7 +76,6 @@ const CAMPAIGN = {
       message: "Praying for everyone's safety!",
       time: '2h ago',
       avatar: 'https://picsum.photos/100/100?random=41',
-      // ── ADD THESE ──────────────────────────────────────
       age: 28,
       gender: 'Female',
       occupation: 'Software Engineer',
@@ -119,7 +94,6 @@ const CAMPAIGN = {
       message: '',
       time: '5h ago',
       avatar: 'https://picsum.photos/100/100?random=42',
-      // ── ADD THESE ──────────────────────────────────────
       age: 35,
       gender: 'Male',
       occupation: 'Business Owner',
@@ -138,7 +112,6 @@ const CAMPAIGN = {
       message: 'May Allah ease your hardships.',
       time: '1d ago',
       avatar: 'https://picsum.photos/100/100?random=43',
-      // ── ADD THESE ──────────────────────────────────────
       age: null,
       gender: null,
       occupation: null,
@@ -154,11 +127,7 @@ const CAMPAIGN = {
   update:
     'Campaign update: First batch of relief funds has been distributed. 15 families received temporary tents today. Thank you 🙏',
   updateAge: 'Posted 2 days ago',
-  documents: [{ id: '1', title: 'Damage_Assessment_Report.pdf' }],
 };
-
-const pct = Math.round((CAMPAIGN.raised / CAMPAIGN.goal) * 100);
-const fmtPK = n => `PKR ${n.toLocaleString('en-PK')}`;
 
 // ═══════════════════════════════════════════════════════════
 // Pressable with scale feedback
@@ -194,24 +163,18 @@ const Pressable = ({ onPress, style, children }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// ✅ HERO — matches screenshot exactly
-// Layout (bottom of image):
-//   [URGENT badge]
-//   [Full title — bold white, wraps freely]
-//   [Emergency Relief pill]
+// HERO — now driven by real campaign data
 // ═══════════════════════════════════════════════════════════
-const HeroImage = memo(({ onBack, onShare, saved, onSave }) => (
+const HeroImage = memo(({ image, title, category, urgent, onBack, onShare, saved, onSave }) => (
   <View style={h.wrap}>
-    <Image source={{ uri: CAMPAIGN.image }} style={h.img} resizeMode="cover" />
+    <Image source={{ uri: image }} style={h.img} resizeMode="contain" />
 
-    {/* Strong bottom gradient so text is always readable */}
     <LinearGradient
       colors={['transparent', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.80)']}
       locations={[0, 0.45, 1]}
       style={h.fade}
     />
 
-    {/* Top controls */}
     <View style={h.controls}>
       <Pressable onPress={onBack} style={h.glassBtn}>
         <Icons name="arrow-left" size={scale(18)} color={C.white} />
@@ -230,24 +193,22 @@ const HeroImage = memo(({ onBack, onShare, saved, onSave }) => (
       </View>
     </View>
 
-    {/* ✅ Bottom content: URGENT → Title → Category pill */}
     <View style={h.bottom}>
-      {/* URGENT badge — red gradient pill */}
-      <LinearGradient
-        colors={[C.red, C.redDeep]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={h.urgentBadge}
-      >
-        <Text style={h.urgentTxt}>URGENT</Text>
-      </LinearGradient>
+      {urgent && (
+        <LinearGradient
+          colors={[C.red, C.redDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={h.urgentBadge}
+        >
+          <Text style={h.urgentTxt}>URGENT</Text>
+        </LinearGradient>
+      )}
 
-      {/* Full title — wraps to as many lines as needed */}
-      <Text style={h.title}>{CAMPAIGN.title}</Text>
+      <Text style={h.title}>{title}</Text>
 
-      {/* Category pill — glass dark */}
       <View style={h.categoryPill}>
-        <Text style={h.categoryTxt}>{CAMPAIGN.category}</Text>
+        <Text style={h.categoryTxt}>{category}</Text>
       </View>
     </View>
   </View>
@@ -265,8 +226,9 @@ const h = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
+    backgroundColor: C.border,
+    // backgroundColor: '#0F172A',
   },
-  // Strong gradient covers bottom 70% so text is always readable
   fade: {
     position: 'absolute',
     bottom: 0,
@@ -297,17 +259,12 @@ const h = StyleSheet.create({
     flexDirection: 'row',
     gap: scale(10),
   },
-
-  // ✅ Bottom section — pinned to bottom of hero
   bottom: {
     position: 'absolute',
-    // bottom:     scale(22),
     bottom: scale(44),
     left: scale(16),
     right: scale(16),
   },
-
-  // URGENT badge
   urgentBadge: {
     alignSelf: 'flex-start',
     paddingHorizontal: scale(14),
@@ -322,8 +279,6 @@ const h = StyleSheet.create({
     letterSpacing: 1,
     includeFontPadding: false,
   },
-
-  // Full title — no line limit, wraps freely
   title: {
     fontSize: scale(22),
     fontWeight: '800',
@@ -333,8 +288,6 @@ const h = StyleSheet.create({
     marginBottom: scale(12),
     includeFontPadding: false,
   },
-
-  // Category pill
   categoryPill: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.52)',
@@ -353,9 +306,9 @@ const h = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// PROGRESS CARD
+// PROGRESS CARD — now driven by real raised/goal/pct
 // ═══════════════════════════════════════════════════════════
-const ProgressCard = memo(() => {
+const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
   const fillAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -364,7 +317,7 @@ const ProgressCard = memo(() => {
       duration: 1100,
       useNativeDriver: false,
     }).start();
-  }, [fillAnim]);
+  }, [fillAnim, pct]);
 
   const fillW = fillAnim.interpolate({
     inputRange: [0, 1],
@@ -376,10 +329,10 @@ const ProgressCard = memo(() => {
       <View style={pg.amtRow}>
         <View>
           <View style={pg.raisedRow}>
-            <Text style={pg.raisedNum}>{fmtPK(CAMPAIGN.raised)}</Text>
+            <Text style={pg.raisedNum}>{fmtPK(raised)}</Text>
             <Text style={pg.raisedWord}> raised</Text>
           </View>
-          <Text style={pg.goalTxt}>of {fmtPK(CAMPAIGN.goal)} goal</Text>
+          <Text style={pg.goalTxt}>of {fmtPK(goal)} goal</Text>
         </View>
         <Text style={pg.pct}>{pct}%</Text>
       </View>
@@ -397,8 +350,8 @@ const ProgressCard = memo(() => {
 
       <View style={pg.pillRow}>
         {[
-          { icon: 'users', label: `${CAMPAIGN.donors} Donors` },
-          { icon: 'clock', label: `${CAMPAIGN.hoursLeft}h left` },
+          { icon: 'users', label: `${donorsCount} Donors` },
+          { icon: 'clock', label: `${hoursLeft}h left` },
           { icon: 'percent', label: `${pct}% funded` },
         ].map(p => (
           <View key={p.label} style={pg.pill}>
@@ -537,22 +490,32 @@ const dn = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// CREATOR CARD
+// CREATOR CARD — now driven by real creator data
 // ═══════════════════════════════════════════════════════════
-const CreatorCard = memo(({ onViewProfile }) => (
+const CreatorCard = memo(({ creator, onViewProfile }) => (
   <View style={cr.card}>
-    <Image source={{ uri: CAMPAIGN.creator.avatar }} style={cr.avatar} />
+    {creator.avatar ? (
+      <Image source={{ uri: creator.avatar }} style={cr.avatar} resizeMode="contain" />
+    ) : (
+      <View style={[cr.avatar, cr.avatarFallback]}>
+        <Text style={cr.avatarInitial}>
+          {creator.name?.charAt(0)?.toUpperCase() || 'U'}
+        </Text>
+      </View>
+    )}
     <View style={cr.info}>
       <View style={cr.nameRow}>
-        <Text style={cr.name}>{CAMPAIGN.creator.name}</Text>
+        <Text style={cr.name}>{creator.name}</Text>
         <View style={cr.badge}>
           <Icons name="check" size={scale(9)} color={C.white} />
         </View>
       </View>
-      <View style={cr.locRow}>
-        <Icons name="map-pin" size={scale(11)} color={C.light} />
-        <Text style={cr.location}> {CAMPAIGN.creator.location}</Text>
-      </View>
+      {!!creator.location && (
+        <View style={cr.locRow}>
+          <Icons name="map-pin" size={scale(11)} color={C.light} />
+          <Text style={cr.location}> {creator.location}</Text>
+        </View>
+      )}
     </View>
     <TouchableOpacity onPress={onViewProfile} activeOpacity={0.7}>
       <Text style={cr.link}>View Profile →</Text>
@@ -576,6 +539,16 @@ const cr = StyleSheet.create({
     height: scale(48),
     borderRadius: scale(24),
     marginRight: scale(12),
+  },
+  avatarFallback: {
+    backgroundColor: C.indigoBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontSize: scale(18),
+    fontWeight: '800',
+    color: C.indigo,
   },
   info: { flex: 1 },
   nameRow: {
@@ -609,22 +582,49 @@ const cr = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// STORY
+// STORY — Read More only appears when the text genuinely
+// overflows 3 lines. A hidden, full (non-truncated) copy of
+// the text is measured off-screen via onTextLayout to get the
+// real line count; the visible text stays truncated/expanded
+// based on that measurement.
 // ═══════════════════════════════════════════════════════════
-const StorySection = memo(() => {
+const StorySection = memo(({ story }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showToggle, setShowToggle] = useState(false);
+
+  const handleMeasureLayout = useCallback(e => {
+    setShowToggle(e.nativeEvent.lines.length > 3);
+  }, []);
+
+  if (!story) return null;
+
   return (
     <View style={st.wrap}>
       <Text style={st.heading}>Story</Text>
-      <Text style={st.body} numberOfLines={expanded ? undefined : 3}>
-        {CAMPAIGN.story}
-      </Text>
-      <TouchableOpacity
-        onPress={() => setExpanded(v => !v)}
-        activeOpacity={0.7}
+
+      {/* Hidden measurer: renders the FULL text with no line limit,
+          off-screen, purely to count how many lines it would take. */}
+      <Text
+        style={[st.body, st.hiddenMeasure]}
+        onTextLayout={handleMeasureLayout}
+        pointerEvents="none"
       >
-        <Text style={st.toggle}>{expanded ? 'Read Less' : 'Read More'}</Text>
-      </TouchableOpacity>
+        {story}
+      </Text>
+
+      {/* Visible text: truncated to 3 lines unless expanded */}
+      <Text style={st.body} numberOfLines={expanded ? undefined : 3}>
+        {story}
+      </Text>
+
+      {showToggle && (
+        <TouchableOpacity
+          onPress={() => setExpanded(v => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={st.toggle}>{expanded ? 'Read Less' : 'Read More'}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 });
@@ -644,6 +644,14 @@ const st = StyleSheet.create({
     lineHeight: scale(24),
     includeFontPadding: false,
   },
+  hiddenMeasure: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    opacity: 0,
+    zIndex: -1,
+  },
   toggle: {
     fontSize: scale(13),
     fontWeight: '700',
@@ -654,30 +662,33 @@ const st = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// MEDIA GALLERY
+// MEDIA GALLERY — now driven by real additionalImages,
+// opens the full-screen swipeable viewer on tap
 // ═══════════════════════════════════════════════════════════
-const MediaGallery = memo(() => (
-  <View style={mg.wrap}>
-    <Text style={mg.heading}>Photos & Videos</Text>
-    <FlatList
-      data={CAMPAIGN.media}
-      keyExtractor={item => item.id}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={mg.row}
-      renderItem={({ item }) => (
-        <TouchableOpacity activeOpacity={0.85} style={mg.item}>
-          <Image source={{ uri: item.uri }} style={mg.img} />
-          <View style={mg.overlay}>
-            <Text style={mg.label} numberOfLines={1}>
-              {item.label}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      )}
-    />
-  </View>
-));
+const MediaGallery = memo(({ media, onItemPress }) => {
+  if (!media || media.length === 0) return null;
+  return (
+    <View style={mg.wrap}>
+      <Text style={mg.heading}>Photos & Videos</Text>
+      <FlatList
+        data={media}
+        keyExtractor={item => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={mg.row}
+        renderItem={({ item, index }) => (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={mg.item}
+            onPress={() => onItemPress(index)}
+          >
+            <Image source={{ uri: item.uri }} style={mg.img} resizeMode="contain" />
+          </TouchableOpacity>
+        )}
+      />
+    </View>
+  );
+});
 
 const mg = StyleSheet.create({
   wrap: { marginBottom: scale(16) },
@@ -696,32 +707,124 @@ const mg = StyleSheet.create({
     borderRadius: scale(12),
     backgroundColor: C.border,
   },
-  overlay: {
+});
+
+// ═══════════════════════════════════════════════════════════
+// FULL-SCREEN IMAGE VIEWER — swipeable, with page indicator
+// ═══════════════════════════════════════════════════════════
+const ImageViewerModal = memo(({ visible, images, initialIndex = 0, onClose }) => {
+  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    if (visible) {
+      setActiveIndex(initialIndex);
+    }
+  }, [visible, initialIndex]);
+
+  const onMomentumScrollEnd = e => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+    setActiveIndex(idx);
+  };
+
+  if (!visible || !images?.length) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={iv.overlay}>
+        <TouchableOpacity
+          style={iv.closeBtn}
+          onPress={onClose}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Icons name="x" size={scale(22)} color={C.white} />
+        </TouchableOpacity>
+
+        <FlatList
+          ref={listRef}
+          data={images}
+          keyExtractor={item => item.id}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          renderItem={({ item }) => (
+            <View style={iv.page}>
+              <Image source={{ uri: item.uri }} style={iv.fullImg} resizeMode="contain" />
+            </View>
+          )}
+        />
+
+        {images.length > 1 && (
+          <View style={iv.dotsRow}>
+            {images.map((img, idx) => (
+              <View
+                key={img.id}
+                style={[iv.dot, idx === activeIndex && iv.dotActive]}
+              />
+            ))}
+          </View>
+        )}
+
+        <Text style={iv.counter}>
+          {activeIndex + 1} / {images.length}
+        </Text>
+      </View>
+    </Modal>
+  );
+});
+
+const iv = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
+  closeBtn: {
     position: 'absolute',
-    bottom: 0,
+    top: SB_H + scale(16),
+    right: scale(16),
+    zIndex: 10,
+    width: scale(38),
+    height: scale(38),
+    borderRadius: scale(19),
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  page: { width: SW, alignItems: 'center', justifyContent: 'center' },
+  fullImg: { width: SW, height: SH * 0.75 },
+  dotsRow: {
+    position: 'absolute',
+    bottom: scale(60),
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.40)',
-    borderBottomLeftRadius: scale(12),
-    borderBottomRightRadius: scale(12),
-    paddingHorizontal: scale(6),
-    paddingVertical: scale(4),
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: scale(6),
   },
-  label: {
-    fontSize: scale(10),
-    color: C.white,
+  dot: {
+    width: scale(6),
+    height: scale(6),
+    borderRadius: scale(3),
+    backgroundColor: 'rgba(255,255,255,0.4)',
+  },
+  dotActive: { backgroundColor: C.white, width: scale(18) },
+  counter: {
+    position: 'absolute',
+    bottom: scale(30),
+    alignSelf: 'center',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: scale(12),
     fontWeight: '600',
-    includeFontPadding: false,
   },
 });
 
 // ═══════════════════════════════════════════════════════════
-// SOCIAL PROOF
+// SOCIAL PROOF (demo donor avatars)
 // ═══════════════════════════════════════════════════════════
-const SocialProof = memo(() => (
+const SocialProof = memo(({ donorsList, donorsCount }) => (
   <View style={soc.wrap}>
     <View style={soc.avatarRow}>
-      {CAMPAIGN.donors_list.slice(0, 3).map((d, i) => (
+      {donorsList.slice(0, 3).map((d, i) => (
         <Image
           key={d.id}
           source={{ uri: d.avatar }}
@@ -730,7 +833,7 @@ const SocialProof = memo(() => (
       ))}
     </View>
     <Text style={soc.txt}>
-      <Text style={soc.bold}>{CAMPAIGN.donors}+ people donated</Text>
+      <Text style={soc.bold}>{donorsCount}+ people donated</Text>
       {'  ❤️'}
     </Text>
   </View>
@@ -757,16 +860,16 @@ const soc = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// UPDATE CARD
+// UPDATE CARD (demo)
 // ═══════════════════════════════════════════════════════════
-const UpdateCard = memo(() => (
+const UpdateCard = memo(({ updateText, updateAge }) => (
   <View style={uc.wrap}>
     <Text style={uc.heading}>Recent Updates</Text>
     <View style={uc.card}>
       <View style={uc.accent} />
       <View style={uc.content}>
-        <Text style={uc.txt}>{CAMPAIGN.update}</Text>
-        <Text style={uc.age}>{CAMPAIGN.updateAge}</Text>
+        <Text style={uc.txt}>{updateText}</Text>
+        <Text style={uc.age}>{updateAge}</Text>
       </View>
     </View>
   </View>
@@ -800,7 +903,7 @@ const uc = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// DONOR ROW
+// DONOR ROW (demo)
 // ═══════════════════════════════════════════════════════════
 const DonorRow = memo(({ item, onPress }) => (
   <TouchableOpacity
@@ -863,24 +966,33 @@ const dr = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// DOCUMENTS
+// DOCUMENTS — now driven by real documents, opens via Linking
+// (device browser/PDF app handles view-or-download)
 // ═══════════════════════════════════════════════════════════
-const Documents = memo(() => (
-  <View style={dc.wrap}>
-    <Text style={dc.heading}>Documents</Text>
-    {CAMPAIGN.documents.map(doc => (
-      <TouchableOpacity key={doc.id} style={dc.row} activeOpacity={0.75}>
-        <View style={dc.iconWrap}>
-          <Icons name="file-text" size={scale(17)} color={C.indigo} />
-        </View>
-        <Text style={dc.title} numberOfLines={1}>
-          {doc.title}
-        </Text>
-        <Icons name="download" size={scale(16)} color={C.gray} />
-      </TouchableOpacity>
-    ))}
-  </View>
-));
+const Documents = memo(({ documents, onDocPress }) => {
+  if (!documents || documents.length === 0) return null;
+  return (
+    <View style={dc.wrap}>
+      <Text style={dc.heading}>Documents</Text>
+      {documents.map(doc => (
+        <TouchableOpacity
+          key={doc.id}
+          style={dc.row}
+          activeOpacity={0.75}
+          onPress={() => onDocPress(doc)}
+        >
+          <View style={dc.iconWrap}>
+            <Icons name="file-text" size={scale(17)} color={C.indigo} />
+          </View>
+          <Text style={dc.title} numberOfLines={1}>
+            {doc.title}
+          </Text>
+          <Icons name="download" size={scale(16)} color={C.gray} />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+});
 
 const dc = StyleSheet.create({
   wrap: { marginBottom: scale(120) },
@@ -922,12 +1034,12 @@ const dc = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════
 // STICKY BOTTOM BAR
 // ═══════════════════════════════════════════════════════════
-const StickyBar = memo(({ onDonate }) => (
+const StickyBar = memo(({ raised, donorsCount, onDonate }) => (
   <View style={sb.wrap}>
     <View>
       <Text style={sb.lbl}>Raised</Text>
-      <Text style={sb.amt}>{fmtPK(CAMPAIGN.raised)}</Text>
-      <Text style={sb.sub}>from {CAMPAIGN.donors} donors</Text>
+      <Text style={sb.amt}>{fmtPK(raised)}</Text>
+      <Text style={sb.sub}>from {donorsCount} donors</Text>
     </View>
     <Pressable onPress={onDonate} style={sb.btn}>
       <LinearGradient
@@ -999,24 +1111,122 @@ const sb = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
+// LOADING / ERROR STATES
+// ═══════════════════════════════════════════════════════════
+const LoadingScreen = () => (
+  <View style={ls.wrap}>
+    <ActivityIndicator size="large" color={C.green} />
+    <Text style={ls.txt}>Loading campaign...</Text>
+  </View>
+);
+
+const ErrorScreen = ({ message, onRetry, onBack }) => (
+  <View style={ls.wrap}>
+    <Icons name="alert-triangle" size={scale(40)} color={C.red} />
+    <Text style={ls.errorTitle}>Something went wrong</Text>
+    <Text style={ls.txt}>{message || 'Could not load this campaign.'}</Text>
+    <View style={ls.btnRow}>
+      <TouchableOpacity style={ls.backBtn} onPress={onBack} activeOpacity={0.8}>
+        <Text style={ls.backBtnTxt}>Go Back</Text>
+      </TouchableOpacity>
+      {!!onRetry && (
+        <TouchableOpacity style={ls.retryBtn} onPress={onRetry} activeOpacity={0.8}>
+          <Text style={ls.retryBtnTxt}>Retry</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
+
+const ls = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    backgroundColor: C.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: scale(32),
+  },
+  txt: {
+    fontSize: scale(13),
+    color: C.gray,
+    textAlign: 'center',
+    marginTop: scale(10),
+  },
+  errorTitle: {
+    fontSize: scale(16),
+    fontWeight: '700',
+    color: C.dark,
+    marginTop: scale(14),
+  },
+  btnRow: { flexDirection: 'row', gap: scale(10), marginTop: scale(18) },
+  backBtn: {
+    paddingHorizontal: scale(20),
+    paddingVertical: scale(10),
+    borderRadius: scale(50),
+    borderWidth: 1.5,
+    borderColor: C.border,
+  },
+  backBtnTxt: { fontSize: scale(13), fontWeight: '700', color: C.dark },
+  retryBtn: {
+    paddingHorizontal: scale(20),
+    paddingVertical: scale(10),
+    borderRadius: scale(50),
+    backgroundColor: C.green,
+  },
+  retryBtnTxt: { fontSize: scale(13), fontWeight: '700', color: C.white },
+});
+
+// ═══════════════════════════════════════════════════════════
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════
-const CampaignDetail = ({ navigation }) => {
+const CampaignDetail = ({ navigation, route }) => {
+  const campaignId = route?.params?.campaignId
+    ? String(route.params.campaignId)
+    : null;
+
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCampaignDetail(campaignId);
+
   const [saved, setSaved] = useState(false);
   const [selectedDonor, setSelectedDonor] = useState(null);
   const [donorModalOpen, setDonorModalOpen] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
   const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
   const handleShare = useCallback(() => {}, []);
   const handleSave = useCallback(() => setSaved(v => !v), []);
+
   const handleDonate = useCallback(
-    () => navigation?.navigate?.('DonateScreen'),
-    [navigation],
+    () => navigation?.navigate?.('DonateScreen', { campaignId }),
+    [navigation, campaignId],
   );
+
   const handleProfile = useCallback(() => {
     navigation?.navigate?.('CreatorProfileScreen', {
-      userId: CAMPAIGN.creator.id,
-    }); // Add userId if available
-  }, [navigation]);
+      userId: data?.creator?.userId,
+    });
+  }, [navigation, data]);
+
+  const handleGalleryPress = useCallback(index => {
+    setViewerIndex(index);
+    setViewerVisible(true);
+  }, []);
+
+const handleOpenDocument = useCallback(async doc => {
+  if (!doc?.url) return;
+  try {
+    await Linking.openURL(doc.url);
+  } catch (err) {
+    console.error('🔴 [CampaignDetail] Open document error:', err?.message);
+    Alert.alert('Error', 'Could not open the document. Please try again.');
+  }
+}, []);
   
   const handleDonorPress = useCallback(donor => {
     setSelectedDonor({
@@ -1024,12 +1234,12 @@ const CampaignDetail = ({ navigation }) => {
       name: donor.name,
       isAnonymous: donor.name === 'Anonymous',
       avatarUri: donor.avatar,
-      location: donor.location ?? null, // ← ADD
-      age: donor.age ?? null, // ← ADD
-      gender: donor.gender ?? null, // ← ADD
-      occupation: donor.occupation ?? null, // ← ADD
-      phone: donor.phone ?? null, // ← ADD
-      totalDonated: donor.totalDonated ?? null, // ← ADD
+      location: donor.location ?? null,
+      age: donor.age ?? null,
+      gender: donor.gender ?? null,
+      occupation: donor.occupation ?? null,
+      phone: donor.phone ?? null,
+      totalDonated: donor.totalDonated ?? null,
       amount: donor.amount,
       donationDate: donor.donationDate ?? '',
       donationTime: donor.time,
@@ -1044,8 +1254,31 @@ const CampaignDetail = ({ navigation }) => {
 
   const handleDonorModalClose = useCallback(() => {
     setDonorModalOpen(false);
-    setTimeout(() => setSelectedDonor(null), 300); // wait for slide-out animation
+    setTimeout(() => setSelectedDonor(null), 300);
   }, []);
+
+  if (!campaignId) {
+    return (
+      <ErrorScreen
+        message="Missing campaign reference."
+        onBack={handleBack}
+      />
+    );
+  }
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (isError || !data) {
+    return (
+      <ErrorScreen
+        message={error?.message}
+        onRetry={refetch}
+        onBack={handleBack}
+      />
+    );
+  }
 
   return (
     <View style={s.root}>
@@ -1060,45 +1293,62 @@ const CampaignDetail = ({ navigation }) => {
         bounces={false}
         overScrollMode="never"
       >
-        {/* ✅ Hero: image + controls + URGENT + title + category */}
         <HeroImage
+          image={data.image}
+          title={data.title}
+          category={data.category}
+          urgent={data.urgent}
           onBack={handleBack}
           onShare={handleShare}
           saved={saved}
           onSave={handleSave}
         />
 
-        {/* ✅ White sheet — only content, no title/urgent here */}
         <View style={s.sheet}>
           <View style={s.handle} />
 
-          <ProgressCard />
+          <ProgressCard
+            raised={data.raised}
+            goal={data.goal}
+            pct={data.pct}
+            donorsCount={DEMO.donors}
+            hoursLeft={DEMO.hoursLeft}
+          />
           <DonateButton onPress={handleDonate} />
-          {/* <CreatorCard onViewProfile={handleProfile} /> */}
-          <CreatorCard onViewProfile={handleProfile} navigation={navigation} />
-          <StorySection />
-          <MediaGallery />
-          <SocialProof />
-          <UpdateCard />
+          <CreatorCard creator={data.creator} onViewProfile={handleProfile} />
+          <StorySection story={data.story} />
+          <MediaGallery media={data.media} onItemPress={handleGalleryPress} />
+          <SocialProof donorsList={DEMO.donors_list} donorsCount={DEMO.donors} />
+          <UpdateCard updateText={DEMO.update} updateAge={DEMO.updateAge} />
 
           <View style={s.section}>
             <Text style={s.sectionTitle}>Recent Donors</Text>
-            {CAMPAIGN.donors_list.map(d => (
+            {DEMO.donors_list.map(d => (
               <DonorRow key={d.id} item={d} onPress={handleDonorPress} />
             ))}
           </View>
 
-          <Documents />
+          <Documents documents={data.documents} onDocPress={handleOpenDocument} />
         </View>
       </ScrollView>
 
-      <StickyBar onDonate={handleDonate} />
+      <StickyBar
+        raised={data.raised}
+        donorsCount={DEMO.donors}
+        onDonate={handleDonate}
+      />
 
-      {/* ── Donor info popup ─────────────────────────── */}
       <DonorInfoModal
         visible={donorModalOpen}
         donor={selectedDonor}
         onClose={handleDonorModalClose}
+      />
+
+      <ImageViewerModal
+        visible={viewerVisible}
+        images={data.media}
+        initialIndex={viewerIndex}
+        onClose={() => setViewerVisible(false)}
       />
     </View>
   );
@@ -1114,8 +1364,6 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
-
-  // ✅ Sheet overlaps hero by just the border radius amount
   sheet: {
     backgroundColor: C.white,
     borderTopLeftRadius: SHEET_R,
@@ -1130,7 +1378,6 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
   },
-
   handle: {
     width: scale(36),
     height: scale(4),
@@ -1139,7 +1386,6 @@ const s = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: scale(16),
   },
-
   section: { marginBottom: scale(16) },
   sectionTitle: {
     fontSize: scale(18),

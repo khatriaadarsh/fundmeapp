@@ -6,6 +6,7 @@ import {
   getUrgentCampaigns,
   getAllCampaigns,
   getMyCampaigns,
+  getCampaignDetail,
 } from '../services/campaignService';
 
 // Change this number to 8 if you want 8 urgent campaigns on home.
@@ -149,6 +150,22 @@ export const useCategories = () => {
   });
 };
 
+
+// ─── Campaign Detail Hook ────────────────────────────────────
+export const useCampaignDetail = (campaignId) => {
+  return useQuery({
+    queryKey: ['campaign-detail', String(campaignId)],
+    queryFn: () => getCampaignDetail(campaignId),
+    enabled: !!campaignId,
+    select: (body) => {
+      if (body?.responseCode !== '000' || !body?.data) {
+        return null;
+      }
+      return mapCampaignDetail(body.data);
+    },
+  });
+};
+
 const mapUrgentCampaignToCard = (item) => {
   const raisedAmount = Number(item?.totalRaised || 0);
   const goalAmount = Number(item?.fundingGoal || 0);
@@ -274,6 +291,67 @@ const mapMyCampaignToCard = (item) => {
   };
 };
 
+const mapCampaignDetail = (item) => {
+  const raisedAmount = Number(item?.raisedAmount || 0);
+  const goalAmount = Number(item?.fundingGoal || 0);
+
+  const pct =
+    goalAmount > 0
+      ? Math.min(Math.round((raisedAmount / goalAmount) * 100), 100)
+      : 0;
+
+  return {
+    campaignId: item?.campaignId ?? item?.id,
+    title: item?.name || 'Campaign',
+    category: item?.category || 'General',
+    image: item?.coverImage || null,
+    coverImage: item?.coverImage || null,
+
+    raised: raisedAmount,
+    goal: goalAmount,
+    pct,
+
+    urgent: !!item?.urgent,
+    story: item?.description || '',
+
+    city: item?.city || '',
+    province: item?.location || '',
+
+    creator: {
+      userId: item?.userId,
+      name: item?.userName || 'Organizer',
+      location: [item?.city, item?.location].filter(Boolean).join(', '),
+      avatar: item?.userProfileImage || null,
+    },
+
+    media: Array.isArray(item?.additionalImages)
+      ? item.additionalImages.map((img) => ({
+          id: String(img.id),
+          uri: img.url,
+        }))
+      : [],
+
+    documents: Array.isArray(item?.documents)
+      ? item.documents.map((doc) => ({
+          id: String(doc.id),
+          url: doc.url,
+          title: getDocFileName(doc.url),
+        }))
+      : [],
+
+    raw: item,
+  };
+};
+
+const getDocFileName = (url) => {
+  if (!url) return 'Document';
+  try {
+    const parts = url.split('/');
+    return decodeURIComponent(parts[parts.length - 1]) || 'Document';
+  } catch {
+    return 'Document';
+  }
+};
 
 const formatCurrency = (value) => {
   const amount = Number(value || 0);

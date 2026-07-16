@@ -76,7 +76,7 @@ const ExploreScreen = ({ navigation }) => {
   }, []);
 
   const handleCardPress = useCallback(item => {
-    navigation?.navigate?.('CampaignDetailScreen', { 
+    navigation?.navigate?.('CampaignDetail', { 
       campaignId: item.campaignId,
       campaign: item.raw 
     });

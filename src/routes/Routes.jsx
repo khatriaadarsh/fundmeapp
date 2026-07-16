@@ -338,7 +338,6 @@ import DonateScreen from '../screens/campaigns/DonateScreen';
 import CheckUser from '../screens/auth/CheckUser';
 import CreatorProfileScreen from '../screens/Profile/CreatorProfileScreen';
 import FeedbackScreen from '../screens/feedback/FeedbackScreen';
-// import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 
 const { width: SW } = Dimensions.get('window');

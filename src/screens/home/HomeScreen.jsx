@@ -86,7 +86,7 @@ const HomeScreen = ({ navigation }) => {
 
   // Navigate to campaign details
   const handleCampaignPress = useCallback((campaign) => {
-    navigation.navigate('CampaignDetailScreen', { 
+    navigation.navigate('CampaignDetail', { 
       campaignId: campaign.campaignId,
       campaign: campaign.raw 
     });
