@@ -283,8 +283,6 @@
 
 // export default Routes;
 
-
-
 //src/routes/Routes.jsx
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -339,23 +337,25 @@ import CheckUser from '../screens/auth/CheckUser';
 import CreatorProfileScreen from '../screens/Profile/CreatorProfileScreen';
 import FeedbackScreen from '../screens/feedback/FeedbackScreen';
 import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
+import PaymentSuccessScreen from '../screens/notifications/PaymentSuccessScreen';
+import PinEntryScreen from '../screens/auth/PinEntryScreen';
 
 const { width: SW } = Dimensions.get('window');
-const sp = (n) => (SW / 375) * n;
+const sp = n => (SW / 375) * n;
 
-const INACTIVE   = '#9CA3AF';
-const WHITE      = '#FFFFFF';
+const INACTIVE = '#9CA3AF';
+const WHITE = '#FFFFFF';
 const OCEAN_BLUE = '#0A3D62';
-const TEAL       = '#00B4CC';
+const TEAL = '#00B4CC';
 const GRAD_START = '#0A3D62';
-const GRAD_END   = '#15AABF';
+const GRAD_END = '#15AABF';
 
 const TAB_CONFIG = {
-  HomeTab:          { icon: 'home',    label: 'Home'    },
-  ExploreTab:       { icon: 'compass', label: 'Explore' },
-  SavedTab:         { icon: 'heart',   label: 'Saved'   },
-  ProfileTab:       { icon: 'user',    label: 'Me'      },
-  NotificationsTab: { icon: 'bell',    label: 'Alerts'  },
+  HomeTab: { icon: 'home', label: 'Home' },
+  ExploreTab: { icon: 'compass', label: 'Explore' },
+  SavedTab: { icon: 'heart', label: 'Saved' },
+  ProfileTab: { icon: 'user', label: 'Me' },
+  NotificationsTab: { icon: 'bell', label: 'Alerts' },
 };
 
 const CustomTabBar = ({ state, navigation }) => {
@@ -375,7 +375,10 @@ const CustomTabBar = ({ state, navigation }) => {
                 onPress={() => navigation.navigate('CreateCampaign')}
                 activeOpacity={0.85}
               >
-                <LinearGradient colors={[GRAD_START, GRAD_END]} style={tabSt.fab}>
+                <LinearGradient
+                  colors={[GRAD_START, GRAD_END]}
+                  style={tabSt.fab}
+                >
                   <Icons name="plus" size={sp(24)} color={WHITE} />
                 </LinearGradient>
               </TouchableOpacity>
@@ -430,10 +433,10 @@ const tabSt = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
   },
-  tab:         { flex: 1, alignItems: 'center', paddingVertical: sp(2) },
-  label:       { fontSize: sp(10), color: INACTIVE, marginTop: sp(3) },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: sp(2) },
+  label: { fontSize: sp(10), color: INACTIVE, marginTop: sp(3) },
   labelActive: { color: OCEAN_BLUE, fontWeight: '700' },
-  fabSlot:     { flex: 1, alignItems: 'center', marginTop: sp(-24) },
+  fabSlot: { flex: 1, alignItems: 'center', marginTop: sp(-24) },
   fab: {
     width: sp(56),
     height: sp(56),
@@ -448,7 +451,7 @@ const tabSt = StyleSheet.create({
   },
 });
 
-const Tab   = createBottomTabNavigator();
+const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // ─── Tab navigator (role-aware) ──────────────────────────────
@@ -459,10 +462,10 @@ const MainTabNavigator = () => {
 
   return (
     <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
+      tabBar={props => <CustomTabBar {...props} />}
       screenOptions={{ headerShown: false, lazy: true }}
     >
-      <Tab.Screen name="HomeTab"    component={HomeScreen}    />
+      <Tab.Screen name="HomeTab" component={HomeScreen} />
       <Tab.Screen name="ExploreTab" component={ExploreScreen} />
 
       {/* Creator: show FAB to create campaign */}
@@ -471,7 +474,7 @@ const MainTabNavigator = () => {
           name="CreateTab"
           component={DummyScreen}
           listeners={({ navigation }) => ({
-            tabPress: (e) => {
+            tabPress: e => {
               e.preventDefault();
               navigation.navigate('ReviewSubmit');
             },
@@ -484,7 +487,7 @@ const MainTabNavigator = () => {
         <Tab.Screen name="NotificationsTab" component={NotificationsScreen} />
       )}
 
-      <Tab.Screen name="SavedTab"   component={SavedScreen}   />
+      <Tab.Screen name="SavedTab" component={SavedScreen} />
       <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -531,7 +534,10 @@ const StackNavigator = () => (
     <Stack.Screen name="MyDonationScreen" component={MyDonationScreen} />
     <Stack.Screen name="MyCampaignsScreen" component={MyCampaignsScreen} />
     <Stack.Screen name="MyWithdrawalsScreen" component={MyWithdrawalsScreen} />
-    <Stack.Screen name="RequestWithdrawalScreen" component={RequestWithdrawalScreen}/>
+    <Stack.Screen
+      name="RequestWithdrawalScreen"
+      component={RequestWithdrawalScreen}
+    />
     <Stack.Screen name="TermsConditions" component={TermsConditions} />
     <Stack.Screen name="FAQScreen" component={FAQScreen} />
     <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
@@ -550,6 +556,11 @@ const StackNavigator = () => (
       options={{ headerShown: false }}
     />
     <Stack.Screen name="FeedbackScreen" component={FeedbackScreen} />
+    <Stack.Screen name="PinEntryScreen" component={PinEntryScreen} />
+    <Stack.Screen
+      name="PaymentSuccessScreen"
+      component={PaymentSuccessScreen}
+    />
   </Stack.Navigator>
 );
 
