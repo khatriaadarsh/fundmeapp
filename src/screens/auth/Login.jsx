@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,7 +16,7 @@ import {
   LayoutAnimation,
   UIManager,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 
@@ -43,28 +44,32 @@ if (
 
 const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
-// How far the layout is allowed to compress when the keyboard eats into
-// the available space. 1 = full size (keyboard closed / plenty of room).
-// COMPACT_FLOOR = the smallest fraction we'll ever shrink the LOGO to —
-// kept mild (70%) so the brand mark stays recognizable. Vertical spacing
-// is allowed to compress much more aggressively (down to 25%) since that's
-// where most of the reclaimed space should come from, not the logo.
-const COMPACT_FLOOR = 0.7;
-const SPACING_FLOOR = 0.25;
+// How far the logo is allowed to shrink when the keyboard is open — kept
+// mild (60%) so the brand mark stays recognizable. Vertical spacing
+// compresses far more aggressively (down to 20%), and the purely
+// decorative rows (subtitle, divider, sign-up prompt) are hidden
+// entirely while typing — between the three, the form should always
+// fit above the keyboard without needing to scroll.
+const COMPACT_FLOOR = 0.6;
+const SPACING_FLOOR = 0.2;
+
+// Fallback duration for Android, which doesn't reliably report keyboard
+// animation duration the way iOS does. Deliberately kept short — the
+// goal is for the compaction to feel like it happens IN THE SAME INSTANT
+// as the keyboard, not as its own visible tween. A duration close to (or
+// even slightly under) the keyboard's own animation reads as "instant"
+// to the eye, whereas anything noticeably longer reads as "adjusting".
+const ANDROID_KB_DURATION = 180;
+const IOS_KB_DURATION_FALLBACK = 200;
 
 const lerp = (min, max, t) => min + (max - min) * t;
 const clamp01 = v => Math.min(1, Math.max(0, v));
-
-const LAYOUT_ANIM_CONFIG = LayoutAnimation.create(
-  220,
-  LayoutAnimation.Types.easeInEaseOut,
-  LayoutAnimation.Properties.opacity,
-);
 
 const LoginScreen = ({ navigation, route }) => {
   const toast = useToast();
   const { saveUser, currentUser } = useAppContext();
   const { mutate: doLogin, isPending } = useLogin();
+  const insets = useSafeAreaInsets();
 
   // ── Static, screen-size-based baseline (never changes with keyboard) ──
   // Uses Dimensions.get('screen') — the physical device size — not
@@ -103,76 +108,107 @@ const LoginScreen = ({ navigation, route }) => {
   });
 
   // Entrance fade/slide — Animated API, native driver, completely
-  // separate from the compact-scaling logic below. This is the ONLY
-  // place Animated.Value is used in this screen.
+  // separate from the compact-scaling logic below.
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scrollRef = useRef(null);
 
-  // ── Dynamic "compact when keyboard opens" scaling ───────────────────
-  // Instead of scrolling (or fighting React Native's Animated native/JS
-  // driver restrictions), this uses LayoutAnimation: whenever the target
-  // scale changes, we call LayoutAnimation.configureNext() and then just
-  // update PLAIN numeric state. React Native then animates the resulting
-  // layout change (width/height/margin/padding) natively and smoothly —
-  // no Animated.Value involved for these props at all, so there is no
-  // possibility of the native/JS driver conflict.
-  //
-  // We measure the REAL space left after the keyboard opens
-  // (containerHeight, via onLayout — reflects the KeyboardAvoidingView's
-  // shrunk size) against the form's natural full-size height
-  // (baseContentHeight, captured once on first layout while the keyboard
-  // is closed). The ratio drives a single scale factor (0..1) that
-  // compresses the logo and vertical spacing — never the input fields or
-  // button, which stay full-size and tappable at all times.
-  const [containerHeight, setContainerHeight] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
+  // ── Compact-on-keyboard scaling, synced to the keyboard's own timing ──
+  // Instead of reacting AFTER the keyboard finishes resizing the view
+  // (which is what made the previous version feel like two separate
+  // motions), we listen to the keyboard show/hide events directly and
+  // kick off our own LayoutAnimation at the EXACT same moment, using the
+  // keyboard's own reported duration on iOS (Android doesn't reliably
+  // report one, so we use a matching fixed fallback). Result: the logo
+  // shrinking, the spacing tightening, and the keyboard rising all
+  // happen as ONE continuous motion instead of a visible two-step jump.
   const [scaleFactor, setScaleFactor] = useState(1);
+  const [kbVisible, setKbVisible] = useState(false);
   const baseContentHeightRef = useRef(0);
   const hasMeasuredBaseRef = useRef(false);
 
   const handleContentSizeChange = useCallback((_w, h) => {
-    setContentHeight(h);
     if (!hasMeasuredBaseRef.current && h > 0) {
       baseContentHeightRef.current = h;
       hasMeasuredBaseRef.current = true;
     }
+    setContentHeight(h);
   }, []);
+
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
 
   const handleContainerLayout = useCallback((e) => {
     setContainerHeight(e.nativeEvent.layout.height);
   }, []);
 
   useEffect(() => {
-    if (!hasMeasuredBaseRef.current || containerHeight === 0) return;
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const target = Math.min(
-      1,
-      Math.max(COMPACT_FLOOR, containerHeight / baseContentHeightRef.current),
-    );
+    const applyCompact = (keyboardHeight, duration) => {
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          duration,
+          LayoutAnimation.Types.linear,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
 
-    if (Math.abs(target - scaleFactor) < 0.01) return; // avoid churn
+      if (hasMeasuredBaseRef.current && keyboardHeight > 0) {
+        const availableHeight =
+          screenDims.height - insets.top - insets.bottom - keyboardHeight;
+        const target = Math.min(
+          1,
+          Math.max(COMPACT_FLOOR, availableHeight / baseContentHeightRef.current),
+        );
+        setScaleFactor(target);
+      }
+      setKbVisible(keyboardHeight > 0);
+    };
 
-    LayoutAnimation.configureNext(LAYOUT_ANIM_CONFIG);
-    setScaleFactor(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [containerHeight]);
+    const showSub = Keyboard.addListener(showEvt, (e) => {
+      const height = e?.endCoordinates?.height ?? 0;
+      const duration =
+        Platform.OS === 'ios'
+          ? e?.duration || IOS_KB_DURATION_FALLBACK
+          : ANDROID_KB_DURATION;
+      applyCompact(height, duration);
+    });
 
-  // Safety net only — with compacting active, content should virtually
-  // always fit. This only enables scrolling on genuinely extreme cases
-  // (very tall keyboard + very short device) where even COMPACT_FLOOR
-  // isn't enough.
+    const hideSub = Keyboard.addListener(hideEvt, (e) => {
+      const duration =
+        Platform.OS === 'ios'
+          ? e?.duration || IOS_KB_DURATION_FALLBACK
+          : ANDROID_KB_DURATION;
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          duration,
+          LayoutAnimation.Types.linear,
+          LayoutAnimation.Properties.opacity,
+        ),
+      );
+      setScaleFactor(1);
+      setKbVisible(false);
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [screenDims, insets]);
+
+  // Safety net only, for genuinely extreme cases where even the combined
+  // compaction (logo shrink + spacing shrink + hidden decorative rows)
+  // still isn't enough — e.g. a very tall keyboard on a very short
+  // device. Toggling scrollEnabled has no visual effect by itself, so it
+  // can't cause a jump; it just permits/blocks a touch gesture.
   const canScroll = contentHeight > containerHeight + 1;
 
-  useEffect(() => {
-    if (!canScroll) {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    }
-  }, [canScroll]);
-
-  // Plain-number interpolation (no Animated) — logo shrinks mildly
-  // (floor 0.7), vertical spacing shrinks aggressively (floor 0.25) so
-  // most of the reclaimed room comes from whitespace, not the logo.
+  // Plain-number interpolation (no Animated) for the logo/spacing, driven
+  // by scaleFactor which is now set directly by the keyboard listener
+  // above, in sync with the keyboard's own animation.
   const t = clamp01((scaleFactor - COMPACT_FLOOR) / (1 - COMPACT_FLOOR));
   const logoSize = lerp(BASE_LOGO_SIZE * COMPACT_FLOOR, BASE_LOGO_SIZE, t);
   const logoMargin = lerp(BASE_LOGO_MARGIN * SPACING_FLOOR, BASE_LOGO_MARGIN, t);
@@ -302,18 +338,6 @@ const LoginScreen = ({ navigation, route }) => {
 
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          // Both platforms actively shrink this view when the keyboard
-          // opens (rather than passively depending on native OS resize):
-          //  - iOS: "padding" adds bottom padding equal to keyboard height.
-          //  - Android: "height" makes RN track the keyboard via its own
-          //    JS listener and shrink this view directly — required so
-          //    that `containerHeight` below actually reflects the real
-          //    reduced space, which is what drives the compact-scaling.
-          //
-          // Pair this with android:windowSoftInputMode="adjustPan" in
-          // AndroidManifest.xml (on the main Activity) so the native OS
-          // does NOT also resize the window — otherwise you'd get two
-          // systems shrinking the view at once.
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? scale(12) : 0}
         >
@@ -330,10 +354,6 @@ const LoginScreen = ({ navigation, route }) => {
             bounces={false}
             automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
-            {/* Entrance animation — Animated API, native driver only,
-                fully isolated from the plain-number compact-scaling
-                logic below (no Animated.Value used for layout metrics
-                anywhere in this screen). */}
             <Animated.View
               style={{
                 opacity: fadeAnim,
@@ -362,7 +382,14 @@ const LoginScreen = ({ navigation, route }) => {
                   >
                     Welcome Back
                   </Text>
-                  <Text style={styles.subtitle}>Log in to your account</Text>
+                  {/* Purely decorative — hidden while the keyboard is open
+                      to reclaim vertical space, restored the instant it
+                      closes. LayoutAnimation (configured in the keyboard
+                      listener above) animates this removal/insertion in
+                      sync with everything else. */}
+                  {!kbVisible && (
+                    <Text style={styles.subtitle}>Log in to your account</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputsContainer}>
@@ -420,18 +447,25 @@ const LoginScreen = ({ navigation, route }) => {
                   disabled={isPending}
                 />
 
-                <View style={styles.divider}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or</Text>
-                  <View style={styles.dividerLine} />
-                </View>
+                {/* Purely decorative — same hide-while-typing treatment. */}
+                {!kbVisible && (
+                  <>
+                    <View style={styles.divider}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>or</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
 
-                <View style={styles.signUpContainer}>
-                  <Text style={styles.signUpText}>Don't have an account? </Text>
-                  <TouchableOpacity onPress={handleSignUp} disabled={isPending}>
-                    <Text style={styles.signUpLink}>Sign Up</Text>
-                  </TouchableOpacity>
-                </View>
+                    <View style={styles.signUpContainer}>
+                      <Text style={styles.signUpText}>
+                        Don't have an account?{' '}
+                      </Text>
+                      <TouchableOpacity onPress={handleSignUp} disabled={isPending}>
+                        <Text style={styles.signUpLink}>Sign Up</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </View>
             </Animated.View>
           </ScrollView>
