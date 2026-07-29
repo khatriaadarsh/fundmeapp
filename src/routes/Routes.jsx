@@ -557,9 +557,7 @@ const StackNavigator = () => (
     />
     <Stack.Screen name="FeedbackScreen" component={FeedbackScreen} />
     <Stack.Screen name="PinEntryScreen" component={PinEntryScreen} />
-    <Stack.Screen
-      name="PaymentSuccessScreen"
-      component={PaymentSuccessScreen}
+    <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen}
     />
   </Stack.Navigator>
 );

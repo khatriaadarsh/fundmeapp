@@ -3,16 +3,17 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   Animated,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   ScrollView,
-  Image,
   StatusBar,
   Dimensions,
+  LayoutAnimation,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -30,24 +31,45 @@ import { useAppContext } from '../../context/AppContext';
 import { COLORS, SPACING, TYPOGRAPHY, scale } from '../../theme';
 import LogoImg from '../../assets/logo.png';
 
+// Required on Android (older architecture) for LayoutAnimation to work at
+// all — harmless no-op on iOS / new-architecture Android where it's
+// already enabled by default.
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
+// How far the layout is allowed to compress when the keyboard eats into
+// the available space. 1 = full size (keyboard closed / plenty of room).
+// COMPACT_FLOOR = the smallest fraction we'll ever shrink the LOGO to —
+// kept mild (70%) so the brand mark stays recognizable. Vertical spacing
+// is allowed to compress much more aggressively (down to 25%) since that's
+// where most of the reclaimed space should come from, not the logo.
+const COMPACT_FLOOR = 0.7;
+const SPACING_FLOOR = 0.25;
+
+const lerp = (min, max, t) => min + (max - min) * t;
+const clamp01 = v => Math.min(1, Math.max(0, v));
+
+const LAYOUT_ANIM_CONFIG = LayoutAnimation.create(
+  220,
+  LayoutAnimation.Types.easeInEaseOut,
+  LayoutAnimation.Properties.opacity,
+);
 
 const LoginScreen = ({ navigation, route }) => {
   const toast = useToast();
   const { saveUser, currentUser } = useAppContext();
   const { mutate: doLogin, isPending } = useLogin();
 
-  // ── Responsive metrics ──────────────────────────────────────
-  // IMPORTANT: we deliberately use Dimensions.get('screen') here, NOT
-  // useWindowDimensions()/Dimensions.get('window'). On Android with
-  // windowSoftInputMode="adjustResize", the "window" height itself
-  // shrinks by the keyboard's height while it's open — so breakpoints
-  // driven by window height (e.g. isCompactHeight) would silently
-  // flip mid-typing and resize the logo/fonts, which is an extra
-  // source of the "blink" being reported. "screen" is the physical
-  // device size and never changes when the keyboard shows/hides —
-  // only on a real orientation change — so our spacing/sizing stays
-  // 100% stable regardless of keyboard state.
+  // ── Static, screen-size-based baseline (never changes with keyboard) ──
+  // Uses Dimensions.get('screen') — the physical device size — not
+  // useWindowDimensions()/'window', which can shift when the keyboard
+  // opens on Android and would cause this baseline to jitter mid-typing.
   const [screenDims, setScreenDims] = useState(() => Dimensions.get('screen'));
 
   useEffect(() => {
@@ -57,8 +79,13 @@ const LoginScreen = ({ navigation, route }) => {
     return () => sub?.remove?.();
   }, []);
 
-  const isCompactHeight = screenDims.height < 700; // small/short phones (e.g. SE-class)
+  const isCompactHeight = screenDims.height < 700; // small/short phones
   const isNarrowWidth = screenDims.width < 360;
+
+  const BASE_LOGO_SIZE = isCompactHeight ? scale(58) : scale(72);
+  const BASE_LOGO_MARGIN = isCompactHeight ? SPACING.lg : SPACING.xl;
+  const BASE_HEADLINE_MARGIN = isCompactHeight ? SPACING.lg : SPACING.xxl;
+  const BASE_TOP_PADDING = isCompactHeight ? SPACING.lg : SPACING.xxxl;
 
   // Prefill email from CheckUser/SignUp flow, then from saved user
   const prefilledEmail = route?.params?.email || currentUser?.email || '';
@@ -67,7 +94,6 @@ const LoginScreen = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Popup state
   const [popup, setPopup] = useState({
     visible: false,
     title: '',
@@ -76,35 +102,86 @@ const LoginScreen = ({ navigation, route }) => {
     variant: 'warning',
   });
 
+  // Entrance fade/slide — Animated API, native driver, completely
+  // separate from the compact-scaling logic below. This is the ONLY
+  // place Animated.Value is used in this screen.
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scrollRef = useRef(null);
 
-  // ── Scroll-only-when-needed ──────────────────────────────────
-  // An enterprise-grade form screen should NOT be swipeable/scrollable
-  // when its content already fits on screen, and should NEVER visibly
-  // reposition itself in response to the keyboard opening/closing —
-  // that reposition (a second, JS-driven layout change layered on top
-  // of the OS's own smooth keyboard-resize animation) is exactly what
-  // caused the "blink". So this screen's layout style is now 100%
-  // static — it never changes based on keyboard state. The ONLY thing
-  // we control in JS is whether touch-scrolling is permitted, which we
-  // derive by measuring the ScrollView's real visible height against
-  // its real content height. Toggling `scrollEnabled` has no visual
-  // effect on its own (it doesn't move anything), so it can't blink.
+  // ── Dynamic "compact when keyboard opens" scaling ───────────────────
+  // Instead of scrolling (or fighting React Native's Animated native/JS
+  // driver restrictions), this uses LayoutAnimation: whenever the target
+  // scale changes, we call LayoutAnimation.configureNext() and then just
+  // update PLAIN numeric state. React Native then animates the resulting
+  // layout change (width/height/margin/padding) natively and smoothly —
+  // no Animated.Value involved for these props at all, so there is no
+  // possibility of the native/JS driver conflict.
+  //
+  // We measure the REAL space left after the keyboard opens
+  // (containerHeight, via onLayout — reflects the KeyboardAvoidingView's
+  // shrunk size) against the form's natural full-size height
+  // (baseContentHeight, captured once on first layout while the keyboard
+  // is closed). The ratio drives a single scale factor (0..1) that
+  // compresses the logo and vertical spacing — never the input fields or
+  // button, which stay full-size and tappable at all times.
   const [containerHeight, setContainerHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
-  const canScroll = contentHeight > containerHeight + 1; // +1 guards float rounding
+  const [scaleFactor, setScaleFactor] = useState(1);
+  const baseContentHeightRef = useRef(0);
+  const hasMeasuredBaseRef = useRef(false);
 
-  // If content stops overflowing (e.g. keyboard closed, freeing up
-  // space), silently snap back to the top with NO animation — this
-  // only fires on the true→false transition, so it never fights with
-  // the keyboard's own close animation.
+  const handleContentSizeChange = useCallback((_w, h) => {
+    setContentHeight(h);
+    if (!hasMeasuredBaseRef.current && h > 0) {
+      baseContentHeightRef.current = h;
+      hasMeasuredBaseRef.current = true;
+    }
+  }, []);
+
+  const handleContainerLayout = useCallback((e) => {
+    setContainerHeight(e.nativeEvent.layout.height);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMeasuredBaseRef.current || containerHeight === 0) return;
+
+    const target = Math.min(
+      1,
+      Math.max(COMPACT_FLOOR, containerHeight / baseContentHeightRef.current),
+    );
+
+    if (Math.abs(target - scaleFactor) < 0.01) return; // avoid churn
+
+    LayoutAnimation.configureNext(LAYOUT_ANIM_CONFIG);
+    setScaleFactor(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [containerHeight]);
+
+  // Safety net only — with compacting active, content should virtually
+  // always fit. This only enables scrolling on genuinely extreme cases
+  // (very tall keyboard + very short device) where even COMPACT_FLOOR
+  // isn't enough.
+  const canScroll = contentHeight > containerHeight + 1;
+
   useEffect(() => {
     if (!canScroll) {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
     }
   }, [canScroll]);
+
+  // Plain-number interpolation (no Animated) — logo shrinks mildly
+  // (floor 0.7), vertical spacing shrinks aggressively (floor 0.25) so
+  // most of the reclaimed room comes from whitespace, not the logo.
+  const t = clamp01((scaleFactor - COMPACT_FLOOR) / (1 - COMPACT_FLOOR));
+  const logoSize = lerp(BASE_LOGO_SIZE * COMPACT_FLOOR, BASE_LOGO_SIZE, t);
+  const logoMargin = lerp(BASE_LOGO_MARGIN * SPACING_FLOOR, BASE_LOGO_MARGIN, t);
+  const headlineMargin = lerp(
+    BASE_HEADLINE_MARGIN * SPACING_FLOOR,
+    BASE_HEADLINE_MARGIN,
+    t,
+  );
+  const topPadding = lerp(BASE_TOP_PADDING * SPACING_FLOOR, BASE_TOP_PADDING, t);
 
   useEffect(() => {
     Animated.parallel([
@@ -150,7 +227,6 @@ const LoginScreen = ({ navigation, route }) => {
           const respCode = body?.responseCode;
           const respMsg = body?.responseMessage;
 
-          // Persist user
           await saveUser({
             id: data.id,
             userId: data.id,
@@ -172,14 +248,12 @@ const LoginScreen = ({ navigation, route }) => {
             profile: data,
           });
 
-          // ── Route based on accountStatus ─────────────────
           if (status === 'ACTIVE') {
             toast.success(respMsg || 'Welcome back!');
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
             return;
           }
 
-          // Non-active → show themed popup with backend message + code
           setPopup({
             visible: true,
             title: status === 'PENDING' ? 'Account Pending' : 'Account Notice',
@@ -189,7 +263,6 @@ const LoginScreen = ({ navigation, route }) => {
           });
         },
         onError: err => {
-          // Show popup for known status codes; toast for generic errors
           if (err?.code && err?.message) {
             setPopup({
               visible: true,
@@ -229,142 +302,136 @@ const LoginScreen = ({ navigation, route }) => {
 
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          // "padding" on iOS lifts content correctly above the keyboard.
-          // On Android we deliberately do NOT set a behavior — Android's
-          // own windowSoftInputMode="adjustResize" (set in
-          // AndroidManifest.xml) already resizes the view when the
-          // keyboard opens. Layering KeyboardAvoidingView's "height"
-          // behavior on TOP of that native resize is what caused the
-          // double-adjustment / jumpy-scroll/blink bug on Android OEM
-          // skins like vivo's FuntouchOS. Letting Android's native
-          // resize be the ONLY thing that moves the layout — with no
-          // JS-driven repositioning of our own — is what keeps this
-          // smooth across devices.
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Both platforms actively shrink this view when the keyboard
+          // opens (rather than passively depending on native OS resize):
+          //  - iOS: "padding" adds bottom padding equal to keyboard height.
+          //  - Android: "height" makes RN track the keyboard via its own
+          //    JS listener and shrink this view directly — required so
+          //    that `containerHeight` below actually reflects the real
+          //    reduced space, which is what drives the compact-scaling.
+          //
+          // Pair this with android:windowSoftInputMode="adjustPan" in
+          // AndroidManifest.xml (on the main Activity) so the native OS
+          // does NOT also resize the window — otherwise you'd get two
+          // systems shrinking the view at once.
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? scale(12) : 0}
         >
           <ScrollView
             ref={scrollRef}
-            onLayout={e => setContainerHeight(e.nativeEvent.layout.height)}
-            onContentSizeChange={(_w, h) => setContentHeight(h)}
+            onLayout={handleContainerLayout}
+            onContentSizeChange={handleContentSizeChange}
             scrollEnabled={canScroll}
             overScrollMode="never"
-            contentContainerStyle={[
-              styles.scrollContent,
-              {
-                paddingTop: isCompactHeight ? SPACING.lg : SPACING.xxxl,
-              },
-            ]}
+            contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
             showsVerticalScrollIndicator={false}
             bounces={false}
             automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           >
+            {/* Entrance animation — Animated API, native driver only,
+                fully isolated from the plain-number compact-scaling
+                logic below (no Animated.Value used for layout metrics
+                anywhere in this screen). */}
             <Animated.View
-              style={[
-                styles.contentContainer,
-                { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-              ]}
+              style={{
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }}
             >
-              <View
-                style={[
-                  styles.logoContainer,
-                  { marginBottom: isCompactHeight ? SPACING.lg : SPACING.xl },
-                ]}
-              >
-                <Image
-                  source={LogoImg}
-                  style={[
-                    styles.logo,
-                    isCompactHeight && { width: scale(58), height: scale(58) },
-                  ]}
-                />
-              </View>
+              <View style={[styles.contentContainer, { paddingTop: topPadding }]}>
+                <View style={[styles.logoContainer, { marginBottom: logoMargin }]}>
+                  <Image
+                    source={LogoImg}
+                    style={{ width: logoSize, height: logoSize, resizeMode: 'contain' }}
+                  />
+                </View>
 
-              <View
-                style={[
-                  styles.headlineContainer,
-                  { marginBottom: isCompactHeight ? SPACING.lg : SPACING.xxl },
-                ]}
-              >
-                <Text
+                <View
                   style={[
-                    styles.headline,
-                    isNarrowWidth && { fontSize: TYPOGRAPHY.fontSize.xl },
+                    styles.headlineContainer,
+                    { marginBottom: headlineMargin },
                   ]}
                 >
-                  Welcome Back
-                </Text>
-                <Text style={styles.subtitle}>Log in to your account</Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.headline,
+                      isNarrowWidth && { fontSize: TYPOGRAPHY.fontSize.xl },
+                    ]}
+                  >
+                    Welcome Back
+                  </Text>
+                  <Text style={styles.subtitle}>Log in to your account</Text>
+                </View>
 
-              <View style={styles.inputsContainer}>
-                <InputField
-                  label="Email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChangeText={setEmail}
-                  leftIcon="mail"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  editable={!isPending}
-                  returnKeyType="next"
-                />
+                <View style={styles.inputsContainer}>
+                  <InputField
+                    label="Email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChangeText={setEmail}
+                    leftIcon="mail"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    editable={!isPending}
+                    returnKeyType="next"
+                  />
 
-                <InputField
-                  label="Password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChangeText={setPassword}
-                  leftIcon="lock"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  editable={!isPending}
-                  returnKeyType="done"
-                  onSubmitEditing={handleLogin}
-                  rightElement={
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      disabled={isPending}
-                    >
-                      <Icon
-                        name={showPassword ? 'eye' : 'eye-off'}
-                        size={scale(20)}
-                        color={COLORS.textTertiary}
-                      />
-                    </TouchableOpacity>
-                  }
-                />
-              </View>
+                  <InputField
+                    label="Password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChangeText={setPassword}
+                    leftIcon="lock"
+                    secureTextEntry={!showPassword}
+                    autoCapitalize="none"
+                    editable={!isPending}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                    rightElement={
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        disabled={isPending}
+                      >
+                        <Icon
+                          name={showPassword ? 'eye' : 'eye-off'}
+                          size={scale(20)}
+                          color={COLORS.textTertiary}
+                        />
+                      </TouchableOpacity>
+                    }
+                  />
+                </View>
 
-              <TouchableOpacity
-                onPress={handleForgotPassword}
-                style={styles.forgotButton}
-                disabled={isPending}
-              >
-                <Text style={styles.forgotText}>Forgot Password?</Text>
-              </TouchableOpacity>
-
-              <GradientButton
-                title={isPending ? 'Signing in…' : 'Log In'}
-                onPress={handleLogin}
-                variant="primary"
-                disabled={isPending}
-              />
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <View style={styles.signUpContainer}>
-                <Text style={styles.signUpText}>Don't have an account? </Text>
-                <TouchableOpacity onPress={handleSignUp} disabled={isPending}>
-                  <Text style={styles.signUpLink}>Sign Up</Text>
+                <TouchableOpacity
+                  onPress={handleForgotPassword}
+                  style={styles.forgotButton}
+                  disabled={isPending}
+                >
+                  <Text style={styles.forgotText}>Forgot Password?</Text>
                 </TouchableOpacity>
+
+                <GradientButton
+                  title={isPending ? 'Signing in…' : 'Log In'}
+                  onPress={handleLogin}
+                  variant="primary"
+                  disabled={isPending}
+                />
+
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+
+                <View style={styles.signUpContainer}>
+                  <Text style={styles.signUpText}>Don't have an account? </Text>
+                  <TouchableOpacity onPress={handleSignUp} disabled={isPending}>
+                    <Text style={styles.signUpLink}>Sign Up</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </Animated.View>
           </ScrollView>
@@ -399,7 +466,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: { width: '100%' },
   logoContainer: { alignItems: 'center' },
-  logo: { width: scale(72), height: scale(72), resizeMode: 'contain' },
   headlineContainer: { alignItems: 'center' },
   headline: {
     fontSize: TYPOGRAPHY.fontSize.display,

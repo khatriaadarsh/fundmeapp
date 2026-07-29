@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
+
+// ── Confirmation + PIN modals ───────────────────────────────
+import DonationConfirmModal from '../../components/donation/DonationConfirmModal';
+import PinEntryModal from '../../components/payment/PinEntryModal';
+
+// ── API / context wiring ────────────────────────────────────
+import { useCampaignDetail } from '../../hooks/useCampaign';
+import { useAppContext } from '../../context/AppContext';
 
 // ─── Scale ───────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -35,16 +43,11 @@ const C = {
   gray:       '#64748B',
   light:      '#94A3B8',
   border:     '#E2E8F0',
+  red:        '#EF4444',
 };
 
 // ─── Static data ─────────────────────────────────────────
 const AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
-
-const CAMPAIGN = {
-  title:     "Help Fatima's Heart Surgery",
-  image:     'https://picsum.photos/80/60?random=10',
-  remaining: 175000,
-};
 
 const METHODS = [
   { id: 'easypaisa', label: 'EasyPaisa',         icon: 'smartphone'  },
@@ -52,18 +55,28 @@ const METHODS = [
   { id: 'bank',      label: 'Bank Transfer',      icon: 'repeat'      },
 ];
 
+// Methods that need an "Account Number" to identify the sender
+const METHODS_NEEDING_ACCOUNT = ['easypaisa', 'bank'];
+const ACCOUNT_NUMBER_LENGTH = 11;
+
 const fmt = n => n.toLocaleString('en-PK');
 
 // ─── Sub-components ───────────────────────────────────────
 
-// Campaign summary card at top
-const CampaignCard = memo(() => (
+// Campaign summary card at top — driven by real campaign data
+const CampaignCard = memo(({ title, image, remaining, loading }) => (
   <View style={s.campaignCard}>
-    <Image source={{ uri: CAMPAIGN.image }} style={s.campaignImg} resizeMode="cover" />
+    <Image
+      source={{ uri: image }}
+      style={s.campaignImg}
+      resizeMode="cover"
+    />
     <View style={s.campaignInfo}>
-      <Text style={s.campaignTitle} numberOfLines={1}>{CAMPAIGN.title}</Text>
+      <Text style={s.campaignTitle} numberOfLines={1}>
+        {loading ? 'Loading campaign...' : title}
+      </Text>
       <Text style={s.campaignRemaining}>
-        Remaining: PKR {fmt(CAMPAIGN.remaining)}
+        Remaining: PKR {fmt(remaining || 0)}
       </Text>
     </View>
   </View>
@@ -102,12 +115,35 @@ const MethodRow = memo(({ item, selected, onSelect }) => (
 ));
 
 // ─── Main Screen ──────────────────────────────────────────
-const DonateScreen = ({ navigation }) => {
-  const [selected,   setSelected  ] = useState(5000);
-  const [custom,     setCustom    ] = useState('5,000');
-  const [anonymous,  setAnonymous ] = useState(true);
-  const [message,    setMessage   ] = useState('');
-  const [method,     setMethod    ] = useState('easypaisa');
+const DonateScreen = ({ navigation, route }) => {
+  const campaignId = route?.params?.campaignId
+    ? String(route.params.campaignId)
+    : null;
+
+  // ── Real campaign data (title, image, creator) ────────────
+  const {
+    data: campaign,
+    isLoading: campaignLoading,
+  } = useCampaignDetail(campaignId);
+
+  // ── Logged-in donor's name ─────────────────────────────────
+  const { currentUser } = useAppContext();
+  const donorName = useMemo(() => {
+    const first = currentUser?.firstName || '';
+    const last = currentUser?.lastName || '';
+    return `${first} ${last}`.trim() || 'Donor';
+  }, [currentUser]);
+
+  const [selected,       setSelected      ] = useState(5000);
+  const [custom,         setCustom        ] = useState('5,000');
+  const [anonymous,      setAnonymous     ] = useState(true);
+  const [message,        setMessage       ] = useState('');
+  const [method,         setMethod        ] = useState('easypaisa');
+  const [accountNumber,  setAccountNumber ] = useState('');
+  const [accountError,   setAccountError  ] = useState('');
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [pinVisible,     setPinVisible    ] = useState(false);
+  const [paying,         setPaying        ] = useState(false);
 
   // Sync custom field when preset tapped
   const handleAmountPress = useCallback(amount => {
@@ -122,9 +158,76 @@ const DonateScreen = ({ navigation }) => {
     setSelected(clean ? Number(clean) : 0);
   }, []);
 
+  const handleAccountNumberChange = useCallback(text => {
+    const digits = text.replace(/[^0-9]/g, '').slice(0, ACCOUNT_NUMBER_LENGTH);
+    setAccountNumber(digits);
+    if (accountError) setAccountError('');
+  }, [accountError]);
+
+  const handleMethodSelect = useCallback(id => {
+    setMethod(id);
+    setAccountError('');
+  }, []);
+
+  const showAccountField = METHODS_NEEDING_ACCOUNT.includes(method);
+
+  // Human-readable label for the currently selected payment method
+  const selectedMethodLabel = useMemo(
+    () => METHODS.find(m => m.id === method)?.label,
+    [method],
+  );
+
+  // Donor name shown on the confirmation modal — respects the
+  // Anonymous toggle.
+  const displayName = anonymous ? 'Anonymous' : donorName;
+
+  // Pay button → validates, then opens the confirmation modal
   const handlePay = useCallback(() => {
-    // Wire up payment API here
-    navigation?.navigate?.('PaymentSuccess');
+    if (!selected || selected <= 0) return;
+
+    if (showAccountField) {
+      if (!accountNumber.trim()) {
+        setAccountError('Please enter your account number to continue');
+        return;
+      }
+      if (accountNumber.length !== ACCOUNT_NUMBER_LENGTH) {
+        setAccountError(`Account number must be ${ACCOUNT_NUMBER_LENGTH} digits`);
+        return;
+      }
+    }
+
+    setAccountError('');
+    setConfirmVisible(true);
+  }, [selected, showAccountField, accountNumber]);
+
+  // "Confirm Payment" in the summary modal → hand off to PIN entry
+  const handleProceedToPin = useCallback(() => {
+    setConfirmVisible(false);
+    setPinVisible(true);
+  }, []);
+
+  // Called once the PIN is entered successfully — this is where the
+  // actual donation submission happens.
+  const handlePinSuccess = useCallback(async () => {
+    setPaying(true);
+    try {
+      // Wire up the real donation API call here, e.g.:
+      // await submitDonation({
+      //   campaignId,
+      //   amount: selected,
+      //   method,
+      //   accountNumber,
+      //   anonymous,
+      //   message,
+      // });
+      setPinVisible(false);
+      navigation?.navigate?.('PaymentSuccess');
+    } catch (error) {
+      console.error('🔴 [DonateScreen] Donation submit error:', error?.message);
+      setPinVisible(false);
+    } finally {
+      setPaying(false);
+    }
   }, [navigation]);
 
   return (
@@ -152,7 +255,12 @@ const DonateScreen = ({ navigation }) => {
         overScrollMode="never"
       >
         {/* Campaign card */}
-        <CampaignCard />
+        <CampaignCard
+          title={campaign?.title}
+          image={campaign?.image}
+          remaining={campaign ? campaign.goal - campaign.raised : 0}
+          loading={campaignLoading}
+        />
 
         {/* Amount presets */}
         <Text style={s.sectionLabel}>Select Amount</Text>
@@ -216,10 +324,38 @@ const DonateScreen = ({ navigation }) => {
               key={m.id}
               item={m}
               selected={method === m.id}
-              onSelect={setMethod}
+              onSelect={handleMethodSelect}
             />
           ))}
         </View>
+
+        {/* Account number — only for EasyPaisa / Bank Transfer */}
+        {showAccountField && (
+          <>
+            <Text style={s.sectionLabel}>Account Number</Text>
+            <View style={[s.accountWrap, accountError && s.accountWrapError]}>
+              <Icons name="phone" size={sp(15)} color={accountError ? C.red : C.gray} />
+              <TextInput
+                style={s.accountInput}
+                value={accountNumber}
+                onChangeText={handleAccountNumberChange}
+                keyboardType="number-pad"
+                placeholder="e.g. 03451234567"
+                placeholderTextColor={C.light}
+                maxLength={ACCOUNT_NUMBER_LENGTH}
+              />
+              <Text style={s.accountCounter}>
+                {accountNumber.length}/{ACCOUNT_NUMBER_LENGTH}
+              </Text>
+            </View>
+            {!!accountError && (
+              <View style={s.errorRow}>
+                <Icons name="alert-circle" size={sp(12)} color={C.red} />
+                <Text style={s.errorText}>{accountError}</Text>
+              </View>
+            )}
+          </>
+        )}
 
         <View style={s.bottomPad} />
       </ScrollView>
@@ -247,6 +383,28 @@ const DonateScreen = ({ navigation }) => {
           </Text>
         </View>
       </View>
+
+      {/* Donation confirmation modal — Confirm hands off to PIN entry */}
+      <DonationConfirmModal
+        visible={confirmVisible}
+        onClose={() => setConfirmVisible(false)}
+        onConfirm={handleProceedToPin}
+        loading={false}
+        campaignTitle={campaign?.title}
+        campaignCreator={campaign?.creator?.name}
+        creatorLoading={campaignLoading}
+        amount={selected}
+        accountNumber={showAccountField ? accountNumber : null}
+        name={displayName}
+        paymentMethod={selectedMethodLabel}
+      />
+
+      {/* PIN entry modal — final step before actual submission */}
+      <PinEntryModal
+        visible={pinVisible}
+        onClose={() => setPinVisible(false)}
+        onSuccess={handlePinSuccess}
+      />
     </View>
   );
 };
@@ -495,6 +653,47 @@ const s = StyleSheet.create({
     height:          sp(10),
     borderRadius:    sp(5),
     backgroundColor: C.teal,
+  },
+
+  // Account number field
+  accountWrap: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    backgroundColor:   C.white,
+    borderRadius:      sp(10),
+    borderWidth:       1.5,
+    borderColor:       C.border,
+    paddingHorizontal: sp(14),
+    height:            sp(48),
+    marginBottom:      sp(6),
+    gap:               sp(8),
+  },
+  accountWrapError: {
+    borderColor: C.red,
+  },
+  accountInput: {
+    flex:               1,
+    fontSize:           sp(14),
+    color:              C.dark,
+    padding:            0,
+    includeFontPadding: false,
+  },
+  accountCounter: {
+    fontSize:           sp(11),
+    color:              C.light,
+    includeFontPadding: false,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           sp(5),
+    marginBottom:  sp(16),
+  },
+  errorText: {
+    fontSize:           sp(11.5),
+    color:              C.red,
+    flex:                1,
+    includeFontPadding: false,
   },
 
   bottomPad: { height: sp(8) },

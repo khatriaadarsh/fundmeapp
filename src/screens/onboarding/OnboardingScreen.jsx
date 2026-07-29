@@ -880,6 +880,7 @@ const OnboardingScreen = ({ navigation }) => {
   const handleStart = useCallback(async () => {
     await markOnboardingSeen();
     navigation.reset({ index: 0, routes: [{ name: 'CheckUser' }] });
+    // navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   }, [markOnboardingSeen, navigation]);
 
   const currentScreen = SCREENS[currentIndex];
