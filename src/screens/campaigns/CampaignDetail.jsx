@@ -58,6 +58,20 @@ const C = {
 const HERO_H = scale(340);
 const SHEET_R = scale(24);
 
+// ═══════════════════════════════════════════════════════════
+// ✅ STICKY BAR HEIGHT — used to pad the ScrollView's content so
+// nothing (e.g. the tail of "Recent Donors") ever renders behind
+// the absolutely-positioned StickyBar at the bottom of the screen.
+// Derived from the actual `sb` styles below (gradient height +
+// top/bottom padding), not a magic number, so it stays correct if
+// StickyBar's padding is ever tweaked.
+// ═══════════════════════════════════════════════════════════
+const STICKY_BAR_H =
+  scale(56) + // Donate button inner row height (icon + text)
+  (Platform.OS === 'ios' ? vscale(28) : scale(16)) + // bottom safe padding
+  scale(14); // top padding
+const SCROLL_BOTTOM_PAD = STICKY_BAR_H + scale(-10); // + breathing room
+
 const fmtPK = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
 
 // ═══════════════════════════════════════════════════════════
@@ -123,6 +137,24 @@ const DEMO = {
       paymentMethod: 'Visa ••42',
       donationDate: 'Jan 14, 2025',
     },
+    {
+      id: '4',
+      name: 'Ali R.',
+      amount: 5500,
+      message: 'May Allah ease your hardships.',
+      time: '1d ago',
+      avatar: 'https://picsum.photos/100/100?random=45',
+      age: null,
+      gender: null,
+      occupation: null,
+      phone: null,
+      totalDonated: null,
+      location: null,
+      memberSince: '',
+      totalCampaigns: 0,
+      paymentMethod: 'Visa ••42',
+      donationDate: 'Jan 14, 2025',
+    },
   ],
   update:
     'Campaign update: First batch of relief funds has been distributed. 15 families received temporary tents today. Thank you 🙏',
@@ -163,56 +195,58 @@ const Pressable = ({ onPress, style, children }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// HERO — now driven by real campaign data
+// HERO — driven by real campaign data
 // ═══════════════════════════════════════════════════════════
-const HeroImage = memo(({ image, title, category, urgent, onBack, onShare, saved, onSave }) => (
-  <View style={h.wrap}>
-    <Image source={{ uri: image }} style={h.img} resizeMode="contain" />
+const HeroImage = memo(
+  ({ image, title, category, urgent, onBack, onShare, saved, onSave }) => (
+    <View style={h.wrap}>
+      <Image source={{ uri: image }} style={h.img} resizeMode="contain" />
 
-    <LinearGradient
-      colors={['transparent', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.80)']}
-      locations={[0, 0.45, 1]}
-      style={h.fade}
-    />
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.80)']}
+        locations={[0, 0.45, 1]}
+        style={h.fade}
+      />
 
-    <View style={h.controls}>
-      <Pressable onPress={onBack} style={h.glassBtn}>
-        <Icons name="arrow-left" size={scale(18)} color={C.white} />
-      </Pressable>
-      <View style={h.rightBtns}>
-        <Pressable onPress={onShare} style={h.glassBtn}>
-          <Icons name="share-2" size={scale(17)} color={C.white} />
+      <View style={h.controls}>
+        <Pressable onPress={onBack} style={h.glassBtn}>
+          <Icons name="arrow-left" size={scale(18)} color={C.white} />
         </Pressable>
-        <Pressable onPress={onSave} style={h.glassBtn}>
-          <Icons
-            name="heart"
-            size={scale(17)}
-            color={saved ? '#FF4F6A' : C.white}
-          />
-        </Pressable>
+        <View style={h.rightBtns}>
+          <Pressable onPress={onShare} style={h.glassBtn}>
+            <Icons name="share-2" size={scale(17)} color={C.white} />
+          </Pressable>
+          <Pressable onPress={onSave} style={h.glassBtn}>
+            <Icons
+              name="heart"
+              size={scale(17)}
+              color={saved ? '#FF4F6A' : C.white}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={h.bottom}>
+        {urgent && (
+          <LinearGradient
+            colors={[C.red, C.redDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={h.urgentBadge}
+          >
+            <Text style={h.urgentTxt}>URGENT</Text>
+          </LinearGradient>
+        )}
+
+        <Text style={h.title}>{title}</Text>
+
+        <View style={h.categoryPill}>
+          <Text style={h.categoryTxt}>{category}</Text>
+        </View>
       </View>
     </View>
-
-    <View style={h.bottom}>
-      {urgent && (
-        <LinearGradient
-          colors={[C.red, C.redDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={h.urgentBadge}
-        >
-          <Text style={h.urgentTxt}>URGENT</Text>
-        </LinearGradient>
-      )}
-
-      <Text style={h.title}>{title}</Text>
-
-      <View style={h.categoryPill}>
-        <Text style={h.categoryTxt}>{category}</Text>
-      </View>
-    </View>
-  </View>
-));
+  ),
+);
 
 const h = StyleSheet.create({
   wrap: {
@@ -227,7 +261,6 @@ const h = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: C.border,
-    // backgroundColor: '#0F172A',
   },
   fade: {
     position: 'absolute',
@@ -306,7 +339,7 @@ const h = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// PROGRESS CARD — now driven by real raised/goal/pct
+// PROGRESS CARD — driven by real raised/goal/pct
 // ═══════════════════════════════════════════════════════════
 const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
   const fillAnim = useRef(new Animated.Value(0)).current;
@@ -490,12 +523,16 @@ const dn = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// CREATOR CARD — now driven by real creator data
+// CREATOR CARD — driven by real creator data
 // ═══════════════════════════════════════════════════════════
 const CreatorCard = memo(({ creator, onViewProfile }) => (
   <View style={cr.card}>
     {creator.avatar ? (
-      <Image source={{ uri: creator.avatar }} style={cr.avatar} resizeMode="contain" />
+      <Image
+        source={{ uri: creator.avatar }}
+        style={cr.avatar}
+        resizeMode="contain"
+      />
     ) : (
       <View style={[cr.avatar, cr.avatarFallback]}>
         <Text style={cr.avatarInitial}>
@@ -662,8 +699,8 @@ const st = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// MEDIA GALLERY — now driven by real additionalImages,
-// opens the full-screen swipeable viewer on tap
+// MEDIA GALLERY — driven by real additionalImages, opens the
+// full-screen swipeable viewer on tap
 // ═══════════════════════════════════════════════════════════
 const MediaGallery = memo(({ media, onItemPress }) => {
   if (!media || media.length === 0) return null;
@@ -682,7 +719,11 @@ const MediaGallery = memo(({ media, onItemPress }) => {
             style={mg.item}
             onPress={() => onItemPress(index)}
           >
-            <Image source={{ uri: item.uri }} style={mg.img} resizeMode="contain" />
+            <Image
+              source={{ uri: item.uri }}
+              style={mg.img}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         )}
       />
@@ -712,72 +753,91 @@ const mg = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════
 // FULL-SCREEN IMAGE VIEWER — swipeable, with page indicator
 // ═══════════════════════════════════════════════════════════
-const ImageViewerModal = memo(({ visible, images, initialIndex = 0, onClose }) => {
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const listRef = useRef(null);
+const ImageViewerModal = memo(
+  ({ visible, images, initialIndex = 0, onClose }) => {
+    const [activeIndex, setActiveIndex] = useState(initialIndex);
+    const listRef = useRef(null);
 
-  useEffect(() => {
-    if (visible) {
-      setActiveIndex(initialIndex);
-    }
-  }, [visible, initialIndex]);
+    useEffect(() => {
+      if (visible) {
+        setActiveIndex(initialIndex);
+      }
+    }, [visible, initialIndex]);
 
-  const onMomentumScrollEnd = e => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
-    setActiveIndex(idx);
-  };
+    const onMomentumScrollEnd = e => {
+      const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+      setActiveIndex(idx);
+    };
 
-  if (!visible || !images?.length) return null;
+    if (!visible || !images?.length) return null;
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={iv.overlay}>
-        <TouchableOpacity
-          style={iv.closeBtn}
-          onPress={onClose}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Icons name="x" size={scale(22)} color={C.white} />
-        </TouchableOpacity>
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
+        <View style={iv.overlay}>
+          <TouchableOpacity
+            style={iv.closeBtn}
+            onPress={onClose}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Icons name="x" size={scale(22)} color={C.white} />
+          </TouchableOpacity>
 
-        <FlatList
-          ref={listRef}
-          data={images}
-          keyExtractor={item => item.id}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
-          getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={({ item }) => (
-            <View style={iv.page}>
-              <Image source={{ uri: item.uri }} style={iv.fullImg} resizeMode="contain" />
+          <FlatList
+            ref={listRef}
+            data={images}
+            keyExtractor={item => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={initialIndex}
+            getItemLayout={(_, index) => ({
+              length: SW,
+              offset: SW * index,
+              index,
+            })}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            renderItem={({ item }) => (
+              <View style={iv.page}>
+                <Image
+                  source={{ uri: item.uri }}
+                  style={iv.fullImg}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+          />
+
+          {images.length > 1 && (
+            <View style={iv.dotsRow}>
+              {images.map((img, idx) => (
+                <View
+                  key={img.id}
+                  style={[iv.dot, idx === activeIndex && iv.dotActive]}
+                />
+              ))}
             </View>
           )}
-        />
 
-        {images.length > 1 && (
-          <View style={iv.dotsRow}>
-            {images.map((img, idx) => (
-              <View
-                key={img.id}
-                style={[iv.dot, idx === activeIndex && iv.dotActive]}
-              />
-            ))}
-          </View>
-        )}
-
-        <Text style={iv.counter}>
-          {activeIndex + 1} / {images.length}
-        </Text>
-      </View>
-    </Modal>
-  );
-});
+          <Text style={iv.counter}>
+            {activeIndex + 1} / {images.length}
+          </Text>
+        </View>
+      </Modal>
+    );
+  },
+);
 
 const iv = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center' },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+  },
   closeBtn: {
     position: 'absolute',
     top: SB_H + scale(16),
@@ -966,8 +1026,13 @@ const dr = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// DOCUMENTS — now driven by real documents, opens via Linking
+// DOCUMENTS — driven by real documents, opens via Linking
 // (device browser/PDF app handles view-or-download)
+//
+// ✅ FIX: marginBottom no longer inflated to fake scroll clearance.
+// The ScrollView itself now owns bottom padding via
+// SCROLL_BOTTOM_PAD, so this section behaves correctly whether
+// it renders or returns null.
 // ═══════════════════════════════════════════════════════════
 const Documents = memo(({ documents, onDocPress }) => {
   if (!documents || documents.length === 0) return null;
@@ -995,7 +1060,7 @@ const Documents = memo(({ documents, onDocPress }) => {
 });
 
 const dc = StyleSheet.create({
-  wrap: { marginBottom: scale(120) },
+  wrap: { marginBottom: scale(16) }, // ✅ was scale(120) — no longer relied on for scroll clearance
   heading: {
     fontSize: scale(18),
     fontWeight: '800',
@@ -1130,7 +1195,11 @@ const ErrorScreen = ({ message, onRetry, onBack }) => (
         <Text style={ls.backBtnTxt}>Go Back</Text>
       </TouchableOpacity>
       {!!onRetry && (
-        <TouchableOpacity style={ls.retryBtn} onPress={onRetry} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={ls.retryBtn}
+          onPress={onRetry}
+          activeOpacity={0.8}
+        >
           <Text style={ls.retryBtnTxt}>Retry</Text>
         </TouchableOpacity>
       )}
@@ -1184,13 +1253,8 @@ const CampaignDetail = ({ navigation, route }) => {
     ? String(route.params.campaignId)
     : null;
 
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useCampaignDetail(campaignId);
+  const { data, isLoading, isError, error, refetch } =
+    useCampaignDetail(campaignId);
 
   const [saved, setSaved] = useState(false);
   const [selectedDonor, setSelectedDonor] = useState(null);
@@ -1218,16 +1282,16 @@ const CampaignDetail = ({ navigation, route }) => {
     setViewerVisible(true);
   }, []);
 
-const handleOpenDocument = useCallback(async doc => {
-  if (!doc?.url) return;
-  try {
-    await Linking.openURL(doc.url);
-  } catch (err) {
-    console.error('🔴 [CampaignDetail] Open document error:', err?.message);
-    Alert.alert('Error', 'Could not open the document. Please try again.');
-  }
-}, []);
-  
+  const handleOpenDocument = useCallback(async doc => {
+    if (!doc?.url) return;
+    try {
+      await Linking.openURL(doc.url);
+    } catch (err) {
+      console.error('🔴 [CampaignDetail] Open document error:', err?.message);
+      Alert.alert('Error', 'Could not open the document. Please try again.');
+    }
+  }, []);
+
   const handleDonorPress = useCallback(donor => {
     setSelectedDonor({
       id: donor.id,
@@ -1259,10 +1323,7 @@ const handleOpenDocument = useCallback(async doc => {
 
   if (!campaignId) {
     return (
-      <ErrorScreen
-        message="Missing campaign reference."
-        onBack={handleBack}
-      />
+      <ErrorScreen message="Missing campaign reference." onBack={handleBack} />
     );
   }
 
@@ -1292,6 +1353,10 @@ const handleOpenDocument = useCallback(async doc => {
         showsVerticalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
+        // ✅ FIX: guarantees the last section (Recent Donors / Documents)
+        // always clears the absolutely-positioned StickyBar, regardless
+        // of which optional sections render.
+        contentContainerStyle={s.scrollContent}
       >
         <HeroImage
           image={data.image}
@@ -1318,7 +1383,10 @@ const handleOpenDocument = useCallback(async doc => {
           <CreatorCard creator={data.creator} onViewProfile={handleProfile} />
           <StorySection story={data.story} />
           <MediaGallery media={data.media} onItemPress={handleGalleryPress} />
-          <SocialProof donorsList={DEMO.donors_list} donorsCount={DEMO.donors} />
+          <SocialProof
+            donorsList={DEMO.donors_list}
+            donorsCount={DEMO.donors}
+          />
           <UpdateCard updateText={DEMO.update} updateAge={DEMO.updateAge} />
 
           <View style={s.section}>
@@ -1328,7 +1396,10 @@ const handleOpenDocument = useCallback(async doc => {
             ))}
           </View>
 
-          <Documents documents={data.documents} onDocPress={handleOpenDocument} />
+          <Documents
+            documents={data.documents}
+            onDocPress={handleOpenDocument}
+          />
         </View>
       </ScrollView>
 
@@ -1363,6 +1434,12 @@ const s = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  // ✅ NEW: applied via ScrollView's contentContainerStyle so the
+  // full page — including the tail of "Recent Donors" — always
+  // scrolls clear of the absolutely-positioned StickyBar.
+  scrollContent: {
+    paddingBottom: SCROLL_BOTTOM_PAD,
   },
   sheet: {
     backgroundColor: C.white,
