@@ -11,16 +11,19 @@ import {
   Dimensions,
   Platform,
   Image,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
-// ── Confirmation + PIN modals ───────────────────────────────
+// ── Modals ───────────────────────────────────────────────────
 import DonationConfirmModal from '../../components/donation/DonationConfirmModal';
 import PinEntryModal from '../../components/payment/PinEntryModal';
+import DonationReceiptModal from '../../components/donation/DonationReceiptModal';
 
 // ── API / context wiring ────────────────────────────────────
 import { useCampaignDetail } from '../../hooks/useCampaign';
+import { useInitiateDonation, useConfirmDonation } from '../../hooks/useDonation';
 import { useAppContext } from '../../context/AppContext';
 
 // ─── Scale ───────────────────────────────────────────────
@@ -55,6 +58,15 @@ const METHODS = [
   { id: 'bank',      label: 'Bank Transfer',      icon: 'repeat'      },
 ];
 
+// ⚠️ Only EASYPAISA was confirmed by the sample API payload.
+// CARD / BANK_TRANSFER are assumptions — confirm the exact enum
+// strings your backend expects and adjust here if different.
+const PAYMENT_METHOD_API = {
+  easypaisa: 'EASYPAISA',
+  card: 'CARD',
+  bank: 'BANK_TRANSFER',
+};
+
 // Methods that need an "Account Number" to identify the sender
 const METHODS_NEEDING_ACCOUNT = ['easypaisa', 'bank'];
 const ACCOUNT_NUMBER_LENGTH = 11;
@@ -63,14 +75,9 @@ const fmt = n => n.toLocaleString('en-PK');
 
 // ─── Sub-components ───────────────────────────────────────
 
-// Campaign summary card at top — driven by real campaign data
 const CampaignCard = memo(({ title, image, remaining, loading }) => (
   <View style={s.campaignCard}>
-    <Image
-      source={{ uri: image }}
-      style={s.campaignImg}
-      resizeMode="cover"
-    />
+    <Image source={{ uri: image }} style={s.campaignImg} resizeMode="cover" />
     <View style={s.campaignInfo}>
       <Text style={s.campaignTitle} numberOfLines={1}>
         {loading ? 'Loading campaign...' : title}
@@ -82,7 +89,6 @@ const CampaignCard = memo(({ title, image, remaining, loading }) => (
   </View>
 ));
 
-// Amount preset pill
 const AmountPill = memo(({ amount, selected, onPress }) => (
   <TouchableOpacity
     style={[s.pill, selected && s.pillActive]}
@@ -95,7 +101,6 @@ const AmountPill = memo(({ amount, selected, onPress }) => (
   </TouchableOpacity>
 ));
 
-// Payment method row
 const MethodRow = memo(({ item, selected, onSelect }) => (
   <TouchableOpacity
     style={[s.methodRow, selected && s.methodRowActive]}
@@ -120,19 +125,18 @@ const DonateScreen = ({ navigation, route }) => {
     ? String(route.params.campaignId)
     : null;
 
-  // ── Real campaign data (title, image, creator) ────────────
-  const {
-    data: campaign,
-    isLoading: campaignLoading,
-  } = useCampaignDetail(campaignId);
+  const { data: campaign, isLoading: campaignLoading } = useCampaignDetail(campaignId);
 
-  // ── Logged-in donor's name ─────────────────────────────────
   const { currentUser } = useAppContext();
+  const donorId = currentUser?.id;
   const donorName = useMemo(() => {
     const first = currentUser?.firstName || '';
     const last = currentUser?.lastName || '';
     return `${first} ${last}`.trim() || 'Donor';
   }, [currentUser]);
+
+  const initiateDonationMutation = useInitiateDonation();
+  const confirmDonationMutation = useConfirmDonation();
 
   const [selected,       setSelected      ] = useState(5000);
   const [custom,         setCustom        ] = useState('5,000');
@@ -143,7 +147,10 @@ const DonateScreen = ({ navigation, route }) => {
   const [accountError,   setAccountError  ] = useState('');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [pinVisible,     setPinVisible    ] = useState(false);
-  const [paying,         setPaying        ] = useState(false);
+  const [receiptVisible, setReceiptVisible] = useState(false);
+
+  const [paymentReference, setPaymentReference] = useState(null);
+  const [receiptData,      setReceiptData     ] = useState(null);
 
   // Sync custom field when preset tapped
   const handleAmountPress = useCallback(amount => {
@@ -151,7 +158,6 @@ const DonateScreen = ({ navigation, route }) => {
     setCustom(fmt(amount));
   }, []);
 
-  // Parse custom input → update selected
   const handleCustomChange = useCallback(text => {
     const clean = text.replace(/[^0-9]/g, '');
     setCustom(clean ? fmt(Number(clean)) : '');
@@ -171,17 +177,15 @@ const DonateScreen = ({ navigation, route }) => {
 
   const showAccountField = METHODS_NEEDING_ACCOUNT.includes(method);
 
-  // Human-readable label for the currently selected payment method
   const selectedMethodLabel = useMemo(
     () => METHODS.find(m => m.id === method)?.label,
     [method],
   );
 
-  // Donor name shown on the confirmation modal — respects the
-  // Anonymous toggle.
   const displayName = anonymous ? 'Anonymous' : donorName;
+  const trimmedMessage = message.trim();
 
-  // Pay button → validates, then opens the confirmation modal
+  // ── Step 1: Pay button → validate → open confirm modal ──────
   const handlePay = useCallback(() => {
     if (!selected || selected <= 0) return;
 
@@ -196,38 +200,96 @@ const DonateScreen = ({ navigation, route }) => {
       }
     }
 
+    if (!campaignId) {
+      Alert.alert('Error', 'Missing campaign reference.');
+      return;
+    }
+    if (!donorId) {
+      Alert.alert('Error', 'Could not identify your account. Please log in again.');
+      return;
+    }
+
     setAccountError('');
     setConfirmVisible(true);
-  }, [selected, showAccountField, accountNumber]);
+  }, [selected, showAccountField, accountNumber, campaignId, donorId]);
 
-  // "Confirm Payment" in the summary modal → hand off to PIN entry
-  const handleProceedToPin = useCallback(() => {
-    setConfirmVisible(false);
-    setPinVisible(true);
-  }, []);
-
-  // Called once the PIN is entered successfully — this is where the
-  // actual donation submission happens.
-  const handlePinSuccess = useCallback(async () => {
-    setPaying(true);
+  // ── Step 2: "Confirm Payment" in the summary modal → initiate ──
+  const handleInitiate = useCallback(async () => {
     try {
-      // Wire up the real donation API call here, e.g.:
-      // await submitDonation({
-      //   campaignId,
-      //   amount: selected,
-      //   method,
-      //   accountNumber,
-      //   anonymous,
-      //   message,
-      // });
-      setPinVisible(false);
-      navigation?.navigate?.('PaymentSuccess');
+      const payload = {
+        campaignId: Number(campaignId),
+        donorId: Number(donorId),
+        amount: selected,
+        paymentMethod: PAYMENT_METHOD_API[method] || method.toUpperCase(),
+        anonymous,
+      };
+
+      if (showAccountField && accountNumber) {
+        payload.walletNumber = accountNumber;
+      }
+      if (trimmedMessage) {
+        payload.donorMessage = trimmedMessage;
+      }
+
+      const response = await initiateDonationMutation.mutateAsync(payload);
+
+      if (response?.responseCode && response.responseCode !== '000') {
+        Alert.alert('Error', response?.responseMessage || 'Could not initiate donation. Please try again.');
+        return;
+      }
+
+      const reference = response?.data?.paymentReference;
+      if (!reference) {
+        Alert.alert('Error', 'Could not start the payment. Please try again.');
+        return;
+      }
+
+      setPaymentReference(reference);
+      setConfirmVisible(false);
+      setPinVisible(true);
     } catch (error) {
-      console.error('🔴 [DonateScreen] Donation submit error:', error?.message);
-      setPinVisible(false);
-    } finally {
-      setPaying(false);
+      console.error('🔴 [DonateScreen] Initiate donation error:', error?.message);
+      const backendMsg = error?.response?.data?.responseMessage;
+      Alert.alert('Error', backendMsg || 'Could not initiate donation. Please check your connection.');
     }
+  }, [
+    campaignId,
+    donorId,
+    selected,
+    method,
+    anonymous,
+    showAccountField,
+    accountNumber,
+    trimmedMessage,
+    initiateDonationMutation,
+  ]);
+
+  // ── Step 3: PIN entered → confirm donation ──────────────────
+  const handlePinSubmit = useCallback(
+    async pin => {
+      const response = await confirmDonationMutation.mutateAsync({
+        paymentReference,
+        pin,
+      });
+
+      if (response?.responseCode && response.responseCode !== '000') {
+        // Throwing here lets PinEntryModal shake + clear the input
+        throw new Error(response?.responseMessage || 'Incorrect PIN');
+      }
+
+      setReceiptData(response?.data || null);
+      setPinVisible(false);
+      setReceiptVisible(true);
+    },
+    [paymentReference, confirmDonationMutation],
+  );
+
+  // ── Step 4: Receipt "Done" → reset + navigate away ──────────
+  const handleReceiptDone = useCallback(() => {
+    setReceiptVisible(false);
+    setReceiptData(null);
+    setPaymentReference(null);
+    navigation?.navigate?.('MainTabs');
   }, [navigation]);
 
   return (
@@ -254,7 +316,6 @@ const DonateScreen = ({ navigation, route }) => {
         bounces={false}
         overScrollMode="never"
       >
-        {/* Campaign card */}
         <CampaignCard
           title={campaign?.title}
           image={campaign?.image}
@@ -262,7 +323,6 @@ const DonateScreen = ({ navigation, route }) => {
           loading={campaignLoading}
         />
 
-        {/* Amount presets */}
         <Text style={s.sectionLabel}>Select Amount</Text>
         <View style={s.pillGrid}>
           {AMOUNTS.map(a => (
@@ -275,7 +335,6 @@ const DonateScreen = ({ navigation, route }) => {
           ))}
         </View>
 
-        {/* Custom amount input */}
         <Text style={s.orLabel}>Or enter amount</Text>
         <View style={s.customWrap}>
           <Text style={s.currencyPrefix}>PKR</Text>
@@ -289,7 +348,6 @@ const DonateScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Anonymous toggle */}
         <View style={s.toggleRow}>
           <Icons name="grid" size={sp(16)} color={C.gray} />
           <Text style={s.toggleLabel}>Donate Anonymously</Text>
@@ -303,7 +361,6 @@ const DonateScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Message */}
         <Text style={s.sectionLabel}>Message (optional)</Text>
         <TextInput
           style={s.messageInput}
@@ -316,7 +373,6 @@ const DonateScreen = ({ navigation, route }) => {
           textAlignVertical="top"
         />
 
-        {/* Payment method */}
         <Text style={s.sectionLabel}>Payment Method</Text>
         <View style={s.methodGroup}>
           {METHODS.map(m => (
@@ -329,7 +385,6 @@ const DonateScreen = ({ navigation, route }) => {
           ))}
         </View>
 
-        {/* Account number — only for EasyPaisa / Bank Transfer */}
         {showAccountField && (
           <>
             <Text style={s.sectionLabel}>Account Number</Text>
@@ -360,7 +415,6 @@ const DonateScreen = ({ navigation, route }) => {
         <View style={s.bottomPad} />
       </ScrollView>
 
-      {/* Sticky pay button */}
       <View style={s.footer}>
         <TouchableOpacity onPress={handlePay} activeOpacity={0.88}>
           <LinearGradient
@@ -384,12 +438,12 @@ const DonateScreen = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* Donation confirmation modal — Confirm hands off to PIN entry */}
+      {/* Step 1 — review + triggers initiate donation */}
       <DonationConfirmModal
         visible={confirmVisible}
         onClose={() => setConfirmVisible(false)}
-        onConfirm={handleProceedToPin}
-        loading={false}
+        onConfirm={handleInitiate}
+        loading={initiateDonationMutation.isPending}
         campaignTitle={campaign?.title}
         campaignCreator={campaign?.creator?.name}
         creatorLoading={campaignLoading}
@@ -397,13 +451,22 @@ const DonateScreen = ({ navigation, route }) => {
         accountNumber={showAccountField ? accountNumber : null}
         name={displayName}
         paymentMethod={selectedMethodLabel}
+        message={trimmedMessage}
       />
 
-      {/* PIN entry modal — final step before actual submission */}
+      {/* Step 2 — PIN, triggers confirm donation */}
       <PinEntryModal
         visible={pinVisible}
         onClose={() => setPinVisible(false)}
-        onSuccess={handlePinSuccess}
+        onSubmit={handlePinSubmit}
+      />
+
+      {/* Step 3 — animated success receipt */}
+      <DonationReceiptModal
+        visible={receiptVisible}
+        onDone={handleReceiptDone}
+        data={receiptData}
+        message={trimmedMessage}
       />
     </View>
   );
@@ -419,7 +482,6 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
   },
 
-  // Header
   header: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -439,14 +501,12 @@ const s = StyleSheet.create({
   },
   headerSpacer: { width: sp(22) },
 
-  // Scroll
   scroll:        { flex: 1 },
   scrollContent: {
     paddingHorizontal: sp(18),
     paddingTop:        sp(16),
   },
 
-  // Campaign card
   campaignCard: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -479,7 +539,6 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Section label
   sectionLabel: {
     fontSize:           sp(14),
     fontWeight:         '700',
@@ -488,7 +547,6 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Amount grid
   pillGrid: {
     flexDirection:  'row',
     flexWrap:       'wrap',
@@ -518,7 +576,6 @@ const s = StyleSheet.create({
     color: C.white,
   },
 
-  // Custom input
   orLabel: {
     fontSize:           sp(12),
     color:              C.gray,
@@ -552,7 +609,6 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Anonymous toggle
   toggleRow: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -578,7 +634,6 @@ const s = StyleSheet.create({
       : [],
   },
 
-  // Message
   messageInput: {
     backgroundColor:   C.white,
     borderRadius:      sp(10),
@@ -594,7 +649,6 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 
-  // Payment methods
   methodGroup: {
     gap:          sp(8),
     marginBottom: sp(16),
@@ -655,7 +709,6 @@ const s = StyleSheet.create({
     backgroundColor: C.teal,
   },
 
-  // Account number field
   accountWrap: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -698,7 +751,6 @@ const s = StyleSheet.create({
 
   bottomPad: { height: sp(8) },
 
-  // Footer
   footer: {
     paddingHorizontal: sp(18),
     paddingTop:        sp(12),

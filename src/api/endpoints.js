@@ -45,6 +45,10 @@ export const ENDPOINTS = {
   USER_SUMMARY: (userId) => `/withdrawal/user/summary/${userId}`,
   MY_WITHDRAWALS: (userId) => `/my/withdrawals/${userId}`,
 },
+DONATION: {
+  INITIATE: '/campaign/donate',
+  CONFIRM: '/campaign/donate/confirm',
+},
   NOTIFICATION: {
     LIST:      '/notifications',
     MARK_READ: (id) => `/notifications/${id}/read`,

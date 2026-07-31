@@ -1,332 +1,300 @@
 // src/components/payment/PinEntryModal.jsx
 // ─────────────────────────────────────────────────────────────
 //  PIN Entry Modal — themed to match app colors, presented as a
-//  Modal (driven by visible/onClose/onSuccess) instead of a
-//  standalone screen/navigation route.
-//
-//  Layout:
-//  - True bottom sheet: slides up from the bottom and extends
-//    all the way down to the screen edge (safe-area aware), so
-//    the parent screen's CTA (e.g. "Pay PKR 5,000") is fully
-//    covered/hidden while the sheet is open — not peeking
-//    through underneath.
-//  - Rounded corners on the TOP only (bottom is flush with the
-//    screen edge, standard bottom-sheet behaviour).
-//  - Backdrop is a real blur (BlurView) + dark tint, so content
-//    behind the sheet reads as blurred, not just dimmed.
-//  - No header / back button — monkey emoji, "Enter PIN" title,
-//    4 PIN boxes, curved wave divider, navy keypad.
-//
-//  Dependency: this uses @react-native-community/blur for the
-//  backdrop blur. If it isn't installed yet:
-//    npm install @react-native-community/blur
-//    npx pod-install   (iOS)
-//  If you'd rather not add the dependency, swap <BlurView> below
-//  for a plain semi-transparent View (see FALLBACK note).
+//  Modal. Calls onSubmit(pin) when 4 digits are entered; onSubmit
+//  should be an async function that throws on failure (the modal
+//  will shake + clear the PIN automatically on error).
 // ─────────────────────────────────────────────────────────────
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import {
-  Modal,
   View,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   StyleSheet,
   StatusBar,
-  Dimensions,
   Animated,
-  Platform,
+  Dimensions,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
-import { BlurView } from '@react-native-community/blur';
-import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Feather';
 
-import { sp } from '../../theme/theme';
+import { COLORS, SPACING, TYPOGRAPHY, scale } from '../../theme';
 
-// ─────────────────────────────────────────────────────────────
-//  Responsive helpers — same pattern used across the app
-// ─────────────────────────────────────────────────────────────
 const { width: SW, height: SH } = Dimensions.get('window');
-const scale = n => (SW / 390) * n;
+const vscale = n => (SH / 812) * n;
 
-// ─────────────────────────────────────────────────────────────
-//  Design tokens — SAME palette as the rest of the app
-// ─────────────────────────────────────────────────────────────
-const C = {
-  white: '#FFFFFF',
-  dark: '#111827',
-  gray: '#6B7280',
-  lightGray: '#9CA3AF',
-  border: '#E5E7EB',
-
-  navy: '#0D4F6B',
-  amountGreen: '#16A34A',
-  greenBg: 'rgba(22,163,74,0.08)',
-
-  waveLight: '#C7D0DA',
-
-  scrim: 'rgba(8,15,28,0.35)',
+const T = {
+  navy: COLORS?.primary ?? '#0D4F6B',
+  navyDark: COLORS?.primaryDark ?? '#0B3D52',
+  teal: COLORS?.secondary ?? '#00B4CC',
+  white: COLORS?.white ?? '#FFFFFF',
+  textDark: COLORS?.textPrimary ?? '#111827',
+  textGray: COLORS?.textSecondary ?? '#64748B',
+  bg: COLORS?.background ?? '#F8FAFC',
+  dotBorder: COLORS?.secondary ?? '#00B4CC',
+  dotFill: COLORS?.secondary ?? '#00B4CC',
+  red: '#EF4444',
 };
 
-const KEYS = [
+const PIN_LENGTH = 4;
+
+const PAD_KEYS = [
   ['1', '2', '3'],
   ['4', '5', '6'],
   ['7', '8', '9'],
-  ['', '0', 'back'],
+  ['', '0', 'del'],
 ];
 
-const PIN_LENGTH = 4;
-const SHEET_RADIUS = scale(28);
-
 // ─────────────────────────────────────────────────────────────
-//  PinDots — the 4 boxes (filled = green border + green dot)
+//  PinDot
 // ─────────────────────────────────────────────────────────────
-const PinDots = ({ length, filled }) => (
-  <View style={dots.row}>
-    {Array.from({ length }).map((_, i) => {
-      const isFilled = i < filled;
-      return (
-        <View key={i} style={[dots.box, isFilled && dots.boxFilled]}>
-          {isFilled && <View style={dots.dot} />}
-        </View>
-      );
-    })}
-  </View>
-);
+const PinDot = memo(({ filled }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
-const dots = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: sp(14),
-    marginTop: sp(18),
-    marginBottom: sp(26),
-  },
-  box: {
-    width: scale(60),
-    height: scale(60),
+  useEffect(() => {
+    if (filled) {
+      Animated.sequence([
+        Animated.spring(scaleAnim, { toValue: 1.25, tension: 300, friction: 6, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [filled, scaleAnim]);
+
+  return (
+    <Animated.View
+      style={[pd.dot, filled && pd.dotFilled, { transform: [{ scale: scaleAnim }] }]}
+    >
+      {filled && <Text style={pd.asterisk}>*</Text>}
+    </Animated.View>
+  );
+});
+
+const pd = StyleSheet.create({
+  dot: {
+    width: scale(54),
+    height: scale(54),
     borderRadius: scale(12),
-    borderWidth: 1.5,
-    borderColor: C.border,
+    borderWidth: 2,
+    borderColor: T.dotBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T.white,
+    marginHorizontal: scale(8),
   },
-  boxFilled: {
-    borderColor: C.amountGreen,
-    backgroundColor: C.greenBg,
-  },
-  dot: {
-    width: scale(12),
-    height: scale(12),
-    borderRadius: scale(6),
-    backgroundColor: C.amountGreen,
-  },
-});
-
-// ─────────────────────────────────────────────────────────────
-//  Wave divider — real curve between the white section and the
-//  navy keypad (a large clipped circle, not a flat bar).
-// ─────────────────────────────────────────────────────────────
-const WAVE_H = scale(30);
-
-const WaveDivider = () => (
-  <View style={wave.wrap}>
-    <View style={wave.hill} />
-  </View>
-);
-
-const wave = StyleSheet.create({
-  wrap: {
-    height: WAVE_H,
-    backgroundColor: C.navy,
-    overflow: 'hidden',
-  },
-  hill: {
-    position: 'absolute',
-    left: '-10%',
-    top: -WAVE_H * 1.6,
-    width: '120%',
-    height: WAVE_H * 2.6,
-    borderRadius: 999,
-    backgroundColor: C.waveLight,
+  dotFilled: { backgroundColor: T.white },
+  asterisk: {
+    fontSize: scale(28),
+    fontWeight: '800',
+    color: T.dotFill,
+    includeFontPadding: false,
+    lineHeight: scale(30),
   },
 });
 
 // ─────────────────────────────────────────────────────────────
-//  Keypad
+//  NumKey
 // ─────────────────────────────────────────────────────────────
-const Keypad = React.memo(({ onPress, onBackspace, bottomPad }) => (
-  <View style={[keypad.wrap, { paddingBottom: sp(24) + bottomPad }]}>
-    {KEYS.map((row, ri) => (
-      <View key={ri} style={keypad.row}>
-        {row.map((key, ki) => {
-          if (key === '') {
-            return <View key={ki} style={keypad.key} />;
-          }
-          if (key === 'back') {
-            return (
-              <TouchableOpacity
-                key={ki}
-                style={keypad.key}
-                activeOpacity={0.6}
-                onPress={onBackspace}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <View style={keypad.backspaceBox}>
-                  <MCIcons name="backspace-outline" size={scale(18)} color="rgba(255,255,255,0.9)" />
-                </View>
-              </TouchableOpacity>
-            );
-          }
-          return (
-            <TouchableOpacity
-              key={ki}
-              style={keypad.key}
-              activeOpacity={0.5}
-              onPress={() => onPress(key)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <Text style={keypad.keyText}>{key}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    ))}
+const NumKey = memo(({ label, onPress, disabled }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () =>
+    Animated.spring(scaleAnim, { toValue: 0.88, tension: 300, friction: 8, useNativeDriver: true }).start();
+  const handlePressOut = () =>
+    Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }).start();
+
+  if (!label) return <View style={nk.empty} />;
+
+  const isDelete = label === 'del';
+
+  return (
+    <TouchableOpacity
+      onPress={() => !disabled && onPress(label)}
+      onPressIn={disabled ? undefined : handlePressIn}
+      onPressOut={disabled ? undefined : handlePressOut}
+      activeOpacity={1}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      disabled={disabled}
+    >
+      <Animated.View
+        style={[
+          nk.key,
+          isDelete && nk.deleteKey,
+          disabled && nk.keyDisabled,
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        {isDelete ? (
+          <Icon name="delete" size={scale(20)} color={T.white} />
+        ) : (
+          <Text style={nk.label}>{label}</Text>
+        )}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+});
+
+const nk = StyleSheet.create({
+  key: {
+    width: scale(72),
+    height: scale(72),
+    borderRadius: scale(36),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  keyDisabled: { opacity: 0.4 },
+  deleteKey: {
+    width: scale(56),
+    height: scale(44),
+    borderRadius: scale(10),
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  empty: { width: scale(72), height: scale(72) },
+  label: {
+    fontSize: scale(26),
+    fontFamily: TYPOGRAPHY?.fontFamily?.semiBold ?? 'System',
+    color: T.white,
+    includeFontPadding: false,
+  },
+});
+
+// ─────────────────────────────────────────────────────────────
+//  Wave divider
+// ─────────────────────────────────────────────────────────────
+const WaveDivider = memo(() => (
+  <View style={wv.container} pointerEvents="none">
+    <View style={[wv.wave, wv.wave3]} />
+    <View style={[wv.wave, wv.wave2]} />
+    <View style={[wv.wave, wv.wave1]} />
   </View>
 ));
 
-const KEY_SIZE = scale(68);
-
-const keypad = StyleSheet.create({
-  wrap: {
-    backgroundColor: C.navy,
-    paddingHorizontal: sp(30),
-    paddingTop: sp(4),
+const WAVE_H = scale(48);
+const wv = StyleSheet.create({
+  container: { width: SW, height: WAVE_H, position: 'relative', marginBottom: -2 },
+  wave: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: WAVE_H * 1.6,
+    borderTopLeftRadius: SW * 0.55,
+    borderTopRightRadius: SW * 0.55,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: sp(14),
-  },
-  key: {
-    width: KEY_SIZE,
-    height: KEY_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyText: {
-    fontSize: sp(28),
-    fontWeight: '700',
-    color: C.white,
-  },
-  backspaceBox: {
-    width: scale(38),
-    height: scale(38),
-    borderRadius: scale(10),
-    borderWidth: 1.4,
-    borderColor: 'rgba(255,255,255,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  wave1: { backgroundColor: T.white, bottom: 0 },
+  wave2: { backgroundColor: 'rgba(255,255,255,0.5)', bottom: scale(6), transform: [{ scaleX: 1.05 }] },
+  wave3: { backgroundColor: 'rgba(255,255,255,0.25)', bottom: scale(12), transform: [{ scaleX: 1.1 }] },
 });
 
 // ─────────────────────────────────────────────────────────────
 //  PinEntryModal
 // ─────────────────────────────────────────────────────────────
-const PinEntryModal = ({
-  visible,
-  onClose,
-  onSuccess,
-  navigation,
-  avatarEmoji = '🙈',
-  successRoute = 'PaymentSuccessScreen',
-  successParams = {},
-  // Extra bottom padding so keys aren't flush against the home
-  // indicator / gesture bar on notched devices. Pass your
-  // useSafeAreaInsets().bottom here if you have it handy.
-  bottomSafeInset = Platform.OS === 'ios' ? scale(24) : sp(8),
-}) => {
-  const [pin, setPin] = useState('');
-  const shake = useRef(new Animated.Value(0)).current;
+const PinEntryModal = ({ visible, onClose, onSubmit }) => {
+  const [pin, setPin] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) setPin('');
+    if (visible) {
+      setPin([]);
+      setSubmitting(false);
+    }
   }, [visible]);
 
-  const handleComplete = useCallback(
-    enteredPin => {
-      if (onSuccess) {
-        onSuccess(enteredPin);
-      } else if (navigation) {
-        navigation.replace(successRoute, { pin: enteredPin, ...successParams });
+  const triggerShake = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 35, useNativeDriver: true }),
+    ]).start();
+  }, [shakeAnim]);
+
+  const handleKey = useCallback(
+    async key => {
+      if (submitting) return;
+
+      if (key === 'del') {
+        setPin(prev => prev.slice(0, -1));
+        return;
       }
-      setPin('');
-    },
-    [onSuccess, navigation, successRoute, successParams],
-  );
+      if (pin.length >= PIN_LENGTH) return;
 
-  const handlePress = useCallback(
-    key => {
-      setPin(prev => {
-        if (prev.length >= PIN_LENGTH) return prev;
-        const next = prev + key;
-        if (next.length === PIN_LENGTH) {
-          setTimeout(() => handleComplete(next), 220);
+      const newPin = [...pin, key];
+      setPin(newPin);
+
+      if (newPin.length === PIN_LENGTH) {
+        const pinStr = newPin.join('');
+        setSubmitting(true);
+        try {
+          await onSubmit?.(pinStr);
+          // On success, the parent screen is responsible for closing
+          // this modal (e.g. once it opens the receipt).
+        } catch (err) {
+          triggerShake();
+          setPin([]);
+        } finally {
+          setSubmitting(false);
         }
-        return next;
-      });
+      }
     },
-    [handleComplete],
+    [pin, submitting, onSubmit, triggerShake],
   );
-
-  const handleBackspace = useCallback(() => {
-    setPin(prev => prev.slice(0, -1));
-  }, []);
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+      <View style={s.root}>
+        <StatusBar barStyle="light-content" backgroundColor={T.navy} />
 
-      <View style={m.root}>
-        {/* Blurred + tinted backdrop — tapping it dismisses the sheet */}
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={StyleSheet.absoluteFill}>
-            <BlurView
-              style={StyleSheet.absoluteFill}
-              blurType="dark"
-              blurAmount={12}
-              reducedTransparencyFallbackColor="rgba(8,15,28,0.6)"
-            />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: C.scrim }]} />
-          </View>
-        </TouchableWithoutFeedback>
+        <SafeAreaView style={s.header} edges={['top']}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={s.backBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            disabled={submitting}
+          >
+            <Icon name="arrow-left" size={scale(20)} color={T.white} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Enter PIN</Text>
+        </SafeAreaView>
 
-        {/* The sheet — covers all the way to the bottom edge */}
-        <TouchableWithoutFeedback onPress={() => {}}>
-          <View style={m.sheet}>
-            <View style={m.whiteSection}>
-              <Text style={m.avatarEmoji}>{avatarEmoji}</Text>
+        <View style={s.cardSection}>
+          <Text style={s.emoji}>🙈</Text>
 
-              <Text style={m.title}>Enter PIN</Text>
-              <Text style={m.subtitle}>Please enter your PIN to proceed</Text>
+          <Text style={s.pinTitle}>Enter PIN</Text>
+          <Text style={s.pinSubtitle}>
+            {submitting ? 'Verifying your PIN...' : 'Please enter your PIN to proceed'}
+          </Text>
 
-              <Animated.View style={{ transform: [{ translateX: shake }] }}>
-                <PinDots length={PIN_LENGTH} filled={pin.length} />
-              </Animated.View>
+          <Animated.View style={[s.dotsRow, { transform: [{ translateX: shakeAnim }] }]}>
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <PinDot key={i} filled={i < pin.length} />
+            ))}
+          </Animated.View>
+
+          {submitting && (
+            <ActivityIndicator size="small" color={T.teal} style={s.submittingLoader} />
+          )}
+        </View>
+
+        <View style={s.waveWrapper}>
+          <WaveDivider />
+        </View>
+
+        <View style={s.padSection}>
+          {PAD_KEYS.map((row, ri) => (
+            <View key={ri} style={s.padRow}>
+              {row.map((key, ki) => (
+                <NumKey key={ki} label={key} onPress={handleKey} disabled={submitting} />
+              ))}
             </View>
-
-            <WaveDivider />
-
-            <Keypad onPress={handlePress} onBackspace={handleBackspace} bottomPad={bottomSafeInset} />
-          </View>
-        </TouchableWithoutFeedback>
+          ))}
+          <SafeAreaView edges={['bottom']} style={{ height: vscale(16) }} />
+        </View>
       </View>
     </Modal>
   );
@@ -334,41 +302,46 @@ const PinEntryModal = ({
 
 export default PinEntryModal;
 
-const m = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    width: SW,
-    borderTopLeftRadius: SHEET_RADIUS,
-    borderTopRightRadius: SHEET_RADIUS,
-    overflow: 'hidden',
-    backgroundColor: C.white,
-    elevation: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-  },
-  whiteSection: {
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: T.navy },
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.white,
-    paddingTop: sp(30),
-    paddingHorizontal: sp(20),
+    paddingHorizontal: scale(20),
+    paddingVertical: scale(14),
+    backgroundColor: T.navy,
   },
-  avatarEmoji: {
-    fontSize: scale(58),
+  backBtn: { marginRight: scale(16) },
+  headerTitle: {
+    fontSize: scale(20),
+    fontFamily: TYPOGRAPHY?.fontFamily?.bold ?? 'System',
+    color: T.white,
+    letterSpacing: -0.3,
   },
-  title: {
-    fontSize: sp(22),
-    fontWeight: '800',
-    color: C.dark,
-    marginTop: sp(14),
+  cardSection: {
+    flex: 1,
+    backgroundColor: T.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: scale(16),
   },
-  subtitle: {
-    fontSize: sp(13.5),
-    color: C.gray,
-    marginTop: sp(4),
+  emoji: { fontSize: scale(60), marginBottom: scale(16) },
+  pinTitle: {
+    fontSize: scale(22),
+    fontFamily: TYPOGRAPHY?.fontFamily?.bold ?? 'System',
+    color: T.textDark,
+    marginBottom: scale(8),
+    letterSpacing: -0.3,
   },
+  pinSubtitle: {
+    fontSize: scale(13),
+    fontFamily: TYPOGRAPHY?.fontFamily?.regular ?? 'System',
+    color: T.textGray,
+    marginBottom: scale(28),
+  },
+  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  submittingLoader: { marginTop: scale(20) },
+  waveWrapper: { backgroundColor: T.navy },
+  padSection: { backgroundColor: T.navy, paddingTop: scale(16), paddingBottom: scale(8), alignItems: 'center' },
+  padRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: scale(20), marginBottom: scale(8) },
 });

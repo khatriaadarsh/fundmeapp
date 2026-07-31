@@ -41,8 +41,8 @@ const C = {
 };
 
 const fmt = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
+
 // Masks an account number to first 4 + dots + last 3 digits.
-// e.g. "03451234567" -> "0345••••567"
 const maskAccount = num => {
   if (!num) return null;
   const digits = String(num);
@@ -60,7 +60,7 @@ const Row = memo(({ icon, label, value }) => (
     </View>
     <View style={row.textCol}>
       <Text style={row.label}>{label}</Text>
-      <Text style={row.value} numberOfLines={1}>
+      <Text style={row.value} numberOfLines={2}>
         {value || '—'}
       </Text>
     </View>
@@ -70,7 +70,7 @@ const Row = memo(({ icon, label, value }) => (
 const row = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: scale(11),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
@@ -94,6 +94,7 @@ const row = StyleSheet.create({
     fontSize: scale(14),
     fontWeight: '700',
     color: C.dark,
+    lineHeight: scale(19),
   },
 });
 
@@ -111,6 +112,7 @@ const DonationConfirmModal = ({
   accountNumber,
   name,
   paymentMethod,
+  message,
 }) => {
   const total = Number(amount || 0) + Number(serviceFee || 0);
 
@@ -157,6 +159,7 @@ const DonationConfirmModal = ({
               onPress={onClose}
               style={s.closeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              disabled={loading}
             >
               <Icons name="x" size={scale(15)} color={C.white} />
             </TouchableOpacity>
@@ -187,10 +190,14 @@ const DonationConfirmModal = ({
               label="Campaign Creator"
               value={creatorLoading ? 'Loading...' : campaignCreator}
             />
-            {/* <Row icon="credit-card" label="Account Number" value={accountNumber} /> */}
             <Row icon="phone" label="Account Number" value={maskAccount(accountNumber)} />
             <Row icon="user-check" label="Donor Name" value={name} />
             <Row icon="smartphone" label="Payment Method" value={paymentMethod} />
+
+            {/* Message — only shown when the donor actually entered one */}
+            {!!message && (
+              <Row icon="message-circle" label="Message" value={message} />
+            )}
 
             {serviceFee > 0 && (
               <View style={s.feeRow}>

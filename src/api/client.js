@@ -5,10 +5,10 @@ import { getUserId } from '../config/session';
 import { getDeviceInfo } from '../config/device';
 import { parseApiError, buildBusinessError } from '../utils/errorHandler';
 import { isSuccessCode } from './responseCodes';
-
+//192.168.0.103 //B-H-WIFI
 const BASE_URL =
   Platform.OS === 'android'
-    ? 'http://192.168.18.16:8082/api/v1'
+    ? 'http://10.78.135.120:8082/api/v1'
     : 'http://localhost:8082/api/v1';
 
 const apiClient = axios.create({
@@ -53,10 +53,17 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error?.isBusiness) return Promise.reject(error);
-    const parsed = parseApiError(error);
-    if (__DEV__) console.log(`❌ ${error.config?.url}`, parsed);
-    return Promise.reject(parsed);
+    // if (error?.isBusiness) return Promise.reject(error);
+    // const parsed = parseApiError(error);
+    // if (__DEV__) console.log(`❌ ${error.config?.url}`, parsed);
+    // return Promise.reject(parsed);
+    console.log("========== AXIOS ERROR ==========");
+    console.log("Message :", error.message);
+    console.log("Code    :", error.code);
+    console.log("Response:", error.response);
+    console.log("Request :", error.request);
+    console.log("Config  :", error.config);
+    console.log("=================================");
   },
 );
 
