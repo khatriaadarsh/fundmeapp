@@ -50,9 +50,12 @@ DONATION: {
   CONFIRM: '/campaign/donate/confirm',
 },
   NOTIFICATION: {
-    LIST:      '/notifications',
-    MARK_READ: (id) => `/notifications/${id}/read`,
-  },
+  COUNT: '/notification/count',
+  LIST: '/notification/list',
+  READ: '/notification/read',
+  READ_ALL: '/notification/read-all',
+  DELETE: '/notification/delete',
+},
 };
 
 /**

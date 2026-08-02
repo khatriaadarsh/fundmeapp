@@ -1,10 +1,27 @@
 // src/screens/notifications/NotificationsScreen.jsx
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, memo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar, SectionList, Dimensions
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, SectionList, Dimensions,
+  Animated, PanResponder, LayoutAnimation, Platform, UIManager, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
+
+import { useAppContext } from '../../context/AppContext';
+import {
+  useNotificationList,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  useDeleteNotification,
+} from '../../hooks/useNotifications';
+import { groupNotificationsIntoSections } from '../../utils/notificationTransform';
+
+if (
+  Platform.OS === 'android' &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // --- Constants, Scaling & Theme (Self-contained) ---
 const { width: SW } = Dimensions.get('window');
@@ -26,6 +43,9 @@ const C = {
   cnic: '#6B7280',
   cnicBg: '#F9FAFB',
   markAll: '#15AABF',
+  // Delete / trash accent — reuses the same danger red already used
+  // elsewhere in the app (e.g. ProfileScreen logout), not a new color.
+  danger: '#EF4444',
 };
 
 // --- THIS IS THE FIX ---
@@ -51,23 +71,6 @@ const TYPE_CONFIG = {
   },
 };
 // --- END OF FIX ---
-
-// --- Mock Data ---
-const INITIAL_DATA = [
-  {
-    title: 'TODAY',
-    data: [
-      { id: '1', type: 'donation', title: 'Donation Received 🎉', body: 'Ahmed donated PKR 5,000 to your campaign', time: '2h ago', unread: true },
-      { id: '2', type: 'approved', title: 'Campaign Approved ✅', body: 'Your campaign "Help Fatima\'s Heart Surgery" is now live.', time: '5h ago', unread: true },
-    ],
-  },
-  {
-    title: 'YESTERDAY',
-    data: [
-      { id: '3', type: 'cnic', title: 'CNIC Verified', body: 'Your identity verification has been successfully completed.', time: 'Yesterday', unread: false },
-    ],
-  },
-];
 
 // --- Local Components ---
 
@@ -102,6 +105,113 @@ const NotifCard = memo(({ item, onPress }) => {
   );
 });
 
+// ─────────────────────────────────────────────────────────────
+// SwipeableNotifCard — wraps NotifCard with a swipe-left-to-reveal-trash
+// gesture. Swiping past the threshold (or the trash icon growing to full
+// size) triggers a "thrown into the trash" animation: the card slides
+// further left while shrinking and fading, landing on the trash icon,
+// then calls onDelete once the animation completes.
+// ─────────────────────────────────────────────────────────────
+const TRASH_WIDTH = sp(64);
+const DELETE_THRESHOLD = -TRASH_WIDTH;
+
+const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(1)).current;
+  const cardOpacity = useRef(new Animated.Value(1)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dx < 0) {
+          translateX.setValue(Math.max(gesture.dx, -TRASH_WIDTH - sp(24)));
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx <= DELETE_THRESHOLD) {
+          triggerDelete();
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            friction: 8,
+            tension: 60,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, {
+          toValue: 0,
+          useNativeDriver: true,
+          friction: 8,
+        }).start();
+      },
+    }),
+  ).current;
+
+  const triggerDelete = useCallback(() => {
+    // Card flies the rest of the way into the trash icon: slides fully
+    // left, shrinks down, and fades out — then the parent removes it
+    // from the list (with LayoutAnimation collapsing the gap smoothly).
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -sp(240),
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardScale, {
+        toValue: 0.35,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onDelete(item);
+    });
+  }, [item, onDelete, translateX, cardScale, cardOpacity]);
+
+  const trashOpacity = translateX.interpolate({
+    inputRange: [-TRASH_WIDTH, -sp(16), 0],
+    outputRange: [1, 0.6, 0],
+    extrapolate: 'clamp',
+  });
+  const trashScale = translateX.interpolate({
+    inputRange: [-TRASH_WIDTH - sp(24), -TRASH_WIDTH, 0],
+    outputRange: [1.15, 1, 0.6],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={styles.swipe_wrap}>
+      {/* Trash bin — revealed behind the card as the user swipes left */}
+      <Animated.View
+        style={[
+          styles.swipe_trash,
+          { opacity: trashOpacity, transform: [{ scale: trashScale }] },
+        ]}
+      >
+        <Icons name="trash-2" size={sp(20)} color={C.white} />
+      </Animated.View>
+
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          transform: [{ translateX }, { scale: cardScale }],
+          opacity: cardOpacity,
+        }}
+      >
+        <NotifCard item={item} onPress={onPress} />
+      </Animated.View>
+    </View>
+  );
+});
+
 const EmptyState = memo(() => (
   <View style={styles.empty_wrap}>
     <View style={styles.empty_iconWrap}><Icons name="bell-off" size={sp(32)} color={C.textLight} /></View>
@@ -110,17 +220,66 @@ const EmptyState = memo(() => (
   </View>
 ));
 
+const LoadingState = memo(() => (
+  <View style={styles.empty_wrap}>
+    <ActivityIndicator size="small" color={C.markAll} />
+  </View>
+));
+
 // --- Main Screen ---
 const NotificationsScreen = ({ navigation }) => {
-  const [sections, setSections] = useState(INITIAL_DATA);
+  const { currentUser } = useAppContext();
+  const userId = currentUser?.id;
+
+  const { data: rawNotifications = [], isLoading } = useNotificationList(userId);
+  const markReadMutation = useMarkNotificationRead(userId);
+  const markAllMutation = useMarkAllNotificationsRead(userId);
+  const deleteMutation = useDeleteNotification(userId);
+
+  // Optimistic local removal so the swipe/trash animation never waits on
+  // the network — if the delete call fails, the id is un-hidden again.
+  const [removedIds, setRemovedIds] = useState(() => new Set());
+
+  const visibleNotifications = useMemo(
+    () => rawNotifications.filter(n => !removedIds.has(n.notificationId)),
+    [rawNotifications, removedIds],
+  );
+
+  const sections = useMemo(
+    () => groupNotificationsIntoSections(visibleNotifications),
+    [visibleNotifications],
+  );
 
   const handleMarkAll = useCallback(() => {
-    setSections(prev => prev.map(section => ({ ...section, data: section.data.map(n => ({ ...n, unread: false })) })));
-  }, []);
+    markAllMutation.mutate();
+  }, [markAllMutation]);
 
-  const handleNotifPress = useCallback(item => {
-    setSections(prev => prev.map(section => ({ ...section, data: section.data.map(n => n.id === item.id ? { ...n, unread: false } : n) })));
-  }, []);
+  const handleNotifPress = useCallback((item) => {
+    if (item.unread) {
+      markReadMutation.mutate(Number(item.id));
+    }
+  }, [markReadMutation]);
+
+  const handleDelete = useCallback((item) => {
+    const notificationId = Number(item.id);
+
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setRemovedIds(prev => new Set(prev).add(notificationId));
+
+    deleteMutation.mutate(notificationId, {
+      onError: () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setRemovedIds(prev => {
+          const next = new Set(prev);
+          next.delete(notificationId);
+          return next;
+        });
+        Alert.alert('Error', 'Failed to delete notification. Please try again.');
+      },
+    });
+  }, [deleteMutation]);
+
+  const hasAnyData = sections.length > 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -130,12 +289,14 @@ const NotificationsScreen = ({ navigation }) => {
         sections={sections}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.list_content, sections.flatMap(s => s.data).length === 0 && styles.list_contentEmpty]}
+        contentContainerStyle={[styles.list_content, !hasAnyData && styles.list_contentEmpty]}
         stickySectionHeadersEnabled={false}
         renderSectionHeader={({ section }) => <Text style={styles.section_title}>{section.title}</Text>}
-        renderItem={({ item }) => <NotifCard item={item} onPress={handleNotifPress} />}
+        renderItem={({ item }) => (
+          <SwipeableNotifCard item={item} onPress={handleNotifPress} onDelete={handleDelete} />
+        )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={<EmptyState />}
+        ListEmptyComponent={isLoading ? <LoadingState /> : <EmptyState />}
       />
     </SafeAreaView>
   );
@@ -165,6 +326,20 @@ const styles = StyleSheet.create({
   card_title: { fontSize: sp(13), fontWeight: '700', color: C.textDark, marginBottom: vsp(3), lineHeight: sp(18) },
   card_body: { fontSize: sp(12), color: C.textGray, lineHeight: sp(17), marginBottom: vsp(6) },
   card_time: { fontSize: sp(11), fontWeight: '500', color: C.textLight },
+
+  // ── Swipe-to-delete ──────────────────────────────────────────
+  swipe_wrap: { position: 'relative' },
+  swipe_trash: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: TRASH_WIDTH,
+    borderRadius: sp(12),
+    backgroundColor: C.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   
   empty_wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: vsp(80), paddingHorizontal: sp(40) },
   empty_iconWrap: { width: sp(72), height: sp(72), borderRadius: sp(36), backgroundColor: '#EEF2F7', alignItems: 'center', justifyContent: 'center', marginBottom: vsp(16) },
