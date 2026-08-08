@@ -1,5 +1,5 @@
 // src/screens/auth/CheckUser.jsx
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Platform,
   Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,14 +43,31 @@ const CheckUser = ({ navigation }) => {
   const [networkError,    setNetworkError]    = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
+  const scrollRef = useRef(null);
+
   useEffect(() => {
     const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true),
+      () => {
+        setKeyboardVisible(true);
+        // Android's ScrollView has no built-in "scroll to focused input"
+        // behavior (iOS handles this natively) — so without this, the
+        // Continue button stays hidden behind the keyboard even though
+        // KeyboardAvoidingView has already shrunk the visible area.
+        // A short delay lets the keyboard-driven layout shrink settle
+        // first, so we scroll to the *final* content height, not a
+        // mid-transition one.
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, Platform.OS === 'android' ? 100 : 0);
+      },
     );
     const hide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false),
+      () => {
+        setKeyboardVisible(false);
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      },
     );
     return () => { show.remove(); hide.remove(); };
   }, []);
@@ -107,46 +125,54 @@ const CheckUser = ({ navigation }) => {
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#0A3D62" />
 
-      <ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
+      <KeyboardAvoidingView
+        style={s.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
-        <HeroSection />
+        <ScrollView
+          ref={scrollRef}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <HeroSection />
 
-        <View style={s.floatingCardWrapper}>
-          <Text style={s.cardTitle}>Welcome to FundMe</Text>
-          <Text style={s.cardSubtitle}>
-            Enter your email to continue. We'll check if you already have an account.
-          </Text>
+          <View style={s.floatingCardWrapper}>
+            <Text style={s.cardTitle}>Welcome to FundMe</Text>
+            <Text style={s.cardSubtitle}>
+              Enter your email to continue. We'll check if you already have an account.
+            </Text>
 
-          <EmailInputField
-            value={email}
-            onChangeText={handleChange}
-            onFocus={() => { setIsFocused(true); setNetworkError(''); }}
-            onBlur={handleBlur}
-            isFocused={isFocused}
-            isValid={isValid}
-            hasError={hasError}
-            isLoading={isPending}
-            errorMsg={errorMsg}
-            helperMsg={helperMsg}
-          />
+            <EmailInputField
+              value={email}
+              onChangeText={handleChange}
+              onFocus={() => { setIsFocused(true); setNetworkError(''); }}
+              onBlur={handleBlur}
+              isFocused={isFocused}
+              isValid={isValid}
+              hasError={hasError}
+              isLoading={isPending}
+              errorMsg={errorMsg}
+              helperMsg={helperMsg}
+            />
 
-          <ContinueButton
-            onPress={handleSubmit}
-            isLoading={isPending}
-            disabled={isPending}
-          />
-        </View>
-
-        {!keyboardVisible && (
-          <View style={s.footerContainer}>
-            <TrustBadges />
-            <FooterLinks />
+            <ContinueButton
+              onPress={handleSubmit}
+              isLoading={isPending}
+              disabled={isPending}
+            />
           </View>
-        )}
-      </ScrollView>
+
+          {!keyboardVisible && (
+            <View style={s.footerContainer}>
+              <TrustBadges />
+              <FooterLinks />
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {networkError ? (
         <View style={s.toast}>
@@ -164,6 +190,7 @@ export default CheckUser;
 
 const s = StyleSheet.create({
   safe:               { flex: 1, backgroundColor: '#F4F5F7' },
+  kav:                { flex: 1 },
   scrollContent:      { flexGrow: 1, paddingBottom: sp(20) },
   floatingCardWrapper:{
     backgroundColor: '#FFFFFF',
