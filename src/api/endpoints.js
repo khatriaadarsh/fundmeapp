@@ -14,7 +14,6 @@ export const ENDPOINTS = {
     PROFILE: '/users/profile',
     PROFILE_DETAILS: '/profileDetails',        // POST - Get profile
     UPDATE_PROFILE: '/update/profileDetails',  // POST - Update profile
- 
   },
   PROFILE: {
     DETAILS: '/profileDetails',
@@ -55,6 +54,14 @@ DONATION: {
   READ: '/notification/read',
   READ_ALL: '/notification/read-all',
   DELETE: '/notification/delete',
+},
+CREATOR: {
+  PROFILE: (creatorId) => `/creator/${creatorId}`,
+  ABOUT: (creatorId) => `/creator/${creatorId}/about`,
+  CAMPAIGNS: (creatorId) => `/creator/${creatorId}/campaigns`,
+},
+RATING: {
+  CREATOR: (creatorId) => `/rating/creator/${creatorId}`,
 },
 };
 

@@ -1,7 +1,7 @@
 // src/screens/notifications/NotificationsScreen.jsx
 import React, { useState, useCallback, useMemo, useRef, memo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar, SectionList, Dimensions,
+  View, Text, TouchableOpacity, StyleSheet, StatusBar, SectionList, ScrollView, Dimensions,
   Animated, PanResponder, LayoutAnimation, Platform, UIManager, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,12 @@ import {
   useMarkAllNotificationsRead,
   useDeleteNotification,
 } from '../../hooks/useNotifications';
-import { groupNotificationsIntoSections } from '../../utils/notificationTransform';
+import {
+  groupNotificationsIntoSections,
+  mapNotificationType,
+  getStatusVisual,
+  NOTIFICATION_CATEGORIES,
+} from '../../utils/notificationTransform';
 
 if (
   Platform.OS === 'android' &&
@@ -35,42 +40,68 @@ const C = {
   textGray: '#6B7280',
   textLight: '#9CA3AF',
   border: '#E5E7EB',
-  // Notification type colors
+  // Notification category colors — icons match the original design
+  // exactly (gift=donation, check-circle=campaign, shield=security);
+  // withdrawal/promotional/system are new categories added alongside.
+  campaign: '#16A34A',
+  campaignBg: '#F0FDF4',
   donation: '#15AABF',
   donationBg: '#EEF9FC',
-  approved: '#16A34A',
-  approvedBg: '#F0FDF4',
-  cnic: '#6B7280',
-  cnicBg: '#F9FAFB',
+  withdrawal: '#0891B2', // matches MyWithdrawalsScreen's header color for consistency
+  withdrawalBg: '#ECFEFF',
+  security: '#6B7280',
+  securityBg: '#F9FAFB',
+  promotional: '#F59E0B',
+  promotionalBg: '#FFFBEB',
+  system: '#6366F1',
+  systemBg: '#EEF2FF',
   markAll: '#15AABF',
   // Delete / trash accent — reuses the same danger red already used
   // elsewhere in the app (e.g. ProfileScreen logout), not a new color.
   danger: '#EF4444',
 };
 
-// --- THIS IS THE FIX ---
-// The configuration now correctly maps each type to its specific bar color.
+// Icons match your original screenshot exactly for the 3 existing
+// categories (donation=gift, campaign=check-circle, security=shield);
+// the 3 new categories get their own distinct icon/color.
 const TYPE_CONFIG = {
+  campaign: {
+    icon: 'check-circle',
+    color: C.campaign,
+    bg: C.campaignBg,
+    barColor: C.campaign,
+  },
   donation: {
-    icon: 'gift', // Using a more appropriate icon
+    icon: 'gift',
     color: C.donation,
     bg: C.donationBg,
-    barColor: C.donation, // Teal bar
+    barColor: C.donation,
   },
-  approved: {
-    icon: 'check-circle',
-    color: C.approved,
-    bg: C.approvedBg,
-    barColor: C.approved, // Green bar
+  withdrawal: {
+    icon: 'arrow-up-circle',
+    color: C.withdrawal,
+    bg: C.withdrawalBg,
+    barColor: C.withdrawal,
   },
-  cnic: {
+  security: {
     icon: 'shield',
-    color: C.cnic,
-    bg: C.cnicBg,
-    barColor: C.border, // Neutral gray bar
+    color: C.security,
+    bg: C.securityBg,
+    barColor: C.border,
+  },
+  promotional: {
+    icon: 'tag',
+    color: C.promotional,
+    bg: C.promotionalBg,
+    barColor: C.promotional,
+  },
+  system: {
+    icon: 'settings',
+    color: C.system,
+    bg: C.systemBg,
+    barColor: C.system,
   },
 };
-// --- END OF FIX ---
 
 // --- Local Components ---
 
@@ -86,11 +117,71 @@ const Header = memo(({ onBack, onMarkAll }) => (
   </View>
 ));
 
+// Category filter row — uniform teal theme color for every chip
+// (matching the app's single accent color, same as "Mark All"), not
+// color-coded per category. Each chip still shows its category's icon
+// shape for quick recognition, just rendered in the theme color rather
+// than a unique hue. Horizontal scroll keeps this safe on any screen
+// width with 7 chips — nothing can overlap or get clipped, it just
+// scrolls.
+const FilterRow = memo(({ active, onChange }) => (
+  <ScrollView
+    horizontal
+    showsHorizontalScrollIndicator={false}
+    removeClippedSubviews={false}
+    contentContainerStyle={styles.filter_row}
+  >
+    {NOTIFICATION_CATEGORIES.map(cat => {
+      const isActive = active === cat.id;
+      const cfg = TYPE_CONFIG[cat.id];
+
+      return (
+        <TouchableOpacity
+          key={cat.id}
+          style={[
+            styles.filter_chip,
+            {
+              backgroundColor: isActive ? C.markAll : C.white,
+              borderColor: C.markAll,
+            },
+            isActive && styles.filter_chipActive,
+          ]}
+          onPress={() => onChange(cat.id)}
+          activeOpacity={0.8}
+        >
+          {!!cfg && (
+            <Icons
+              name={cfg.icon}
+              size={sp(12.5)}
+              color={isActive ? C.white : C.markAll}
+              style={styles.filter_icon}
+            />
+          )}
+          <Text
+            style={[styles.filter_label, { color: isActive ? C.white : C.markAll }]}
+            numberOfLines={1}
+          >
+            {cat.label}
+          </Text>
+        </TouchableOpacity>
+      );
+    })}
+  </ScrollView>
+));
+
 const NotifCard = memo(({ item, onPress }) => {
-  const cfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.cnic;
+  // Status (approved/rejected/submitted) takes priority over the
+  // category default — this is what gives "Campaign Approved",
+  // "Campaign Rejected", and "Campaign Submitted" each their own
+  // distinct icon/color instead of sharing one generic campaign icon.
+  const categoryCfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.security;
+  const statusOverride = getStatusVisual(item.raw?.notificationType);
+  const cfg = statusOverride ?? categoryCfg;
+  const barColor = statusOverride ? statusOverride.color : categoryCfg.barColor;
+
   return (
     <TouchableOpacity style={[styles.card, item.unread && styles.card_unread]} onPress={() => onPress(item)} activeOpacity={0.75}>
-      {item.unread && <View style={[styles.card_unreadBar, { backgroundColor: cfg.barColor }]} />}
+      {item.unread && <View style={[styles.card_unreadBar, { backgroundColor: barColor }]} />}
       <View style={styles.card_content}>
         <View style={[styles.card_iconWrap, { backgroundColor: cfg.bg }]}>
           <Icons name={cfg.icon} size={sp(16)} color={cfg.color} />
@@ -107,10 +198,9 @@ const NotifCard = memo(({ item, onPress }) => {
 
 // ─────────────────────────────────────────────────────────────
 // SwipeableNotifCard — wraps NotifCard with a swipe-left-to-reveal-trash
-// gesture. Swiping past the threshold (or the trash icon growing to full
-// size) triggers a "thrown into the trash" animation: the card slides
-// further left while shrinking and fading, landing on the trash icon,
-// then calls onDelete once the animation completes.
+// gesture. Swiping past the threshold triggers a "thrown into the
+// trash" animation: the card slides further left while shrinking and
+// fading, landing on the trash icon, then calls onDelete.
 // ─────────────────────────────────────────────────────────────
 const TRASH_WIDTH = sp(64);
 const DELETE_THRESHOLD = -TRASH_WIDTH;
@@ -152,9 +242,6 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
   ).current;
 
   const triggerDelete = useCallback(() => {
-    // Card flies the rest of the way into the trash icon: slides fully
-    // left, shrinks down, and fades out — then the parent removes it
-    // from the list (with LayoutAnimation collapsing the gap smoothly).
     Animated.parallel([
       Animated.timing(translateX, {
         toValue: -sp(240),
@@ -189,7 +276,6 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
 
   return (
     <View style={styles.swipe_wrap}>
-      {/* Trash bin — revealed behind the card as the user swipes left */}
       <Animated.View
         style={[
           styles.swipe_trash,
@@ -236,6 +322,8 @@ const NotificationsScreen = ({ navigation }) => {
   const markAllMutation = useMarkAllNotificationsRead(userId);
   const deleteMutation = useDeleteNotification(userId);
 
+  const [activeFilter, setActiveFilter] = useState('all');
+
   // Optimistic local removal so the swipe/trash animation never waits on
   // the network — if the delete call fails, the id is un-hidden again.
   const [removedIds, setRemovedIds] = useState(() => new Set());
@@ -245,10 +333,29 @@ const NotificationsScreen = ({ navigation }) => {
     [rawNotifications, removedIds],
   );
 
+  // Frontend-only category filter — filters the raw list by mapped
+  // category before grouping into TODAY/YESTERDAY sections.
+  const filteredNotifications = useMemo(() => {
+    if (activeFilter === 'all') return visibleNotifications;
+    return visibleNotifications.filter(
+      n => mapNotificationType(n.notificationType) === activeFilter,
+    );
+  }, [visibleNotifications, activeFilter]);
+
   const sections = useMemo(
-    () => groupNotificationsIntoSections(visibleNotifications),
-    [visibleNotifications],
+    () => groupNotificationsIntoSections(filteredNotifications),
+    [filteredNotifications],
   );
+
+  const handleFilterChange = useCallback((id) => {
+    // Deliberately NOT wrapped in LayoutAnimation — animating the whole
+    // screen's layout here (including the chip row above) was what
+    // caused the jarring "jump" when switching to a category with zero
+    // results: the tall EmptyState block appearing mid-animation made
+    // it look like the filter chips themselves were growing. A filter
+    // tap should just swap content instantly and cleanly.
+    setActiveFilter(id);
+  }, []);
 
   const handleMarkAll = useCallback(() => {
     markAllMutation.mutate();
@@ -285,6 +392,7 @@ const NotificationsScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
       <Header onBack={() => navigation.goBack()} onMarkAll={handleMarkAll} />
+      <FilterRow active={activeFilter} onChange={handleFilterChange} />
       <SectionList
         sections={sections}
         keyExtractor={item => item.id}
@@ -312,6 +420,46 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: sp(16), paddingVertical: vsp(12), backgroundColor: C.pageBg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
   header_title: { fontSize: sp(17), fontWeight: '700', color: C.textDark, letterSpacing: -0.2 },
   header_markAll: { fontSize: sp(13), fontWeight: '600', color: C.markAll },
+
+  // ── Category filter row ──────────────────────────────────────
+  // NOTE: deliberately using marginRight on each chip instead of `gap`
+  // on the row — `gap` inside a horizontal ScrollView's
+  // contentContainerStyle has known reflow-timing issues on RN/Android,
+  // where it can recompute at the wrong moment when a sibling's style
+  // changes (like a chip switching active/inactive), causing chips to
+  // visibly reposition for a frame. Explicit margins never have this
+  // ambiguity.
+  filter_row: {
+    paddingHorizontal: sp(16),
+    paddingVertical: vsp(10),
+    alignItems: 'center', // vertical centering regardless of chip content
+  },
+  filter_chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: sp(34), // FIXED height — every chip is always identical, no
+                     // matter whether it has an icon, how bold its text
+                     // renders, or how long its label is.
+    paddingHorizontal: sp(12),
+    marginRight: sp(8),
+    borderRadius: sp(17),
+    borderWidth: 1,
+  },
+  filter_chipActive: {
+    // No elevation/shadow here — Android's `elevation` can subtly
+    // affect a view's measured box in some renderer combinations,
+    // which was a candidate for the chip repositioning bug. The solid
+    // color fill vs. white/border already makes the active state
+    // clearly distinct without needing a shadow.
+  },
+  filter_icon: {
+    marginRight: sp(5),
+  },
+  filter_label: {
+    fontSize: sp(12.5),
+    fontWeight: '700',
+  },
 
   list_content: { paddingHorizontal: sp(16), paddingTop: vsp(16), paddingBottom: vsp(32) },
   list_contentEmpty: { flexGrow: 1 },
