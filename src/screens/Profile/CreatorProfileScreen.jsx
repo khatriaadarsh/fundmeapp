@@ -327,11 +327,19 @@ const CreatorProfileScreen = ({ navigation, route }) => {
         <ProfileHeader user={user} />
 
         {/* index 1 — Trust badges + Stats (not sticky) */}
-        <View>
-          <TrustBadges />
-          <StatsRow />
-          <View style={{ height: sp(20) }} />
-        </View>
+        <TrustBadges
+  isVerified={creatorProfile.isVerified}
+  cnicVerified={creatorProfile.cnicVerified}
+  emailVerified={creatorProfile.emailVerified}
+  phoneVerified={creatorProfile.phoneVerified}
+/>
+
+<StatsRow
+  campaignCount={creatorProfile.campaignCount}
+  amountRaised={creatorProfile.amountRaised}
+  totalDonors={creatorProfile.totalDonors}
+  averageRating={creatorProfile.averageRating}
+/>
 
         {/* index 2 — Tab switcher (STICKY) */}
         <TabSwitcher active={activeTab} onChange={handleTabChange} />
