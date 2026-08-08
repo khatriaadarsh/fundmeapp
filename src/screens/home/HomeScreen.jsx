@@ -7,7 +7,8 @@ import {
   ScrollView, 
   StatusBar, 
   Text,
-  ActivityIndicator 
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,6 +23,7 @@ import SectionHeader   from '../../components/SectionHeader';
 import CategoryChips   from '../../components/shared/CategoryChips';
 import UrgentCard      from '../../components/UrgentCard';
 import FeaturedItem    from '../../components/FeaturedItem';
+import RatingModal     from '../../components/rating/RatingModal';
 
 import { useAppContext } from '../../context/AppContext';
 import {
@@ -35,6 +37,37 @@ const HomeScreen = ({ navigation }) => {
 
   const [activeCat, setActiveCat] = useState('all');
   const [search,    setSearch]    = useState('');
+
+  // ── TEMPORARY — for previewing RatingModal against the reference
+  // screenshots only. Remove this block once you wire the real triggers:
+  //   - "app" should open once per user, gated by a hasRatedApp flag
+  //     you check on load (see chat notes for the exact pattern).
+  //   - "creator" should open right after a successful donation, gated
+  //     by a server-side can-rate check per (donorId, creatorId).
+  const [ratingVisible, setRatingVisible] = useState(false);
+  const [ratingContext, setRatingContext] = useState('app');
+
+  const openRatingTest = useCallback((context) => {
+    setRatingContext(context);
+    setRatingVisible(true);
+  }, []);
+
+  const handleRateNow = useCallback(() => {
+    console.log('[RatingModal] onRateNow → would open store link here');
+  }, []);
+
+  const handleRatingSubmit = useCallback(async (payload) => {
+    console.log('[RatingModal] onSubmit payload:', payload);
+    // Simulate a network call so the SUBMIT button's loading state is
+    // visible during testing too.
+    await new Promise(resolve => setTimeout(resolve, 600));
+  }, []);
+
+  const handleRatingClose = useCallback((reason) => {
+    console.log('[RatingModal] onClose reason:', reason);
+    setRatingVisible(false);
+  }, []);
+  // ── END TEMPORARY BLOCK ──────────────────────────────────────────
 
   const {
     data: categories = [{ id: 'all', name: 'All', label: 'All' }],
@@ -199,6 +232,33 @@ const HomeScreen = ({ navigation }) => {
           ))}
         </View>
       </ScrollView>
+
+      {/* TEMPORARY test triggers — remove once real gating is wired up */}
+      <View style={styles.testDock} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.testBtn}
+          activeOpacity={0.85}
+          onPress={() => openRatingTest('app')}
+        >
+          <Text style={styles.testBtnTxt}>Test: App Rating</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.testBtn, styles.testBtnAlt]}
+          activeOpacity={0.85}
+          onPress={() => openRatingTest('creator')}
+        >
+          <Text style={styles.testBtnTxt}>Test: Creator Rating</Text>
+        </TouchableOpacity>
+      </View>
+
+      <RatingModal
+  visible={ratingVisible}
+  context={ratingContext}
+  targetName="Ahmed Khan"
+  onRateNow={handleRateNow}
+  onSubmit={handleRatingSubmit}
+  onClose={handleRatingClose}
+/>
     </SafeAreaView>
   );
 };
@@ -260,6 +320,32 @@ const styles = StyleSheet.create({
     fontSize: sp(13),
     color: P.light,
     textAlign: 'center',
+  },
+  // TEMPORARY — test dock styles, remove alongside the block above
+  testDock: {
+    position: 'absolute',
+    right: sp(16),
+    bottom: sp(24),
+    gap: sp(10),
+  },
+  testBtn: {
+    backgroundColor: '#0A3D62',
+    paddingVertical: sp(10),
+    paddingHorizontal: sp(16),
+    borderRadius: sp(24),
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  testBtnAlt: {
+    backgroundColor: '#15AABF',
+  },
+  testBtnTxt: {
+    color: '#FFFFFF',
+    fontSize: sp(12),
+    fontWeight: '700',
   },
 });
 
