@@ -68,4 +68,24 @@ export const getCreatorRatings = async (creatorId) => {
     console.error('🔴 [creatorService] Get ratings error:', error.message);
     throw error;
   }
+
+};
+
+
+/**
+ * Get Creator Statistics
+ * GET /creator/statistics/{userId}
+ * Response data: { creatorId, totalCampaigns, totalDonors, totalRaised }
+ */
+export const getCreatorStatistics = async (userId) => {
+  if (!userId) throw new Error('userId is required');
+  console.log('🔵 [creatorStatsService] Getting statistics for userId:', userId);
+  try {
+    const res = await apiClient.get(ENDPOINTS.CREATOR.STATISTICS(userId));
+    console.log('🟢 [creatorStatsService] Response:', res.data);
+    return res.data;
+  } catch (error) {
+    console.error('🔴 [creatorStatsService] Error:', error.message);
+    throw error;
+  }
 };

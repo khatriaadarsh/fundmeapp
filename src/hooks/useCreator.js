@@ -5,6 +5,7 @@ import {
   getCreatorAbout,
   getCreatorCampaigns,
   getCreatorRatings,
+  getCreatorStatistics,
 } from '../services/creatorService';
 
 const orNA = (value) => {
@@ -145,5 +146,24 @@ export const useCreatorRatings = (creatorId) => {
         reviews,
       };
     },
+  });
+};
+
+
+/**
+ * Hook to fetch creator statistics (totalCampaigns, totalDonors, totalRaised)
+ */
+export const useCreatorStatistics = (userId) => {
+  return useQuery({
+    queryKey: ['creator-statistics', String(userId)],
+    queryFn: async () => {
+      const response = await getCreatorStatistics(userId);
+      if (response?.responseCode === '000' && response?.data) {
+        return response.data;
+      }
+      throw new Error(response?.responseMessage || 'Failed to load creator statistics');
+    },
+    enabled: !!userId,
+    staleTime: 1000 * 30,
   });
 };

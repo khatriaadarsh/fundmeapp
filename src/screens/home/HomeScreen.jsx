@@ -159,7 +159,9 @@ const HomeScreen = ({ navigation }) => {
         <SearchBar value={search} onChange={handleSearchChange} />
         <HeroBanner />
 
-        <StatsRow />
+        {/* userId passed from currentUser so StatsRow can fetch this
+            creator's live stats from /creator/statistics/{userId} */}
+        <StatsRow userId={currentUser?.id} />
 
         <SectionHeader
           title="Categories"

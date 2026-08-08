@@ -1,5 +1,5 @@
 // src/screens/campaigns/CampaignDetail.jsx
-import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,8 @@ import DonorInfoModal from './DonorInfoModal';
 
 // ── API wiring ──────────────────────────────────────────────
 import { useCampaignDetail } from '../../hooks/useCampaign';
+import { useRecentDonors, useDonorProfile } from '../../hooks/useDonor';
+import { useAppContext } from '../../context/AppContext';
 
 // ═══════════════════════════════════════════════════════════
 // Scale
@@ -62,104 +64,79 @@ const SHEET_R = scale(24);
 // ✅ STICKY BAR HEIGHT — used to pad the ScrollView's content so
 // nothing (e.g. the tail of "Recent Donors") ever renders behind
 // the absolutely-positioned StickyBar at the bottom of the screen.
-// Derived from the actual `sb` styles below (gradient height +
-// top/bottom padding), not a magic number, so it stays correct if
-// StickyBar's padding is ever tweaked.
 // ═══════════════════════════════════════════════════════════
 const STICKY_BAR_H =
-  scale(56) + // Donate button inner row height (icon + text)
-  (Platform.OS === 'ios' ? vscale(28) : scale(16)) + // bottom safe padding
-  scale(14); // top padding
-const SCROLL_BOTTOM_PAD = STICKY_BAR_H + scale(-10); // + breathing room
+  scale(56) +
+  (Platform.OS === 'ios' ? vscale(28) : scale(16)) +
+  scale(14);
+const SCROLL_BOTTOM_PAD = STICKY_BAR_H + scale(-10);
 
 const fmtPK = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
 
+// Formats an ISO date string into separate display date + time
+// strings, matching what DonorInfoModal's InfoRow expects
+// ("Jan 15, 2025" · "2:30 PM").
+const formatDonationDateTime = (iso) => {
+  if (!iso) return { date: '', time: '' };
+  try {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return { date, time };
+  } catch {
+    return { date: '', time: '' };
+  }
+};
+
 // ═══════════════════════════════════════════════════════════
-// ⚠️ DEMO / HARDCODED DATA — Recent Donors & Recent Updates are
-// not covered by the campaign-detail API yet, per instructions.
-// Swap this out for a real hook/endpoint once that's available.
+// ⚠️ DEMO / HARDCODED DATA — "Recent Updates" is still not
+// covered by an API per prior instructions. Recent Donors is
+// now fully live (see useRecentDonors below).
 // ═══════════════════════════════════════════════════════════
 const DEMO = {
-  donors: 123,
   hoursLeft: 19,
-  donors_list: [
-    {
-      id: '1',
-      name: 'Zara M.',
-      amount: 5000,
-      message: "Praying for everyone's safety!",
-      time: '2h ago',
-      avatar: 'https://picsum.photos/100/100?random=41',
-      age: 28,
-      gender: 'Female',
-      occupation: 'Software Engineer',
-      phone: '+92 300 1234567',
-      totalDonated: 45000,
-      location: 'Karachi, Pakistan',
-      memberSince: 'Mar 2023',
-      totalCampaigns: 8,
-      paymentMethod: 'EasyPaisa',
-      donationDate: 'Jan 15, 2025',
-    },
-    {
-      id: '2',
-      name: 'Usman K.',
-      amount: 10000,
-      message: '',
-      time: '5h ago',
-      avatar: 'https://picsum.photos/100/100?random=42',
-      age: 35,
-      gender: 'Male',
-      occupation: 'Business Owner',
-      phone: null,
-      totalDonated: 120000,
-      location: 'Lahore, Pakistan',
-      memberSince: 'Jul 2024',
-      totalCampaigns: 3,
-      paymentMethod: 'JazzCash',
-      donationDate: 'Jan 15, 2025',
-    },
-    {
-      id: '3',
-      name: 'Anonymous',
-      amount: 2500,
-      message: 'May Allah ease your hardships.',
-      time: '1d ago',
-      avatar: 'https://picsum.photos/100/100?random=43',
-      age: null,
-      gender: null,
-      occupation: null,
-      phone: null,
-      totalDonated: null,
-      location: null,
-      memberSince: '',
-      totalCampaigns: 0,
-      paymentMethod: 'Visa ••42',
-      donationDate: 'Jan 14, 2025',
-    },
-    {
-      id: '4',
-      name: 'Ali R.',
-      amount: 5500,
-      message: 'May Allah ease your hardships.',
-      time: '1d ago',
-      avatar: 'https://picsum.photos/100/100?random=45',
-      age: null,
-      gender: null,
-      occupation: null,
-      phone: null,
-      totalDonated: null,
-      location: null,
-      memberSince: '',
-      totalCampaigns: 0,
-      paymentMethod: 'Visa ••42',
-      donationDate: 'Jan 14, 2025',
-    },
-  ],
   update:
     'Campaign update: First batch of relief funds has been distributed. 15 families received temporary tents today. Thank you 🙏',
   updateAge: 'Posted 2 days ago',
 };
+
+// ═══════════════════════════════════════════════════════════
+// AvatarOrInitial — shows the real image when available, falls
+// back to the first letter of the name (used for anonymous
+// donors and any donor with a null profileImage).
+// ═══════════════════════════════════════════════════════════
+const AvatarOrInitial = memo(({ uri, name, size, bg, color }) => {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
+  return (
+    <View
+      style={[
+        avI.circle,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bg || C.indigoBg,
+        },
+      ]}
+    >
+      <Text style={[avI.text, { fontSize: size * 0.4, color: color || C.indigo }]}>
+        {(name || '?').charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+});
+
+const avI = StyleSheet.create({
+  circle: { alignItems: 'center', justifyContent: 'center' },
+  text: { fontWeight: '800' },
+});
 
 // ═══════════════════════════════════════════════════════════
 // Pressable with scale feedback
@@ -339,7 +316,7 @@ const h = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// PROGRESS CARD — driven by real raised/goal/pct
+// PROGRESS CARD — driven by real raised/goal/pct/donorsCount
 // ═══════════════════════════════════════════════════════════
 const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
   const fillAnim = useRef(new Animated.Value(0)).current;
@@ -620,10 +597,7 @@ const cr = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════
 // STORY — Read More only appears when the text genuinely
-// overflows 3 lines. A hidden, full (non-truncated) copy of
-// the text is measured off-screen via onTextLayout to get the
-// real line count; the visible text stays truncated/expanded
-// based on that measurement.
+// overflows 3 lines.
 // ═══════════════════════════════════════════════════════════
 const StorySection = memo(({ story }) => {
   const [expanded, setExpanded] = useState(false);
@@ -639,8 +613,6 @@ const StorySection = memo(({ story }) => {
     <View style={st.wrap}>
       <Text style={st.heading}>Story</Text>
 
-      {/* Hidden measurer: renders the FULL text with no line limit,
-          off-screen, purely to count how many lines it would take. */}
       <Text
         style={[st.body, st.hiddenMeasure]}
         onTextLayout={handleMeasureLayout}
@@ -649,7 +621,6 @@ const StorySection = memo(({ story }) => {
         {story}
       </Text>
 
-      {/* Visible text: truncated to 3 lines unless expanded */}
       <Text style={st.body} numberOfLines={expanded ? undefined : 3}>
         {story}
       </Text>
@@ -699,8 +670,7 @@ const st = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// MEDIA GALLERY — driven by real additionalImages, opens the
-// full-screen swipeable viewer on tap
+// MEDIA GALLERY
 // ═══════════════════════════════════════════════════════════
 const MediaGallery = memo(({ media, onItemPress }) => {
   if (!media || media.length === 0) return null;
@@ -751,7 +721,7 @@ const mg = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// FULL-SCREEN IMAGE VIEWER — swipeable, with page indicator
+// FULL-SCREEN IMAGE VIEWER
 // ═══════════════════════════════════════════════════════════
 const ImageViewerModal = memo(
   ({ visible, images, initialIndex = 0, onClose }) => {
@@ -879,17 +849,22 @@ const iv = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// SOCIAL PROOF (demo donor avatars)
+// SOCIAL PROOF — now driven by real recent-donors data, with
+// avatar fallback (initials) when profileImage is null.
 // ═══════════════════════════════════════════════════════════
 const SocialProof = memo(({ donorsList, donorsCount }) => (
   <View style={soc.wrap}>
     <View style={soc.avatarRow}>
       {donorsList.slice(0, 3).map((d, i) => (
-        <Image
-          key={d.id}
-          source={{ uri: d.avatar }}
-          style={[soc.avatar, i > 0 && soc.overlap]}
-        />
+        <View key={d.id} style={[soc.avatarWrap, i > 0 && soc.overlap]}>
+          <AvatarOrInitial
+            uri={d.avatar}
+            name={d.name}
+            size={scale(32)}
+            bg={C.indigoBg}
+            color={C.indigo}
+          />
+        </View>
       ))}
     </View>
     <Text style={soc.txt}>
@@ -907,12 +882,11 @@ const soc = StyleSheet.create({
     marginBottom: scale(16),
   },
   avatarRow: { flexDirection: 'row' },
-  avatar: {
-    width: scale(32),
-    height: scale(32),
+  avatarWrap: {
     borderRadius: scale(16),
     borderWidth: 2,
     borderColor: C.white,
+    overflow: 'hidden',
   },
   overlap: { marginLeft: -scale(10) },
   txt: { fontSize: scale(13), color: C.gray, includeFontPadding: false },
@@ -920,7 +894,7 @@ const soc = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// UPDATE CARD (demo)
+// UPDATE CARD (still demo — no API for this yet)
 // ═══════════════════════════════════════════════════════════
 const UpdateCard = memo(({ updateText, updateAge }) => (
   <View style={uc.wrap}>
@@ -963,7 +937,7 @@ const uc = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// DONOR ROW (demo)
+// DONOR ROW — now driven by real data, with avatar fallback
 // ═══════════════════════════════════════════════════════════
 const DonorRow = memo(({ item, onPress }) => (
   <TouchableOpacity
@@ -971,7 +945,13 @@ const DonorRow = memo(({ item, onPress }) => (
     onPress={() => onPress?.(item)}
     activeOpacity={0.7}
   >
-    <Image source={{ uri: item.avatar }} style={dr.avatar} />
+    <AvatarOrInitial
+      uri={item.avatar}
+      name={item.name}
+      size={scale(38)}
+      bg={C.indigoBg}
+      color={C.indigo}
+    />
     <View style={dr.info}>
       <View style={dr.top}>
         <Text style={dr.name}>{item.name}</Text>
@@ -996,7 +976,6 @@ const dr = StyleSheet.create({
     borderBottomColor: C.border,
     gap: scale(12),
   },
-  avatar: { width: scale(38), height: scale(38), borderRadius: scale(19) },
   info: { flex: 1 },
   top: {
     flexDirection: 'row',
@@ -1026,13 +1005,7 @@ const dr = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// DOCUMENTS — driven by real documents, opens via Linking
-// (device browser/PDF app handles view-or-download)
-//
-// ✅ FIX: marginBottom no longer inflated to fake scroll clearance.
-// The ScrollView itself now owns bottom padding via
-// SCROLL_BOTTOM_PAD, so this section behaves correctly whether
-// it renders or returns null.
+// DOCUMENTS
 // ═══════════════════════════════════════════════════════════
 const Documents = memo(({ documents, onDocPress }) => {
   if (!documents || documents.length === 0) return null;
@@ -1060,7 +1033,7 @@ const Documents = memo(({ documents, onDocPress }) => {
 });
 
 const dc = StyleSheet.create({
-  wrap: { marginBottom: scale(16) }, // ✅ was scale(120) — no longer relied on for scroll clearance
+  wrap: { marginBottom: scale(16) },
   heading: {
     fontSize: scale(18),
     fontWeight: '800',
@@ -1256,11 +1229,28 @@ const CampaignDetail = ({ navigation, route }) => {
   const { data, isLoading, isError, error, refetch } =
     useCampaignDetail(campaignId);
 
+  // ── Recent donors — live data ────────────────────────────
+  const { data: donorsData } = useRecentDonors(campaignId);
+  const donorsList = donorsData?.donors || [];
+  const totalDonors = donorsData?.totalDonors ?? 0;
+
+  // ── Logged-in user, to detect campaign ownership ──────────
+  const { currentUser } = useAppContext();
+
   const [saved, setSaved] = useState(false);
-  const [selectedDonor, setSelectedDonor] = useState(null);
-  const [donorModalOpen, setDonorModalOpen] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+
+  // ── Donor modal state ─────────────────────────────────────
+  // selectedDonorBase = data already available from the recent-donors
+  // list (amount, message, timeAgo, avatar, etc).
+  // selectedDonorId = triggers the individual donor-profile fetch
+  // (skipped entirely for anonymous donors, per requirement).
+  const [donorModalOpen, setDonorModalOpen] = useState(false);
+  const [selectedDonorBase, setSelectedDonorBase] = useState(null);
+  const [selectedDonorId, setSelectedDonorId] = useState(null);
+
+  const { data: donorProfile } = useDonorProfile(selectedDonorId);
 
   const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
   const handleShare = useCallback(() => {}, []);
@@ -1271,12 +1261,23 @@ const CampaignDetail = ({ navigation, route }) => {
     [navigation, campaignId],
   );
 
+  // If the logged-in user is the creator of this campaign, route to
+  // their own ProfileScreen instead of the read-only CreatorProfileScreen.
   const handleProfile = useCallback(() => {
-  if (!data?.creator?.userId) return;
-  navigation?.navigate?.('CreatorProfileScreen', {
-    creatorId: data.creator.userId,
-  });
-}, [navigation, data]);
+    if (!data?.creator?.userId) return;
+
+    const isOwner =
+      currentUser?.id != null &&
+      String(currentUser.id) === String(data.creator.userId);
+
+    if (isOwner) {
+      navigation?.navigate?.('ProfileScreen');
+    } else {
+      navigation?.navigate?.('CreatorProfileScreen', {
+        creatorId: data.creator.userId,
+      });
+    }
+  }, [navigation, data, currentUser]);
 
   const handleGalleryPress = useCallback(index => {
     setViewerIndex(index);
@@ -1293,34 +1294,58 @@ const CampaignDetail = ({ navigation, route }) => {
     }
   }, []);
 
+  // Anonymous donors: no profile fetch, just show what's already in
+  // the recent-donors list entry (per requirement).
   const handleDonorPress = useCallback(donor => {
-    setSelectedDonor({
-      id: donor.id,
-      name: donor.name,
-      isAnonymous: donor.name === 'Anonymous',
-      avatarUri: donor.avatar,
-      location: donor.location ?? null,
-      age: donor.age ?? null,
-      gender: donor.gender ?? null,
-      occupation: donor.occupation ?? null,
-      phone: donor.phone ?? null,
-      totalDonated: donor.totalDonated ?? null,
-      amount: donor.amount,
-      donationDate: donor.donationDate ?? '',
-      donationTime: donor.time,
-      paymentMethod: donor.paymentMethod ?? '',
-      message: donor.message || null,
-      timeAgo: donor.time,
-      totalCampaigns: donor.totalCampaigns ?? 0,
-      memberSince: donor.memberSince ?? '',
-    });
+    setSelectedDonorBase(donor);
+    if (donor.isAnonymous || !donor.userId) {
+      setSelectedDonorId(null);
+    } else {
+      setSelectedDonorId(String(donor.userId));
+    }
     setDonorModalOpen(true);
   }, []);
 
   const handleDonorModalClose = useCallback(() => {
     setDonorModalOpen(false);
-    setTimeout(() => setSelectedDonor(null), 300);
+    setTimeout(() => {
+      setSelectedDonorBase(null);
+      setSelectedDonorId(null);
+    }, 300);
   }, []);
+
+  // Merges the always-available list data (amount, message, time,
+  // paymentMethod) with the extended profile fields fetched
+  // separately (age, gender, occupation, phone, totalDonated,
+  // location, memberSince, totalCampaigns) — skipped entirely for
+  // anonymous donors.
+  const selectedDonor = useMemo(() => {
+    if (!selectedDonorBase) return null;
+
+    const isAnon = selectedDonorBase.isAnonymous;
+    const { date, time } = formatDonationDateTime(selectedDonorBase.donationDate);
+
+    return {
+      id: selectedDonorBase.id,
+      name: selectedDonorBase.name,
+      isAnonymous: isAnon,
+      avatarUri: selectedDonorBase.avatar,
+      location: !isAnon ? (donorProfile?.location ?? null) : null,
+      age: !isAnon ? (donorProfile?.age ?? null) : null,
+      gender: !isAnon ? (donorProfile?.gender ?? null) : null,
+      occupation: !isAnon ? (donorProfile?.occupation ?? null) : null,
+      phone: !isAnon ? (donorProfile?.phone ?? null) : null,
+      totalDonated: !isAnon ? (donorProfile?.totalDonated ?? null) : null,
+      amount: selectedDonorBase.amount,
+      donationDate: date,
+      donationTime: time,
+      paymentMethod: selectedDonorBase.paymentMethod || '',
+      message: selectedDonorBase.message,
+      timeAgo: selectedDonorBase.time,
+      totalCampaigns: !isAnon ? (donorProfile?.totalCampaigns ?? 0) : 0,
+      memberSince: !isAnon ? (donorProfile?.memberSince ?? '') : '',
+    };
+  }, [selectedDonorBase, donorProfile]);
 
   if (!campaignId) {
     return (
@@ -1354,9 +1379,6 @@ const CampaignDetail = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
-        // ✅ FIX: guarantees the last section (Recent Donors / Documents)
-        // always clears the absolutely-positioned StickyBar, regardless
-        // of which optional sections render.
         contentContainerStyle={s.scrollContent}
       >
         <HeroImage
@@ -1377,7 +1399,7 @@ const CampaignDetail = ({ navigation, route }) => {
             raised={data.raised}
             goal={data.goal}
             pct={data.pct}
-            donorsCount={DEMO.donors}
+            donorsCount={totalDonors}
             hoursLeft={DEMO.hoursLeft}
           />
           <DonateButton onPress={handleDonate} />
@@ -1385,14 +1407,14 @@ const CampaignDetail = ({ navigation, route }) => {
           <StorySection story={data.story} />
           <MediaGallery media={data.media} onItemPress={handleGalleryPress} />
           <SocialProof
-            donorsList={DEMO.donors_list}
-            donorsCount={DEMO.donors}
+            donorsList={donorsList}
+            donorsCount={totalDonors}
           />
           <UpdateCard updateText={DEMO.update} updateAge={DEMO.updateAge} />
 
           <View style={s.section}>
             <Text style={s.sectionTitle}>Recent Donors</Text>
-            {DEMO.donors_list.map(d => (
+            {donorsList.map(d => (
               <DonorRow key={d.id} item={d} onPress={handleDonorPress} />
             ))}
           </View>
@@ -1406,7 +1428,7 @@ const CampaignDetail = ({ navigation, route }) => {
 
       <StickyBar
         raised={data.raised}
-        donorsCount={DEMO.donors}
+        donorsCount={totalDonors}
         onDonate={handleDonate}
       />
 
@@ -1436,9 +1458,6 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
-  // ✅ NEW: applied via ScrollView's contentContainerStyle so the
-  // full page — including the tail of "Recent Donors" — always
-  // scrolls clear of the absolutely-positioned StickyBar.
   scrollContent: {
     paddingBottom: SCROLL_BOTTOM_PAD,
   },

@@ -59,9 +59,14 @@ CREATOR: {
   PROFILE: (creatorId) => `/creator/${creatorId}`,
   ABOUT: (creatorId) => `/creator/${creatorId}/about`,
   CAMPAIGNS: (creatorId) => `/creator/${creatorId}/campaigns`,
+  STATISTICS: (userId) => `/creator/statistics/${userId}`,
 },
 RATING: {
   CREATOR: (creatorId) => `/rating/creator/${creatorId}`,
+},
+DONOR: {
+  RECENT: (campaignId) => `/${campaignId}/recent-donors`,
+  PROFILE: (donorId) => `/donor/profile/${donorId}`,
 },
 };
 
