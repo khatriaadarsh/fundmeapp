@@ -8,7 +8,7 @@ import { isSuccessCode } from './responseCodes';
 //192.168.0.103 //B-H-WIFI
 const BASE_URL =
   Platform.OS === 'android'
-    ? 'http://10.78.135.120:8082/api/v1'
+    ? 'http://10.218.139.120:8082/api/v1'
     : 'http://localhost:8082/api/v1';
 
 const apiClient = axios.create({

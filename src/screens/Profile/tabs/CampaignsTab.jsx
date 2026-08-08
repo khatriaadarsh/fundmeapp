@@ -12,13 +12,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import Icons from 'react-native-vector-icons/Feather';
 
-// Shared ProgressBar — adjust path to your actual shared components dir
-// import ProgressBar from '../../components/shared/ProgressBar';
-// import ProgressBar from '../../components/shared/ProgressBar';
 import ProgressBar from '../../../components/common/ProgressBar';
+import { useCreatorCampaigns } from '../../../hooks/useCreator';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -38,71 +37,6 @@ const P = {
   red:       '#EF4444',
   redLight:  '#FEF2F2',
 };
-
-// ── Mock data ────────────────────────────────────────────────
-const ACTIVE_CAMPAIGNS = [
-  {
-    id: '1',
-    title:    'Flood relief for 40 displaced families in Sindh',
-    imageUri: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?w=400',
-    raised:   'PKR 320,000',
-    goal:     'PKR 500,000',
-    pct:      64,
-    donors:   234,
-    daysLeft: 12,
-    urgent:   true,
-    tags:     ['Emergency', 'Active'],
-  },
-  {
-    id: '2',
-    title:    'School supplies for children in underserved communities',
-    imageUri: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400',
-    raised:   'PKR 500,000',
-    goal:     'PKR 500,000',
-    pct:      100,
-    donors:   189,
-    daysLeft: 0,
-    urgent:   false,
-    tags:     ['Education', 'Completed'],
-  },
-  {
-    id: '3',
-    title:    'Winter food packages for orphans in Balochistan',
-    imageUri: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=400',
-    raised:   'PKR 180,000',
-    goal:     'PKR 400,000',
-    pct:      45,
-    donors:   97,
-    daysLeft: 8,
-    urgent:   true,
-    tags:     ['Food', 'Active'],
-  },
-];
-
-const PAST_CAMPAIGNS = [
-  {
-    id: '4',
-    title:    'Emergency kidney surgery for Hamza, age 9',
-    imageUri: 'https://images.unsplash.com/photo-1530026186672-2cd00ffc50fe?w=400',
-    raised:   'PKR 750,000',
-    goal:     'PKR 750,000',
-    pct:      100,
-    donors:   312,
-    status:   'funded',
-    tags:     ['Medical'],
-  },
-  {
-    id: '5',
-    title:    'Rebuild classroom destroyed in flash floods',
-    imageUri: 'https://images.unsplash.com/photo-1551190822-a9333d879b1f?w=400',
-    raised:   'PKR 290,000',
-    goal:     'PKR 350,000',
-    pct:      83,
-    donors:   145,
-    status:   'closed',
-    tags:     ['Education'],
-  },
-];
 
 // ── Tag chip ─────────────────────────────────────────────────
 const TAG_COLORS = {
@@ -130,7 +64,6 @@ const chip = StyleSheet.create({
 // ── Campaign Card ────────────────────────────────────────────
 const CampaignCard = memo(({ item, onPress, isPast }) => (
   <TouchableOpacity style={cc.card} onPress={() => onPress?.(item)} activeOpacity={0.88}>
-    {/* Hero Image */}
     <View style={cc.imgWrap}>
       <Image source={{ uri: item.imageUri }} style={cc.img} resizeMode="cover" />
       {item.urgent && (
@@ -151,26 +84,22 @@ const CampaignCard = memo(({ item, onPress, isPast }) => (
       )}
     </View>
 
-    {/* Body */}
     <View style={cc.body}>
-      {/* Tags */}
-      <View style={cc.tagsRow}>
-        {item.tags.map(t => <TagChip key={t} tag={t} />)}
-      </View>
+      {item.tags.length > 0 && (
+        <View style={cc.tagsRow}>
+          {item.tags.map(t => <TagChip key={t} tag={t} />)}
+        </View>
+      )}
 
-      {/* Title */}
       <Text style={cc.title} numberOfLines={2}>{item.title}</Text>
 
-      {/* Progress bar */}
       <ProgressBar pct={item.pct} />
 
-      {/* Stats row */}
       <View style={cc.statsRow}>
         <Text style={cc.raised}>{item.raised}</Text>
         <Text style={cc.goalPct}>{item.pct}% of goal</Text>
       </View>
 
-      {/* Footer */}
       <View style={cc.footer}>
         <View style={cc.footItem}>
           <Icons name="users" size={sp(12)} color={P.light} />
@@ -264,18 +193,47 @@ const sh = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 //  CampaignsTab — main export
 // ════════════════════════════════════════════════════════════
-const CampaignsTab = memo(({ onCampaignPress }) => (
-  <View style={{ paddingBottom: sp(24) }}>
-    <SectionHeader title={`Active Campaigns (${ACTIVE_CAMPAIGNS.length})`} />
-    {ACTIVE_CAMPAIGNS.map(item => (
-      <CampaignCard key={item.id} item={item} onPress={onCampaignPress} isPast={false} />
-    ))}
+const CampaignsTab = memo(({ creatorId, onCampaignPress }) => {
+  const { data, isLoading, isError, error } = useCreatorCampaigns(creatorId);
 
-    <SectionHeader title={`Past Campaigns (${PAST_CAMPAIGNS.length})`} />
-    {PAST_CAMPAIGNS.map(item => (
-      <CampaignCard key={item.id} item={item} onPress={onCampaignPress} isPast />
-    ))}
-  </View>
-));
+  if (isLoading) {
+    return (
+      <View style={loader.wrap}>
+        <ActivityIndicator size="large" color={P.teal} />
+      </View>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <View style={loader.wrap}>
+        <Text style={loader.errTxt}>
+          {error?.message || 'Could not load campaigns.'}
+        </Text>
+      </View>
+    );
+  }
+
+  const { active, past } = data;
+
+  return (
+    <View style={{ paddingBottom: sp(24) }}>
+      <SectionHeader title={`Active Campaigns (${active.length})`} />
+      {active.map(item => (
+        <CampaignCard key={item.id} item={item} onPress={onCampaignPress} isPast={false} />
+      ))}
+
+      <SectionHeader title={`Past Campaigns (${past.length})`} />
+      {past.map(item => (
+        <CampaignCard key={item.id} item={item} onPress={onCampaignPress} isPast />
+      ))}
+    </View>
+  );
+});
+
+const loader = StyleSheet.create({
+  wrap: { paddingVertical: sp(60), alignItems: 'center', justifyContent: 'center' },
+  errTxt: { fontSize: sp(13), color: P.gray, textAlign: 'center', paddingHorizontal: sp(30) },
+});
 
 export default CampaignsTab;

@@ -19,6 +19,8 @@ const sp = n => (SW / 375) * n;
 const P = {
   teal:      '#00B4CC',
   tealLight: 'rgba(0,180,204,0.10)',
+  red:       '#EF4444',
+  redLight:  'rgba(239,68,68,0.10)',
   dark:      '#111827',
   gray:      '#6B7280',
   white:     '#FFFFFF',
@@ -26,37 +28,60 @@ const P = {
   green:     '#10B981',
 };
 
-const BADGES = [
-  { emoji: '✉️', label: 'Email'       },
-  { emoji: '📱', label: 'Phone'       },
-  { emoji: '🆔', label: 'ID Verified' },
-  { emoji: '🏦', label: 'Bank'        },
-];
+const TrustBadges = memo(({ isVerified, cnicVerified, emailVerified, phoneVerified }) => {
+  // Each badge's `verified` flag now comes directly from the real
+  // profile API values instead of being hardcoded true.
+  const badges = [
+    { emoji: '✉️', label: 'Email', verified: !!emailVerified },
+    { emoji: '📱', label: 'Phone', verified: !!phoneVerified },
+    { emoji: '🆔', label: 'ID Verified', verified: !!cnicVerified },
+    { emoji: '🏦', label: 'Bank', verified: !!isVerified },
+  ];
 
-const TrustBadges = memo(() => (
-  <View style={s.card}>
-    {/* Header row */}
-    <View style={s.headerRow}>
-      <Text style={s.headerLabel}>VERIFIED</Text>
-      <Icons name="check-circle" size={sp(13)} color={P.green} style={{ marginLeft: sp(5) }} />
+  const anyVerified = badges.some(b => b.verified);
+
+  return (
+    <View style={s.card}>
+      {/* Header row — label changed from VERIFIED to VERIFICATION */}
+      <View style={s.headerRow}>
+        <Text style={s.headerLabel}>VERIFICATION</Text>
+        <Icons
+          name={anyVerified ? 'check-circle' : 'alert-circle'}
+          size={sp(13)}
+          color={anyVerified ? P.green : P.gray}
+          style={{ marginLeft: sp(5) }}
+        />
+      </View>
+
+      {/* Badge pills — tick when verified, cross when not */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.pillsRow}
+      >
+        {badges.map(b => (
+          <View
+            key={b.label}
+            style={[s.pill, !b.verified && s.pillUnverified]}
+          >
+            <Text style={s.pillEmoji}>{b.emoji}</Text>
+            <Icons
+              name={b.verified ? 'check' : 'x'}
+              size={sp(9)}
+              color={b.verified ? P.teal : P.red}
+              style={{ marginRight: sp(3) }}
+            />
+            <Text
+              style={[s.pillLabel, !b.verified && s.pillLabelUnverified]}
+            >
+              {b.label}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
     </View>
-
-    {/* Badge pills */}
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={s.pillsRow}
-    >
-      {BADGES.map(b => (
-        <View key={b.label} style={s.pill}>
-          <Text style={s.pillEmoji}>{b.emoji}</Text>
-          <Icons name="check" size={sp(9)} color={P.teal} style={{ marginRight: sp(3) }} />
-          <Text style={s.pillLabel}>{b.label}</Text>
-        </View>
-      ))}
-    </ScrollView>
-  </View>
-));
+  );
+});
 
 export default TrustBadges;
 
@@ -98,10 +123,16 @@ const s = StyleSheet.create({
     paddingVertical: sp(6),
     gap: sp(3),
   },
+  pillUnverified: {
+    backgroundColor: P.redLight,
+  },
   pillEmoji: { fontSize: sp(12) },
   pillLabel: {
     fontSize: sp(11),
     fontWeight: '600',
     color: P.teal,
+  },
+  pillLabelUnverified: {
+    color: P.red,
   },
 });

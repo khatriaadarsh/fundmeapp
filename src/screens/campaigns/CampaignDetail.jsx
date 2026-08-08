@@ -1272,10 +1272,11 @@ const CampaignDetail = ({ navigation, route }) => {
   );
 
   const handleProfile = useCallback(() => {
-    navigation?.navigate?.('CreatorProfileScreen', {
-      userId: data?.creator?.userId,
-    });
-  }, [navigation, data]);
+  if (!data?.creator?.userId) return;
+  navigation?.navigate?.('CreatorProfileScreen', {
+    creatorId: data.creator.userId,
+  });
+}, [navigation, data]);
 
   const handleGalleryPress = useCallback(index => {
     setViewerIndex(index);

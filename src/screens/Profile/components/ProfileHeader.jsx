@@ -24,6 +24,7 @@ const P = {
   darkOcean: '#0A3D62',
   teal:      '#00B4CC',
   white:     '#FFFFFF',
+  gray:      '#9CA3AF',
 };
 
 const HERO_H     = sp(270);
@@ -56,16 +57,30 @@ const ProfileHeader = memo(({ user, onMenuPress }) => {
               </Text>
             </View>
           )}
-          {/* Verified dot */}
-          <View style={s.verifiedBadge}>
-            <Icons name="check" size={sp(13)} color={P.white} />
+          {/* Verified dot — now reflects the real isVerified flag,
+              showing a check when true and an X when false, instead
+              of always rendering a checkmark. */}
+          <View
+            style={[
+              s.verifiedBadge,
+              !user.isVerified && s.notVerifiedBadge,
+            ]}
+          >
+            <Icons
+              name={user.isVerified ? 'check' : 'x'}
+              size={sp(13)}
+              color={P.white}
+            />
           </View>
         </View>
 
         {/* Name */}
         <Text style={s.name}>{user.name}</Text>
-        {/* Username */}
-        <Text style={s.username}>@{user.username}</Text>
+        {/* Username — only rendered when a real value is available,
+            so it never shows a literal "@undefined". */}
+        {!!user.username && (
+          <Text style={s.username}>@{user.username}</Text>
+        )}
 
         {/* Location + joined */}
         <View style={s.locationRow}>
@@ -157,6 +172,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: P.white,
+  },
+  notVerifiedBadge: {
+    backgroundColor: P.gray,
   },
 
   // Text

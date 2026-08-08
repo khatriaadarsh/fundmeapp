@@ -9,10 +9,12 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import Icons from 'react-native-vector-icons/Feather';
+
+import { useCreatorRatings } from '../../../hooks/useCreator';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -31,53 +33,26 @@ const P = {
   red:       '#EF4444',
 };
 
-// ── Mock data ────────────────────────────────────────────────
-const RATING_DISTRIBUTION = [
-  { stars: 5, pct: 78 },
-  { stars: 4, pct: 18 },
-  { stars: 3, pct: 3  },
-  { stars: 2, pct: 1  },
-  { stars: 1, pct: 0  },
-];
+const formatRelative = iso => {
+  if (!iso) return '';
+  try {
+    const date = new Date(iso);
+    const diffMs = Date.now() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHr / 24);
 
-const REVIEWS = [
-  {
-    id: '1',
-    name:    'Ahmed K.',
-    avatar:  null,
-    rating:  5,
-    date:    '2 days ago',
-    text:    'Sarah is incredibly transparent and shared updates throughout the campaign. It made donating feel safe and meaningful.',
-    helpful: 12,
-  },
-  {
-    id: '2',
-    name:    'Fatima R.',
-    avatar:  null,
-    rating:  5,
-    date:    '1 week ago',
-    text:    'Very professional and responsive. She provided photo evidence of every milestone. Will donate again for sure.',
-    helpful: 8,
-  },
-  {
-    id: '3',
-    name:    'Omar H.',
-    avatar:  null,
-    rating:  4,
-    date:    '2 weeks ago',
-    text:    'Great campaign overall. Updates were a bit delayed at times but the cause is genuine and funds were well-spent.',
-    helpful: 5,
-  },
-  {
-    id: '4',
-    name:    'Zainab M.',
-    avatar:  null,
-    rating:  5,
-    date:    '1 month ago',
-    text:    "One of the most trustworthy creators I've supported. The transparency reports were exceptional.",
-    helpful: 19,
-  },
-];
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffDay === 1) return '1 day ago';
+    if (diffDay < 7) return `${diffDay} days ago`;
+    if (diffDay < 30) return `${Math.floor(diffDay / 7)}w ago`;
+    return `${Math.floor(diffDay / 30)}mo ago`;
+  } catch {
+    return '';
+  }
+};
 
 // ════════════════════════════════════════════════════════════
 //  Stars
@@ -96,23 +71,20 @@ const Stars = memo(({ count = 5, size = 13, filled = 5 }) => (
 ));
 
 // ════════════════════════════════════════════════════════════
-//  RatingOverviewCard — big rating + bar chart
+//  RatingOverviewCard
 // ════════════════════════════════════════════════════════════
-const RatingOverviewCard = memo(({ rating = 4.8, total = 234 }) => (
+const RatingOverviewCard = memo(({ rating, total, distribution }) => (
   <View style={ro.card}>
-    {/* Left: big number + stars + caption */}
     <View style={ro.left}>
-      <Text style={ro.bigRating}>{rating}</Text>
+      <Text style={ro.bigRating}>{Number(rating).toFixed(1)}</Text>
       <Stars count={5} size={16} filled={Math.round(rating)} />
       <Text style={ro.basedOn}>Based on {total}{'\n'}reviews</Text>
     </View>
 
-    {/* Thin vertical divider */}
     <View style={ro.vDivider} />
 
-    {/* Right: distribution bars */}
     <View style={ro.right}>
-      {RATING_DISTRIBUTION.map(row => (
+      {distribution.map(row => (
         <View key={row.stars} style={ro.barRow}>
           <Text style={ro.starLabel}>{row.stars}★</Text>
           <View style={ro.barBg}>
@@ -202,11 +174,10 @@ const ro = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-//  Single review row — used inside the shared reviews card
+//  Single review row
 // ════════════════════════════════════════════════════════════
 const ReviewRow = memo(({ review, isLast }) => (
   <View style={rr.wrap}>
-    {/* Top: avatar + name + stars + date */}
     <View style={rr.topRow}>
       <View style={rr.avatar}>
         <Text style={rr.avatarTxt}>{review.name.charAt(0)}</Text>
@@ -215,26 +186,20 @@ const ReviewRow = memo(({ review, isLast }) => (
       <View style={rr.meta}>
         <View style={rr.nameDateRow}>
           <Text style={rr.name}>{review.name}</Text>
-          <Text style={rr.date}>{review.date}</Text>
+          <Text style={rr.date}>{formatRelative(review.createdDate)}</Text>
         </View>
         <Stars count={5} size={11} filled={review.rating} />
       </View>
     </View>
 
-    {/* Review text */}
     <Text style={rr.text}>{review.text}</Text>
 
-    {/* Footer: helpful + reply */}
     <View style={rr.footer}>
-      <TouchableOpacity activeOpacity={0.7} style={rr.helpfulBtn}>
+      <View style={rr.helpfulBtn}>
         <Text style={rr.helpfulTxt}>🤙 Helpful ({review.helpful})</Text>
-      </TouchableOpacity>
-      <TouchableOpacity activeOpacity={0.7}>
-        <Text style={rr.replyTxt}>Reply</Text>
-      </TouchableOpacity>
+      </View>
     </View>
 
-    {/* Separator — hidden on last item */}
     {!isLast && <View style={rr.separator} />}
   </View>
 ));
@@ -299,12 +264,6 @@ const rr = StyleSheet.create({
     fontSize: sp(12),
     color: P.gray,
   },
-  replyTxt: {
-    fontSize: sp(12),
-    fontWeight: '600',
-    color: P.teal,
-  },
-  // Thin separator between reviews — matches screenshot
   separator: {
     height: 1,
     backgroundColor: P.border,
@@ -313,16 +272,15 @@ const rr = StyleSheet.create({
 });
 
 // ════════════════════════════════════════════════════════════
-//  ReviewsListCard — ONE card containing ALL reviews with
-//  thin separators between them (not individual elevated cards)
+//  ReviewsListCard
 // ════════════════════════════════════════════════════════════
-const ReviewsListCard = memo(() => (
+const ReviewsListCard = memo(({ reviews }) => (
   <View style={rl.card}>
-    {REVIEWS.map((review, index) => (
+    {reviews.map((review, index) => (
       <ReviewRow
         key={review.id}
         review={review}
-        isLast={index === REVIEWS.length - 1}
+        isLast={index === reviews.length - 1}
       />
     ))}
   </View>
@@ -346,11 +304,42 @@ const rl = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 //  ReviewsTab — main export
 // ════════════════════════════════════════════════════════════
-const ReviewsTab = memo(() => (
-  <View style={{ paddingBottom: sp(24) }}>
-    <RatingOverviewCard rating={4.8} total={234} />
-    <ReviewsListCard />
-  </View>
-));
+const ReviewsTab = memo(({ creatorId }) => {
+  const { data, isLoading, isError, error } = useCreatorRatings(creatorId);
+
+  if (isLoading) {
+    return (
+      <View style={loader.wrap}>
+        <ActivityIndicator size="large" color={P.teal} />
+      </View>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <View style={loader.wrap}>
+        <Text style={loader.errTxt}>
+          {error?.message || 'Could not load reviews.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ paddingBottom: sp(24) }}>
+      <RatingOverviewCard
+        rating={data.averageRating}
+        total={data.totalReviews}
+        distribution={data.distribution}
+      />
+      <ReviewsListCard reviews={data.reviews} />
+    </View>
+  );
+});
+
+const loader = StyleSheet.create({
+  wrap: { paddingVertical: sp(60), alignItems: 'center', justifyContent: 'center' },
+  errTxt: { fontSize: sp(13), color: P.gray, textAlign: 'center', paddingHorizontal: sp(30) },
+});
 
 export default ReviewsTab;

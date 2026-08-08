@@ -28,8 +28,8 @@ import {
   Platform,
   Animated,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 
 // ── Components ───────────────────────────────────────────────
@@ -42,6 +42,9 @@ import ReportModal from './components/ReportModal';
 import AboutTab from './tabs/AboutTab';
 import CampaignsTab from './tabs/CampaignsTab';
 import ReviewsTab from './tabs/ReviewsTab';
+
+// ── API wiring ───────────────────────────────────────────────
+import { useCreatorProfile } from '../../hooks/useCreator';
 
 // ── Scale ────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
@@ -60,6 +63,7 @@ const P = {
   white: '#FFFFFF',
   border: '#E5E7EB',
   bg: '#F4F5F7',
+  red: '#EF4444',
 };
 
 // ── Tab definitions ──────────────────────────────────────────
@@ -69,16 +73,17 @@ const TABS = [
   { id: 'reviews', label: 'Reviews' },
 ];
 
-// ── Mock user data — replace with route.params / API ────────
-const MOCK_USER = {
-  name: 'Sarah Ahmed',
-  username: 'sarahahmed',
-  avatarUri:
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-  location: 'Karachi, Pakistan',
-  joinedDate: 'March 2023',
-  bio: "Passionate about helping families in need. I started FundMe campaigns in 2023 to support children's medical care in Pakistan. Every donation makes a real difference. Thank you for trusting our cause.",
-  trustScore: 92,
+// ── Fallback used only if the profile API hasn't returned yet /
+//    fails — keeps ProfileHeader/TrustBadges/StatsRow from ever
+//    receiving `undefined`. ─────────────────────────────────────
+const EMPTY_USER = {
+  name: '',
+  username: '',
+  avatarUri: null,
+  location: '',
+  joinedDate: '',
+  bio: '',
+  trustScore: 0,
 };
 
 // ════════════════════════════════════════════════════════════
@@ -196,7 +201,17 @@ const tbs = StyleSheet.create({
 //  CreatorProfileScreen — main
 // ════════════════════════════════════════════════════════════
 const CreatorProfileScreen = ({ navigation, route }) => {
-  const user = route?.params?.user ?? MOCK_USER;
+  const creatorId = route?.params?.creatorId
+    ? String(route.params.creatorId)
+    : null;
+
+  const {
+    data: creatorProfile,
+    isLoading: profileLoading,
+    isError: profileError,
+    error: profileErrorObj,
+    refetch: refetchProfile,
+  } = useCreatorProfile(creatorId);
 
   const [activeTab, setActiveTab] = useState('about');
   const [modalVisible, setModalVisible] = useState(false);
@@ -218,29 +233,86 @@ const CreatorProfileScreen = ({ navigation, route }) => {
     [navigation],
   );
 
-  // Render active tab content
+  const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
+
+  // Build the `user` object ProfileHeader expects — same shape it
+  // always used, just sourced from the live API instead of mock data.
+  const user = creatorProfile
+    ? {
+        name: creatorProfile.name,
+        username: creatorProfile.nickName,
+        avatarUri: creatorProfile.avatarUri,
+        location: creatorProfile.location,
+        joinedDate: creatorProfile.joinedDate,
+        bio: '',
+        trustScore: creatorProfile.trustScore,
+      }
+    : EMPTY_USER;
+
+  // Render active tab content — each tab now fetches its own data
+  // by creatorId, independent of the profile-summary fetch above.
   const renderTabContent = () => {
     switch (activeTab) {
       case 'about':
-        return <AboutTab user={user} />;
+        return <AboutTab creatorId={creatorId} />;
       case 'campaigns':
-        return <CampaignsTab onCampaignPress={handleCampaignPress} />;
+        return <CampaignsTab creatorId={creatorId} onCampaignPress={handleCampaignPress} />;
       case 'reviews':
-        return <ReviewsTab />;
+        return <ReviewsTab creatorId={creatorId} />;
       default:
         return null;
     }
   };
+
+  if (!creatorId) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor={P.white} />
+        <TopBar onBack={handleBack} onMenuPress={handleMenuPress} />
+        <View style={s.centerState}>
+          <Icons name="alert-triangle" size={sp(32)} color={P.red} />
+          <Text style={s.centerStateTxt}>Missing creator reference.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (profileLoading) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor={P.white} />
+        <TopBar onBack={handleBack} onMenuPress={handleMenuPress} />
+        <View style={s.centerState}>
+          <ActivityIndicator size="large" color={P.teal} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (profileError || !creatorProfile) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor={P.white} />
+        <TopBar onBack={handleBack} onMenuPress={handleMenuPress} />
+        <View style={s.centerState}>
+          <Icons name="alert-triangle" size={sp(32)} color={P.red} />
+          <Text style={s.centerStateTxt}>
+            {profileErrorObj?.message || 'Could not load this profile.'}
+          </Text>
+          <TouchableOpacity style={s.retryBtn} onPress={refetchProfile} activeOpacity={0.8}>
+            <Text style={s.retryBtnTxt}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
 
       {/* ── Fixed top bar ──────────────────────────────── */}
-      <TopBar
-        onBack={() => navigation?.goBack?.()}
-        onMenuPress={handleMenuPress}
-      />
+      <TopBar onBack={handleBack} onMenuPress={handleMenuPress} />
 
       {/* ── Scrollable body ────────────────────────────── */}
       <ScrollView
@@ -249,7 +321,6 @@ const CreatorProfileScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         bounces={false}
         overScrollMode="never"
-        // stickyHeaderIndices={[2]} — tab switcher is index 2 in the list below
         stickyHeaderIndices={[2]}
       >
         {/* index 0 — Hero header */}
@@ -289,4 +360,24 @@ const s = StyleSheet.create({
     backgroundColor: P.bg,
     minHeight: 400, // ensure scroll works when content is short
   },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: sp(32),
+  },
+  centerStateTxt: {
+    fontSize: sp(13),
+    color: P.gray,
+    textAlign: 'center',
+    marginTop: sp(10),
+  },
+  retryBtn: {
+    marginTop: sp(16),
+    paddingHorizontal: sp(20),
+    paddingVertical: sp(10),
+    borderRadius: sp(50),
+    backgroundColor: P.teal,
+  },
+  retryBtnTxt: { fontSize: sp(13), fontWeight: '700', color: P.white },
 });

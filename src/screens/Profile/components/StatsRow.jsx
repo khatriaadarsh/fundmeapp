@@ -16,23 +16,33 @@ const P = {
   border:    '#E5E7EB',
 };
 
-const STATS = [
-  { value: '12',     label: 'Campaigns' },
-  { value: '4.5M',   label: 'Raised'    },
-  { value: '234',    label: 'Donors'    },
-  { value: '4.8★',   label: 'Rating'    },
-];
+// Compacts large numbers (e.g. 4500000 -> "4.5M", 850 -> "850")
+const formatCompact = (n) => {
+  const num = Number(n || 0);
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+  return String(num);
+};
 
-const StatsRow = memo(() => (
-  <View style={s.card}>
-    {STATS.map((stat, i) => (
-      <View key={stat.label} style={[s.col, i < STATS.length - 1 && s.divider]}>
-        <Text style={s.value}>{stat.value}</Text>
-        <Text style={s.label}>{stat.label}</Text>
-      </View>
-    ))}
-  </View>
-));
+const StatsRow = memo(({ campaignCount, amountRaised, totalDonors, averageRating }) => {
+  const stats = [
+    { value: formatCompact(campaignCount), label: 'Campaigns' },
+    { value: formatCompact(amountRaised), label: 'Raised' },
+    { value: formatCompact(totalDonors), label: 'Donors' },
+    { value: `${Number(averageRating || 0).toFixed(1)}★`, label: 'Rating' },
+  ];
+
+  return (
+    <View style={s.card}>
+      {stats.map((stat, i) => (
+        <View key={stat.label} style={[s.col, i < stats.length - 1 && s.divider]}>
+          <Text style={s.value}>{stat.value}</Text>
+          <Text style={s.label}>{stat.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+});
 
 export default StatsRow;
 

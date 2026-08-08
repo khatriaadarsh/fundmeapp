@@ -10,10 +10,12 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import Icons   from 'react-native-vector-icons/Feather';
 import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+
+import { useCreatorAbout } from '../../../hooks/useCreator';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -78,30 +80,27 @@ const ab = StyleSheet.create({
   },
 });
 
-// ── Trust Score card ─────────────────────────────────────────
-const TrustScoreCard = memo(({ score = 92 }) => (
+// ── Trust Score card — label now reflects the real API value ──
+const TrustScoreCard = memo(({ score, label, description }) => (
   <SectionCard>
-    {/* Header */}
     <View style={ts.headerRow}>
       <Text style={sc.label}>TRUST SCORE</Text>
       <Icons name="info" size={sp(13)} color={P.light} />
     </View>
 
-    {/* Score + badge */}
     <View style={ts.scoreRow}>
       <Text style={ts.score}>{score}/100</Text>
       <View style={ts.excellentBadge}>
-        <Text style={ts.excellentTxt}>Excellent</Text>
+        <Text style={ts.excellentTxt}>{label}</Text>
       </View>
     </View>
 
-    {/* Progress bar */}
     <View style={ts.barBg}>
       <View style={[ts.barFill, { width: `${score}%` }]} />
     </View>
 
     <Text style={ts.desc}>
-      Verified profile, no past complaints, 100% campaign success
+      {description || 'No trust summary available yet.'}
     </Text>
   </SectionCard>
 ));
@@ -154,37 +153,37 @@ const ts = StyleSheet.create({
   },
 });
 
-// ── Contact card ─────────────────────────────────────────────
-const CONTACT_ROWS = [
-  { icon: 'globe',    iconLib: 'feather', label: 'Website',   value: 'sarahcares.org',         verified: false },
-  { icon: 'mail',     iconLib: 'feather', label: 'Email',     value: 'sarah@sarahcares.org',   verified: true  },
-  { icon: 'phone',    iconLib: 'feather', label: 'Phone',     value: '+92 300 *****56',        verified: true  },
-  { icon: 'message-text-outline', iconLib: 'mc', label: 'Languages', value: 'English, Urdu',  verified: false },
-];
+// ── Contact card — driven by real data, checkmarks removed
+//    (this endpoint doesn't return verified flags per-field) ───
+const ContactCard = memo(({ email, phone, website, language }) => {
+  const rows = [
+    { icon: 'globe', iconLib: 'feather', label: 'Website', value: website },
+    { icon: 'mail', iconLib: 'feather', label: 'Email', value: email },
+    { icon: 'phone', iconLib: 'feather', label: 'Phone', value: phone },
+    { icon: 'message-text-outline', iconLib: 'mc', label: 'Languages', value: language },
+  ];
 
-const ContactCard = memo(() => (
-  <SectionCard>
-    <SectionLabel text="CONTACT" />
-    {CONTACT_ROWS.map((row, i) => (
-      <View key={row.label} style={[ct.row, i < CONTACT_ROWS.length - 1 && ct.rowBorder]}>
-        <View style={ct.iconWrap}>
-          {row.iconLib === 'feather' ? (
-            <Icons name={row.icon} size={sp(16)} color={P.darkOcean} />
-          ) : (
-            <MCIcons name={row.icon} size={sp(16)} color={P.darkOcean} />
-          )}
+  return (
+    <SectionCard>
+      <SectionLabel text="CONTACT" />
+      {rows.map((row, i) => (
+        <View key={row.label} style={[ct.row, i < rows.length - 1 && ct.rowBorder]}>
+          <View style={ct.iconWrap}>
+            {row.iconLib === 'feather' ? (
+              <Icons name={row.icon} size={sp(16)} color={P.darkOcean} />
+            ) : (
+              <MCIcons name={row.icon} size={sp(16)} color={P.darkOcean} />
+            )}
+          </View>
+          <Text style={ct.rowLabel}>{row.label}</Text>
+          <View style={ct.valueWrap}>
+            <Text style={ct.rowValue} numberOfLines={1}>{row.value}</Text>
+          </View>
         </View>
-        <Text style={ct.rowLabel}>{row.label}</Text>
-        <View style={ct.valueWrap}>
-          <Text style={ct.rowValue} numberOfLines={1}>{row.value}</Text>
-          {row.verified && (
-            <Icons name="check-circle" size={sp(13)} color={P.teal} style={{ marginLeft: sp(4) }} />
-          )}
-        </View>
-      </View>
-    ))}
-  </SectionCard>
-));
+      ))}
+    </SectionCard>
+  );
+});
 const ct = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -222,31 +221,31 @@ const ct = StyleSheet.create({
   },
 });
 
-// ── Achievements card ────────────────────────────────────────
-const ACHIEVEMENTS = [
-  { emoji: '🏆', label: 'Top Creator',  bg: '#FEF9C3', textColor: '#92400E' },
-  { emoji: '✅', label: 'Verified',     bg: P.tealLight, textColor: P.teal  },
-  { emoji: '💎', label: '100% Success', bg: '#F5F3FF', textColor: '#7C3AED' },
-  { emoji: '🌟', label: '5-Star Rated', bg: '#FFFBEB', textColor: '#D97706' },
-];
+// ── Achievements card — only renders when the API returns at
+//    least one item (currently always empty per the API sample) ─
+const AchievementsCard = memo(({ achievements }) => {
+  if (!achievements || achievements.length === 0) return null;
 
-const AchievementsCard = memo(() => (
-  <SectionCard>
-    <SectionLabel text="ACHIEVEMENTS" />
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={ach.row}
-    >
-      {ACHIEVEMENTS.map(a => (
-        <View key={a.label} style={[ach.badge, { backgroundColor: a.bg }]}>
-          <Text style={ach.emoji}>{a.emoji}</Text>
-          <Text style={[ach.badgeLabel, { color: a.textColor }]}>{a.label}</Text>
-        </View>
-      ))}
-    </ScrollView>
-  </SectionCard>
-));
+  return (
+    <SectionCard>
+      <SectionLabel text="ACHIEVEMENTS" />
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={ach.row}
+      >
+        {achievements.map((a, i) => (
+          <View key={a.label ?? i} style={[ach.badge, { backgroundColor: a.bg || P.tealLight }]}>
+            <Text style={ach.emoji}>{a.emoji || '🏅'}</Text>
+            <Text style={[ach.badgeLabel, { color: a.textColor || P.teal }]}>
+              {a.label || String(a)}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </SectionCard>
+  );
+});
 const ach = StyleSheet.create({
   row: { gap: sp(10), paddingVertical: sp(4) },
   badge: {
@@ -265,13 +264,49 @@ const ach = StyleSheet.create({
 // ════════════════════════════════════════════════════════════
 //  AboutTab — main export
 // ════════════════════════════════════════════════════════════
-const AboutTab = memo(({ user }) => (
-  <View style={{ paddingBottom: sp(24) }}>
-    <AboutCard bio={user.bio} />
-    <TrustScoreCard score={user.trustScore} />
-    <ContactCard />
-    <AchievementsCard />
-  </View>
-));
+const AboutTab = memo(({ creatorId }) => {
+  const { data, isLoading, isError, error } = useCreatorAbout(creatorId);
+
+  if (isLoading) {
+    return (
+      <View style={loader.wrap}>
+        <ActivityIndicator size="large" color={P.teal} />
+      </View>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <View style={loader.wrap}>
+        <Text style={loader.errTxt}>
+          {error?.message || 'Could not load profile details.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ paddingBottom: sp(24) }}>
+      <AboutCard bio={data.bio} />
+      <TrustScoreCard
+        score={data.trustScore}
+        label={data.trustScoreLabel}
+        description={data.trustDescription}
+      />
+      <ContactCard
+        email={data.email}
+        phone={data.phone}
+        website={data.website}
+        language={data.language}
+      />
+      <AchievementsCard achievements={data.achievements} />
+    </View>
+  );
+});
+
+const loader = StyleSheet.create({
+  wrap: { paddingVertical: sp(60), alignItems: 'center', justifyContent: 'center' },
+  errTxt: { fontSize: sp(13), color: P.gray, textAlign: 'center', paddingHorizontal: sp(30) },
+});
 
 export default AboutTab;
