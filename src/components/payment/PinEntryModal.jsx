@@ -1,208 +1,113 @@
 // src/components/payment/PinEntryModal.jsx
 // ─────────────────────────────────────────────────────────────
-//  PIN Entry Modal — themed to match app colors, presented as a
-//  Modal. Calls onSubmit(pin) when 4 digits are entered; onSubmit
-//  should be an async function that throws on failure (the modal
-//  will shake + clear the PIN automatically on error).
+//  MPIN Entry — centered card modal (teal theme).
+//  - No custom keypad. A hidden TextInput brings up the NATIVE
+//    numeric keyboard automatically when the modal opens / when the
+//    PIN boxes are tapped.
+//  - No logo asset (heart badge), no console.log / no Alert.
+//  - Backend responseCode + responseMessage shown via <ResponseModal />.
+//  onSubmit(pin) should be async and throw on failure → boxes shake+clear.
 // ─────────────────────────────────────────────────────────────
 
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
-  StatusBar,
   Animated,
   Dimensions,
   Modal,
   ActivityIndicator,
+  Keyboard,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 
-import { COLORS, SPACING, TYPOGRAPHY, scale } from '../../theme';
+import ResponseModal from '../ResponseModal';
 
-const { width: SW, height: SH } = Dimensions.get('window');
-const vscale = n => (SH / 812) * n;
+const { width: SW } = Dimensions.get('window');
+const scale = n => (SW / 375) * n;
 
+// ── Theme (teal) ──
 const T = {
-  navy: COLORS?.primary ?? '#0D4F6B',
-  navyDark: COLORS?.primaryDark ?? '#0B3D52',
-  teal: COLORS?.secondary ?? '#00B4CC',
-  white: COLORS?.white ?? '#FFFFFF',
-  textDark: COLORS?.textPrimary ?? '#111827',
-  textGray: COLORS?.textSecondary ?? '#64748B',
-  bg: COLORS?.background ?? '#F8FAFC',
-  dotBorder: COLORS?.secondary ?? '#00B4CC',
-  dotFill: COLORS?.secondary ?? '#00B4CC',
+  navy: '#0D4F6B',
+  teal: '#00B4CC',
+  white: '#FFFFFF',
+  textDark: '#111827',
+  textGray: '#64748B',
+  border: '#E5E7EB',
+  disabled: '#CBD5E1',
   red: '#EF4444',
+  redBg: '#FEE2E2',
+  overlay: 'rgba(15,23,42,0.55)',
 };
 
-const PIN_LENGTH = 4;
+const PIN_LENGTH = 4; // 4-digit MPIN
+const fmt = n => `Rs. ${Number(n || 0).toLocaleString('en-PK')}`;
 
-const PAD_KEYS = [
-  ['1', '2', '3'],
-  ['4', '5', '6'],
-  ['7', '8', '9'],
-  ['', '0', 'del'],
-];
-
-// ─────────────────────────────────────────────────────────────
-//  PinDot
-// ─────────────────────────────────────────────────────────────
-const PinDot = memo(({ filled }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (filled) {
-      Animated.sequence([
-        Animated.spring(scaleAnim, { toValue: 1.25, tension: 300, friction: 6, useNativeDriver: true }),
-        Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [filled, scaleAnim]);
-
-  return (
-    <Animated.View
-      style={[pd.dot, filled && pd.dotFilled, { transform: [{ scale: scaleAnim }] }]}
-    >
-      {filled && <Text style={pd.asterisk}>*</Text>}
-    </Animated.View>
-  );
-});
-
-const pd = StyleSheet.create({
-  dot: {
-    width: scale(54),
-    height: scale(54),
-    borderRadius: scale(12),
-    borderWidth: 2,
-    borderColor: T.dotBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: T.white,
-    marginHorizontal: scale(8),
-  },
-  dotFilled: { backgroundColor: T.white },
-  asterisk: {
-    fontSize: scale(28),
-    fontWeight: '800',
-    color: T.dotFill,
-    includeFontPadding: false,
-    lineHeight: scale(30),
-  },
-});
-
-// ─────────────────────────────────────────────────────────────
-//  NumKey
-// ─────────────────────────────────────────────────────────────
-const NumKey = memo(({ label, onPress, disabled }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handlePressIn = () =>
-    Animated.spring(scaleAnim, { toValue: 0.88, tension: 300, friction: 8, useNativeDriver: true }).start();
-  const handlePressOut = () =>
-    Animated.spring(scaleAnim, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }).start();
-
-  if (!label) return <View style={nk.empty} />;
-
-  const isDelete = label === 'del';
-
-  return (
-    <TouchableOpacity
-      onPress={() => !disabled && onPress(label)}
-      onPressIn={disabled ? undefined : handlePressIn}
-      onPressOut={disabled ? undefined : handlePressOut}
-      activeOpacity={1}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      disabled={disabled}
-    >
-      <Animated.View
-        style={[
-          nk.key,
-          isDelete && nk.deleteKey,
-          disabled && nk.keyDisabled,
-          { transform: [{ scale: scaleAnim }] },
-        ]}
-      >
-        {isDelete ? (
-          <Icon name="delete" size={scale(20)} color={T.white} />
-        ) : (
-          <Text style={nk.label}>{label}</Text>
-        )}
-      </Animated.View>
-    </TouchableOpacity>
-  );
-});
-
-const nk = StyleSheet.create({
-  key: {
-    width: scale(72),
-    height: scale(72),
-    borderRadius: scale(36),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyDisabled: { opacity: 0.4 },
-  deleteKey: {
-    width: scale(56),
-    height: scale(44),
-    borderRadius: scale(10),
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  empty: { width: scale(72), height: scale(72) },
-  label: {
-    fontSize: scale(26),
-    fontFamily: TYPOGRAPHY?.fontFamily?.semiBold ?? 'System',
-    color: T.white,
-    includeFontPadding: false,
-  },
-});
-
-// ─────────────────────────────────────────────────────────────
-//  Wave divider
-// ─────────────────────────────────────────────────────────────
-const WaveDivider = memo(() => (
-  <View style={wv.container} pointerEvents="none">
-    <View style={[wv.wave, wv.wave3]} />
-    <View style={[wv.wave, wv.wave2]} />
-    <View style={[wv.wave, wv.wave1]} />
+// ── Single PIN box ──
+const PinBox = memo(({ filled, isLast }) => (
+  <View style={[box.cell, isLast && box.cellLast]}>
+    {filled ? <Text style={box.dot}>•</Text> : null}
   </View>
 ));
 
-const WAVE_H = scale(48);
-const wv = StyleSheet.create({
-  container: { width: SW, height: WAVE_H, position: 'relative', marginBottom: -2 },
-  wave: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: WAVE_H * 1.6,
-    borderTopLeftRadius: SW * 0.55,
-    borderTopRightRadius: SW * 0.55,
+const box = StyleSheet.create({
+  cell: {
+    width: scale(58),
+    height: scale(58),
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRightWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  wave1: { backgroundColor: T.white, bottom: 0 },
-  wave2: { backgroundColor: 'rgba(255,255,255,0.5)', bottom: scale(6), transform: [{ scaleX: 1.05 }] },
-  wave3: { backgroundColor: 'rgba(255,255,255,0.25)', bottom: scale(12), transform: [{ scaleX: 1.1 }] },
+  cellLast: { borderRightWidth: 1 },
+  dot: {
+    fontSize: scale(26),
+    fontWeight: '800',
+    color: T.textDark,
+    includeFontPadding: false,
+  },
 });
 
-// ─────────────────────────────────────────────────────────────
-//  PinEntryModal
-// ─────────────────────────────────────────────────────────────
-const PinEntryModal = ({ visible, onClose, onSubmit }) => {
-  const [pin, setPin] = useState([]);
+// ── Main component ──
+const PinEntryModal = ({
+  visible,
+  onClose,
+  onSubmit,
+  onForgotPin,
+  amount,
+  name,
+  accountNumber,
+  attempts = 5,
+  title = 'Enter MPIN to authorize payment',
+
+  // Backend response: { visible, code, message } | null
+  error,
+  onErrorClose,
+}) => {
+  const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const inputRef = useRef(null);
 
+  const focusInput = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Reset + auto-open the native keyboard when the modal appears
   useEffect(() => {
     if (visible) {
-      setPin([]);
+      setPin('');
       setSubmitting(false);
+      const t = setTimeout(focusInput, 350);
+      return () => clearTimeout(t);
     }
-  }, [visible]);
+  }, [visible, focusInput]);
 
   const triggerShake = useCallback(() => {
     Animated.sequence([
@@ -214,87 +119,172 @@ const PinEntryModal = ({ visible, onClose, onSubmit }) => {
     ]).start();
   }, [shakeAnim]);
 
-  const handleKey = useCallback(
-    async key => {
-      if (submitting) return;
-
-      if (key === 'del') {
-        setPin(prev => prev.slice(0, -1));
-        return;
-      }
-      if (pin.length >= PIN_LENGTH) return;
-
-      const newPin = [...pin, key];
-      setPin(newPin);
-
-      if (newPin.length === PIN_LENGTH) {
-        const pinStr = newPin.join('');
-        setSubmitting(true);
-        try {
-          await onSubmit?.(pinStr);
-          // On success, the parent screen is responsible for closing
-          // this modal (e.g. once it opens the receipt).
-        } catch (err) {
-          triggerShake();
-          setPin([]);
-        } finally {
-          setSubmitting(false);
-        }
+  const runSubmit = useCallback(
+    async (pinStr) => {
+      setSubmitting(true);
+      Keyboard.dismiss();
+      try {
+        await onSubmit?.(pinStr);
+        // Parent closes the modal on success.
+      } catch (err) {
+        // No alert/log — shake + clear. Parent shows the exact backend
+        // responseCode/message via the `error` prop.
+        triggerShake();
+        setPin('');
+        setTimeout(focusInput, 250);
+      } finally {
+        setSubmitting(false);
       }
     },
-    [pin, submitting, onSubmit, triggerShake],
+    [onSubmit, triggerShake, focusInput],
   );
 
-  return (
-    <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <View style={s.root}>
-        <StatusBar barStyle="light-content" backgroundColor={T.navy} />
+  const handleChange = useCallback(
+    (text) => {
+      if (submitting) return;
+      const digits = text.replace(/[^0-9]/g, '').slice(0, PIN_LENGTH);
+      setPin(digits);
+    },
+    [submitting],
+  );
 
-        <SafeAreaView style={s.header} edges={['top']}>
+  const complete = pin.length === PIN_LENGTH;
+
+  const handleSend = useCallback(() => {
+    if (!complete || submitting) return;
+    runSubmit(pin);
+  }, [complete, submitting, pin, runSubmit]);
+
+  const displayNumber = accountNumber ? String(accountNumber) : null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={s.overlay}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={submitting ? undefined : onClose}
+        />
+
+        <View style={s.card}>
+          {/* Hidden input — drives the native numeric keyboard */}
+          <TextInput
+            ref={inputRef}
+            value={pin}
+            onChangeText={handleChange}
+            keyboardType="number-pad"
+            maxLength={PIN_LENGTH}
+            secureTextEntry
+            autoFocus={false}
+            caretHidden
+            editable={!submitting}
+            style={s.hiddenInput}
+          />
+
+          {/* Close */}
           <TouchableOpacity
             onPress={onClose}
-            style={s.backBtn}
+            style={s.closeBtn}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             disabled={submitting}
           >
-            <Icon name="arrow-left" size={scale(20)} color={T.white} />
+            <Icon name="x" size={scale(20)} color={T.textDark} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>Enter PIN</Text>
-        </SafeAreaView>
 
-        <View style={s.cardSection}>
-          <Text style={s.emoji}>🙈</Text>
+          {/* Sending amount */}
+          <Text style={s.sendingLabel}>Sending</Text>
+          <Text style={s.amount}>{fmt(amount)}</Text>
 
-          <Text style={s.pinTitle}>Enter PIN</Text>
-          <Text style={s.pinSubtitle}>
-            {submitting ? 'Verifying your PIN...' : 'Please enter your PIN to proceed'}
-          </Text>
-
-          <Animated.View style={[s.dotsRow, { transform: [{ translateX: shakeAnim }] }]}>
-            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-              <PinDot key={i} filled={i < pin.length} />
-            ))}
-          </Animated.View>
-
-          {submitting && (
-            <ActivityIndicator size="small" color={T.teal} style={s.submittingLoader} />
-          )}
-        </View>
-
-        <View style={s.waveWrapper}>
-          <WaveDivider />
-        </View>
-
-        <View style={s.padSection}>
-          {PAD_KEYS.map((row, ri) => (
-            <View key={ri} style={s.padRow}>
-              {row.map((key, ki) => (
-                <NumKey key={ki} label={key} onPress={handleKey} disabled={submitting} />
-              ))}
+          {/* Badge + name/number (no "Recipient" fallback text) */}
+          {(name || displayNumber) && (
+            <View style={s.recipientRow}>
+              <View style={s.avatar}>
+                <Icon name="heart" size={scale(20)} color={T.white} />
+              </View>
+              <View>
+                {!!name && <Text style={s.recipientName}>{name}</Text>}
+                {!!displayNumber && (
+                  <Text style={s.recipientNumber}>{displayNumber}</Text>
+                )}
+              </View>
             </View>
-          ))}
-          <SafeAreaView edges={['bottom']} style={{ height: vscale(16) }} />
+          )}
+
+          {/* Title */}
+          <Text style={s.title}>{title}</Text>
+          <View style={s.divider} />
+
+          {/* PIN boxes — tap to open keyboard */}
+          <TouchableWithoutFeedback onPress={focusInput} disabled={submitting}>
+            <Animated.View
+              style={[s.pinRow, { transform: [{ translateX: shakeAnim }] }]}
+            >
+              {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+                <PinBox
+                  key={i}
+                  filled={i < pin.length}
+                  isLast={i === PIN_LENGTH - 1}
+                />
+              ))}
+            </Animated.View>
+          </TouchableWithoutFeedback>
+
+          {/* Attempts / verifying */}
+          {submitting ? (
+            <View style={s.verifyingRow}>
+              <ActivityIndicator size="small" color={T.teal} />
+              <Text style={s.verifyingTxt}>Verifying...</Text>
+            </View>
+          ) : (
+            <Text style={s.attempts}>{attempts} attempts remaining</Text>
+          )}
+
+          {/* Warning */}
+          <View style={s.warning}>
+            <Icon name="alert-triangle" size={scale(20)} color={T.red} />
+            <Text style={s.warningTxt}>
+              Do not trust <Text style={s.warningBold}>ANYONE</Text> with your{' '}
+              <Text style={s.warningBold}>MPIN</Text>
+            </Text>
+          </View>
+
+          {/* Send money */}
+          <TouchableOpacity
+            style={[s.sendBtn, (!complete || submitting) && s.sendBtnDisabled]}
+            onPress={handleSend}
+            activeOpacity={0.88}
+            disabled={!complete || submitting}
+          >
+            <Text style={s.sendTxt}>SEND MONEY</Text>
+          </TouchableOpacity>
+
+          {/* Forgot MPIN */}
+          <TouchableOpacity
+            onPress={onForgotPin}
+            style={s.forgotBtn}
+            activeOpacity={0.7}
+            disabled={submitting}
+          >
+            <Text style={s.forgotTxt}>FORGOT MPIN</Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Backend response — exact code + message from server */}
+        {!!error && (
+          <ResponseModal
+            visible={!!error?.visible}
+            variant="error"
+            code={error?.code}
+            message={error?.message}
+            onClose={onErrorClose}
+          />
+        )}
       </View>
     </Modal>
   );
@@ -303,45 +293,139 @@ const PinEntryModal = ({ visible, onClose, onSubmit }) => {
 export default PinEntryModal;
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: T.navy },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(14),
-    backgroundColor: T.navy,
-  },
-  backBtn: { marginRight: scale(16) },
-  headerTitle: {
-    fontSize: scale(20),
-    fontFamily: TYPOGRAPHY?.fontFamily?.bold ?? 'System',
-    color: T.white,
-    letterSpacing: -0.3,
-  },
-  cardSection: {
+  overlay: {
     flex: 1,
-    backgroundColor: T.white,
+    backgroundColor: T.overlay,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: scale(16),
+    paddingHorizontal: scale(18),
   },
-  emoji: { fontSize: scale(60), marginBottom: scale(16) },
-  pinTitle: {
-    fontSize: scale(22),
-    fontFamily: TYPOGRAPHY?.fontFamily?.bold ?? 'System',
-    color: T.textDark,
-    marginBottom: scale(8),
-    letterSpacing: -0.3,
+  card: {
+    width: '100%',
+    maxWidth: scale(400),
+    backgroundColor: T.white,
+    borderRadius: scale(22),
+    paddingHorizontal: scale(20),
+    paddingTop: scale(14),
+    paddingBottom: scale(20),
   },
-  pinSubtitle: {
-    fontSize: scale(13),
-    fontFamily: TYPOGRAPHY?.fontFamily?.regular ?? 'System',
+
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+    top: 0,
+    left: 0,
+  },
+
+  closeBtn: { alignSelf: 'flex-end', padding: scale(4) },
+
+  sendingLabel: {
+    fontSize: scale(14),
     color: T.textGray,
-    marginBottom: scale(28),
+    textAlign: 'center',
+    marginTop: scale(2),
   },
-  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  submittingLoader: { marginTop: scale(20) },
-  waveWrapper: { backgroundColor: T.navy },
-  padSection: { backgroundColor: T.navy, paddingTop: scale(16), paddingBottom: scale(8), alignItems: 'center' },
-  padRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: scale(20), marginBottom: scale(8) },
+  amount: {
+    fontSize: scale(40),
+    fontWeight: '800',
+    color: T.textDark,
+    textAlign: 'center',
+    marginTop: scale(2),
+  },
+
+  recipientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(12),
+    marginTop: scale(10),
+  },
+  avatar: {
+    width: scale(46),
+    height: scale(46),
+    borderRadius: scale(23),
+    backgroundColor: T.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientName: { fontSize: scale(18), fontWeight: '800', color: T.textDark },
+  recipientNumber: { fontSize: scale(15), color: T.textGray, marginTop: scale(2) },
+
+  title: {
+    fontSize: scale(16),
+    fontWeight: '800',
+    color: T.textDark,
+    textAlign: 'center',
+    marginTop: scale(20),
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: T.border,
+    marginTop: scale(14),
+  },
+
+  pinRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: scale(20),
+  },
+
+  attempts: {
+    fontSize: scale(14),
+    fontWeight: '600',
+    color: T.teal,
+    textAlign: 'center',
+    marginTop: scale(14),
+  },
+  verifyingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scale(8),
+    marginTop: scale(14),
+  },
+  verifyingTxt: { fontSize: scale(14), fontWeight: '600', color: T.teal },
+
+  warning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scale(10),
+    backgroundColor: T.redBg,
+    borderRadius: scale(24),
+    paddingHorizontal: scale(16),
+    paddingVertical: scale(12),
+    marginTop: scale(16),
+  },
+  warningTxt: { flex: 1, fontSize: scale(13.5), color: T.red },
+  warningBold: { fontWeight: '800', color: T.red },
+
+  sendBtn: {
+    height: scale(52),
+    borderRadius: scale(12),
+    backgroundColor: T.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: scale(16),
+  },
+  sendBtnDisabled: { backgroundColor: T.disabled },
+  sendTxt: {
+    fontSize: scale(15),
+    fontWeight: '700',
+    color: T.white,
+    letterSpacing: 0.5,
+  },
+
+  forgotBtn: {
+    alignItems: 'center',
+    paddingVertical: scale(12),
+    marginTop: scale(4),
+  },
+  forgotTxt: {
+    fontSize: scale(14),
+    fontWeight: '800',
+    color: T.teal,
+    letterSpacing: 0.3,
+  },
 });

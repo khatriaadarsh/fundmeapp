@@ -47,6 +47,7 @@ export const ENDPOINTS = {
 DONATION: {
   INITIATE: '/campaign/donate',
   CONFIRM: '/campaign/donate/confirm',
+  HISTORY: (userId) => `/donation/history/${userId}`,
 },
   NOTIFICATION: {
   COUNT: '/notification/count',

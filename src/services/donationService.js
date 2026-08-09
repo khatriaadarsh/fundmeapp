@@ -38,3 +38,12 @@ export const confirmDonation = async ({ paymentReference, pin }) => {
     throw error;
   }
 };
+
+export const getDonationHistory = async (userId) => {
+  if (!userId) {
+    throw new Error('userId is required');
+  }
+  const endpointUrl = ENDPOINTS.DONATION.HISTORY(userId);
+  const res = await apiClient.get(endpointUrl);
+  return res.data;
+};

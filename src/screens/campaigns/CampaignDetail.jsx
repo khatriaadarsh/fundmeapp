@@ -14,17 +14,20 @@ import {
   FlatList,
   Modal,
   Linking,
-  Alert,
+  RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
+import { useFocusEffect } from '@react-navigation/native';
 import DonorInfoModal from './DonorInfoModal';
+import ResponseModal from '../../components/ResponseModal';
 
 // ── API wiring ──────────────────────────────────────────────
 import { useCampaignDetail } from '../../hooks/useCampaign';
 import { useRecentDonors, useDonorProfile } from '../../hooks/useDonor';
 import { useAppContext } from '../../context/AppContext';
+
 
 // ═══════════════════════════════════════════════════════════
 // Scale
@@ -1230,7 +1233,7 @@ const CampaignDetail = ({ navigation, route }) => {
     useCampaignDetail(campaignId);
 
   // ── Recent donors — live data ────────────────────────────
-  const { data: donorsData } = useRecentDonors(campaignId);
+  const { data: donorsData, refetch: refetchDonors } = useRecentDonors(campaignId);
   const donorsList = donorsData?.donors || [];
   const totalDonors = donorsData?.totalDonors ?? 0;
 
@@ -1240,6 +1243,44 @@ const CampaignDetail = ({ navigation, route }) => {
   const [saved, setSaved] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+
+  // ── Pull-to-refresh ────────────────────────────────────────
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetch(), refetchDonors()]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch, refetchDonors]);
+
+  // ── Auto-refresh whenever this screen comes back into focus ─
+  // Catches the "just donated, navigated back" case — raised
+  // amount / donor count / percentage refresh automatically the
+  // instant this screen is shown again, no manual pull needed.
+  useFocusEffect(
+    useCallback(() => {
+      if (campaignId) {
+        refetch();
+        refetchDonors();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [campaignId]),
+  );
+
+  // ── Error popup (bottom-sheet) — shows the EXACT backend
+  // responseCode/responseMessage, never a generic/random string.
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    code: '',
+    message: '',
+  });
+
+  const closeErrorModal = useCallback(() => {
+    setErrorModal(v => ({ ...v, visible: false }));
+  }, []);
 
   // ── Donor modal state ─────────────────────────────────────
   // selectedDonorBase = data already available from the recent-donors
@@ -1290,7 +1331,14 @@ const CampaignDetail = ({ navigation, route }) => {
       await Linking.openURL(doc.url);
     } catch (err) {
       console.error('🔴 [CampaignDetail] Open document error:', err?.message);
-      Alert.alert('Error', 'Could not open the document. Please try again.');
+      setErrorModal({
+        visible: true,
+        code: err?.response?.data?.responseCode || err?.code || '',
+        message:
+          err?.response?.data?.responseMessage ||
+          err?.message ||
+          'Could not open the document. Please try again.',
+      });
     }
   }, []);
 
@@ -1380,6 +1428,14 @@ const CampaignDetail = ({ navigation, route }) => {
         bounces={false}
         overScrollMode="never"
         contentContainerStyle={s.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={[C.green]}
+            tintColor={C.green}
+          />
+        }
       >
         <HeroImage
           image={data.image}
@@ -1444,6 +1500,14 @@ const CampaignDetail = ({ navigation, route }) => {
         initialIndex={viewerIndex}
         onClose={() => setViewerVisible(false)}
       />
+
+      <ResponseModal
+        visible={errorModal.visible}
+        variant="error"
+        code={errorModal.code}
+        message={errorModal.message}
+        onClose={closeErrorModal}
+      />
     </View>
   );
 };
@@ -1492,3 +1556,5 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 });
+
+

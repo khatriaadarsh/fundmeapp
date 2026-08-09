@@ -1,6 +1,5 @@
 // src/screens/donations/MyDonationsScreen.jsx
-
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -10,21 +9,24 @@ import {
   FlatList,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
 import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
 import { sp } from '../../theme/theme';
-
+// import { useDonation } from '../../hooks/useDonation';
+import { useDonation } from '../../hooks/useDonation';
+import { storage } from '../../utils/storage';
+import ResponseModal from '../../components/ResponseModal';
 // ─────────────────────────────────────────────────────────────
 //  Responsive helpers
 // ─────────────────────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const scale = n => (SW / 390) * n; // 390 = design base width
-
 // ─────────────────────────────────────────────────────────────
-//  Design tokens — UNCHANGED from the original screen
+//  Design tokens
 // ─────────────────────────────────────────────────────────────
 const C = {
   pageBg: '#F4F6F9',
@@ -33,81 +35,33 @@ const C = {
   gray: '#6B7280',
   lightGray: '#9CA3AF',
   border: '#E5E7EB',
-
   bannerStart: '#0D4F6B',
   bannerMid: '#0B7B8A',
   bannerEnd: '#00B4CC',
-
   tabActive: '#0D4F6B',
   tabInactive: '#6B7280',
-
   amountGreen: '#16A34A',
-
   completedBg: '#DCFCE7',
   completedFg: '#15803D',
   pendingBg: '#FEF9C3',
   pendingFg: '#B45309',
-
   paymentBg: '#F3F4F6',
   paymentFg: '#374151',
 };
-
-// ─────────────────────────────────────────────────────────────
-//  Mock data — replace with your real DONATION_HISTORY import
-// ─────────────────────────────────────────────────────────────
-const DONATION_HISTORY = [
-  {
-    id: '1',
-    title: "Help Fatima's Heart Surgery",
-    amount: 5000,
-    status: 'Completed',
-    paymentMethod: 'EasyPaisa',
-    transactionId: '564925374920',
-    date: 'Jan 15, 2025',
-    time: '2:30 PM',
-  },
-  {
-    id: '2',
-    title: 'Education Fund for Street Children',
-    amount: 2500,
-    status: 'Completed',
-    paymentMethod: 'Visa ••42',
-    transactionId: '685746354219',
-    date: 'Jan 10, 2025',
-    time: '10:15 AM',
-  },
-  {
-    id: '3',
-    title: 'Emergency Flood Relief',
-    amount: 10000,
-    status: 'Pending',
-    paymentMethod: 'JazzCash',
-    transactionId: '098754354317',
-    date: 'Dec 28, 2024',
-    time: '9:45 PM',
-  },
-];
-
 const TABS = ['All', 'Completed', 'Pending'];
-
 // ─────────────────────────────────────────────────────────────
 //  SummaryCard
-//  Same gradient/colours as before. Now shows Total Donated amount
-//  plus 3 stat boxes: Total, Completed, Pending — matching the
-//  "Total Balance + action row" layout from the reference image.
 // ─────────────────────────────────────────────────────────────
 const SummaryCard = memo(({ totalAmount, totalCount, completedCount, pendingCount }) => (
   <View style={summary.outer}>
     <View style={summary.layerDark} />
     <View style={summary.layerMid} />
     <View style={summary.circle} />
-
     <View style={summary.content}>
       <Text style={summary.label}>Total Donated</Text>
       <Text style={summary.amount}>
         PKR {totalAmount.toLocaleString('en-PK')}
       </Text>
-
       <View style={summary.statsRow}>
         <StatBox icon="layers" label="Total" value={totalCount} />
         <StatBox icon="check" label="Complete" value={completedCount} />
@@ -116,7 +70,6 @@ const SummaryCard = memo(({ totalAmount, totalCount, completedCount, pendingCoun
     </View>
   </View>
 ));
-
 const StatBox = memo(({ icon, label, value }) => (
   <View style={summary.statBox}>
     <View style={summary.statIconWrap}>
@@ -126,10 +79,8 @@ const StatBox = memo(({ icon, label, value }) => (
     <Text style={summary.statLabel}>{label}</Text>
   </View>
 ));
-
 const BANNER_H = scale(172);
 const CIRCLE_SIZE = scale(160);
-
 const summary = StyleSheet.create({
   outer: {
     marginHorizontal: sp(16),
@@ -180,7 +131,6 @@ const summary = StyleSheet.create({
     fontSize: sp(13),
     color: 'rgba(255,255,255,0.80)',
     fontWeight: '800',
-    // fontWeight: 
   },
   amount: {
     fontSize: sp(30),
@@ -189,7 +139,6 @@ const summary = StyleSheet.create({
     letterSpacing: -0.5,
     marginTop: sp(2),
   },
-
   statsRow: {
     flexDirection: 'row',
     gap: sp(8),
@@ -222,9 +171,8 @@ const summary = StyleSheet.create({
     marginTop: sp(1),
   },
 });
-
 // ─────────────────────────────────────────────────────────────
-//  FilterTabs — unchanged
+//  FilterTabs
 // ─────────────────────────────────────────────────────────────
 const FilterTabs = memo(({ tabs, active, onChange }) => (
   <View style={ft.row}>
@@ -244,7 +192,6 @@ const FilterTabs = memo(({ tabs, active, onChange }) => (
     })}
   </View>
 ));
-
 const ft = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -272,12 +219,11 @@ const ft = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
 // ─────────────────────────────────────────────────────────────
-//  StatusBadge — same colours, pill shape to match reference
+//  StatusBadge
 // ─────────────────────────────────────────────────────────────
 const StatusBadge = memo(({ status }) => {
-  const isCompleted = status === 'Completed';
+  const isCompleted = String(status).toUpperCase() === 'SUCCESS' || String(status).toUpperCase() === 'COMPLETED';
   return (
     <View
       style={[
@@ -291,12 +237,11 @@ const StatusBadge = memo(({ status }) => {
           { color: isCompleted ? C.completedFg : C.pendingFg },
         ]}
       >
-        {status}
+        {isCompleted ? 'Completed' : 'Pending'}
       </Text>
     </View>
   );
 });
-
 const badge = StyleSheet.create({
   statusWrap: {
     alignSelf: 'flex-start',
@@ -309,50 +254,69 @@ const badge = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
 // ─────────────────────────────────────────────────────────────
-//  DonationCard — redesigned to match the reference:
-//  icon box · title · amount
-//  payment method ......... status pill
-//  "Transaction ID" label
-//  id value ......... date · time
+//  DonationCard
 // ─────────────────────────────────────────────────────────────
 const ICON_BOX = scale(38);
-
-const DonationCard = memo(({ item }) => (
-  <View style={card.outer}>
-    {/* Top row: icon + title + amount */}
-    <View style={card.topRow}>
-      <View style={card.iconBox}>
-        <MCIcons name="hand-heart-outline" size={scale(18)} color={C.bannerStart} />
+// Formatting Date Helper for ISO 8601 Timestamps from Real API
+const formatDate = isoString => {
+  if (!isoString) return 'Recent';
+  try {
+    const date = new Date(isoString);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+  } catch (e) {
+    return 'Recent';
+  }
+};
+const formatTime = isoString => {
+  if (!isoString) return 'Live';
+  try {
+    const date = new Date(isoString);
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+  } catch (e) {
+    return 'Live';
+  }
+};
+const DonationCard = memo(({ item }) => {
+  const formattedDate = item.date?.includes('-') ? formatDate(item.date) : item.date;
+  const formattedTime = item.date?.includes('-') ? formatTime(item.date) : item.time;
+  return (
+    <View style={card.outer}>
+      {/* Top row: icon + title + amount */}
+      <View style={card.topRow}>
+        <View style={card.iconBox}>
+          <MCIcons name="hand-heart-outline" size={scale(18)} color={C.bannerStart} />
+        </View>
+        <View style={card.titleCol}>
+          <Text style={card.title} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={card.paymentMethod} numberOfLines={1}>
+            {item.paymentMethod}
+          </Text>
+        </View>
+        <View style={card.rightCol}>
+          <Text style={card.amount}>PKR {Number(item.amount || 0).toLocaleString('en-PK')}</Text>
+          <StatusBadge status={item.status} />
+        </View>
       </View>
-
-      <View style={card.titleCol}>
-        <Text style={card.title} numberOfLines={1}>
-          {item.title}
+      {/* Transaction ID + date/time */}
+      <Text style={card.txnLabel}>Transaction ID</Text>
+      <View style={card.txnRow}>
+        <Text style={card.txnId}>{item.transactionId}</Text>
+        <Text style={card.dateTime}>
+          {formattedDate} · {formattedTime}
         </Text>
-        <Text style={card.paymentMethod} numberOfLines={1}>
-          {item.paymentMethod}
-        </Text>
-      </View>
-
-      <View style={card.rightCol}>
-        <Text style={card.amount}>PKR {item.amount.toLocaleString('en-PK')}</Text>
-        <StatusBadge status={item.status} />
       </View>
     </View>
-
-    {/* Transaction ID + date/time */}
-    <Text style={card.txnLabel}>Transaction ID</Text>
-    <View style={card.txnRow}>
-      <Text style={card.txnId}>{item.transactionId}</Text>
-      <Text style={card.dateTime}>
-        {item.date} · {item.time}
-      </Text>
-    </View>
-  </View>
-));
-
+  );
+});
 const card = StyleSheet.create({
   outer: {
     backgroundColor: C.white,
@@ -365,7 +329,6 @@ const card = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
   },
-
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -381,7 +344,6 @@ const card = StyleSheet.create({
     marginRight: sp(10),
     flexShrink: 0,
   },
-
   titleCol: {
     flex: 1,
     marginRight: sp(8),
@@ -396,7 +358,6 @@ const card = StyleSheet.create({
     color: C.gray,
     marginTop: sp(2),
   },
-
   rightCol: {
     alignItems: 'flex-end',
     flexShrink: 0,
@@ -407,7 +368,6 @@ const card = StyleSheet.create({
     fontWeight: '700',
     color: C.amountGreen,
   },
-
   txnLabel: {
     fontSize: sp(10.5),
     color: C.lightGray,
@@ -428,9 +388,8 @@ const card = StyleSheet.create({
     color: C.lightGray,
   },
 });
-
 // ─────────────────────────────────────────────────────────────
-//  EmptyState — inline (no external component dep)
+//  EmptyState
 // ─────────────────────────────────────────────────────────────
 const EmptyState = memo(({ tab }) => (
   <View style={empty.wrap}>
@@ -441,7 +400,6 @@ const EmptyState = memo(({ tab }) => (
     </Text>
   </View>
 ));
-
 const empty = StyleSheet.create({
   wrap: {
     alignItems: 'center',
@@ -463,42 +421,82 @@ const empty = StyleSheet.create({
     lineHeight: sp(20),
   },
 });
-
 // ─────────────────────────────────────────────────────────────
-//  Card separator
+//  Separator
 // ─────────────────────────────────────────────────────────────
 const Separator = () => <View style={{ height: sp(12) }} />;
-
 // ─────────────────────────────────────────────────────────────
 //  MyDonationsScreen — main screen
 // ─────────────────────────────────────────────────────────────
 const MyDonationsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('All');
-
-  // Stats: total (all), completed count, pending count, total amount (all)
-  const stats = useMemo(() => {
-    const completed = DONATION_HISTORY.filter(d => d.status === 'Completed');
-    const pending = DONATION_HISTORY.filter(d => d.status === 'Pending');
-    const total = DONATION_HISTORY.reduce((sum, d) => sum + d.amount, 0);
-    return {
-      total,
-      totalCount: DONATION_HISTORY.length,
-      completedCount: completed.length,
-      pendingCount: pending.length,
+  const [userId, setUserId] = useState(9); // Default fallback user ID
+  const [responseModalVisible, setResponseModalVisible] = useState(false);
+  const [responseModalConfig, setResponseModalConfig] = useState({
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+  });
+  // Fetch logged-in user ID dynamically
+  useEffect(() => {
+    const fetchStoredUser = async () => {
+      const storedId = await storage.getUserId();
+      if (storedId) {
+        setUserId(Number(storedId));
+      }
     };
+    fetchStoredUser();
   }, []);
-
+  // API query integration
+  const { data, isLoading, error, refetch } = useDonation(userId);
+  // Trigger ResponseModal on API error as per response requirements
+  useEffect(() => {
+    if (error) {
+      setResponseModalConfig({
+        variant: 'error',
+        title: 'Network Error',
+        message: error.message || 'Failed to fetch donation history.',
+        code: '500',
+      });
+      setResponseModalVisible(true);
+    }
+  }, [error]);
+  const donationsList = useMemo(() => {
+    return data?.donations || [];
+  }, [data]);
+  // Stats calculation
+  const stats = useMemo(() => {
+    const completedList = donationsList.filter(d => 
+      String(d.status).toUpperCase() === 'SUCCESS' || String(d.status).toUpperCase() === 'COMPLETED'
+    );
+    const pendingList = donationsList.filter(d => 
+      String(d.status).toUpperCase() === 'PENDING'
+    );
+    const totalAmount = donationsList.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    return {
+      total: totalAmount,
+      totalCount: donationsList.length,
+      completedCount: completedList.length,
+      pendingCount: pendingList.length,
+    };
+  }, [donationsList]);
+  // Filtered List
   const filteredData = useMemo(() => {
-    if (activeTab === 'All') return DONATION_HISTORY;
-    return DONATION_HISTORY.filter(d => d.status === activeTab);
-  }, [activeTab]);
-
+    if (activeTab === 'All') return donationsList;
+    
+    return donationsList.filter(d => {
+      const rawStatus = String(d.status).toUpperCase();
+      const isSuccess = rawStatus === 'SUCCESS' || rawStatus === 'COMPLETED';
+      
+      if (activeTab === 'Completed') return isSuccess;
+      if (activeTab === 'Pending') return rawStatus === 'PENDING';
+      return false;
+    });
+  }, [donationsList, activeTab]);
   const handleBack = useCallback(() => navigation?.goBack?.(), [navigation]);
-
   const renderItem = useCallback(({ item }) => <DonationCard item={item} />, []);
-
-  const keyExtractor = useCallback(item => item.id, []);
-
+  const keyExtractor = useCallback(item => String(item.id || Math.random()), []);
   const ListHeader = useMemo(
     () => (
       <>
@@ -513,13 +511,10 @@ const MyDonationsScreen = ({ navigation }) => {
     ),
     [stats, activeTab],
   );
-
   const ListEmpty = useMemo(() => <EmptyState tab={activeTab} />, [activeTab]);
-
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
-
       <View style={s.header}>
         <TouchableOpacity
           onPress={handleBack}
@@ -529,12 +524,14 @@ const MyDonationsScreen = ({ navigation }) => {
         >
           <Icons name="arrow-left" size={sp(22)} color={C.dark} />
         </TouchableOpacity>
-
         <Text style={s.headerTitle}>My Donations</Text>
-
         <View style={s.headerSpacer} />
       </View>
-
+      {isLoading && (
+        <View style={s.loaderBox}>
+          <ActivityIndicator size="small" color={C.bannerStart} />
+        </View>
+      )}
       <FlatList
         data={filteredData}
         keyExtractor={keyExtractor}
@@ -544,21 +541,29 @@ const MyDonationsScreen = ({ navigation }) => {
         ListEmptyComponent={ListEmpty}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.listContent}
+        refreshing={isLoading}
+        onRefresh={refetch} // Triggers only on Pull-to-Refresh swipe gesture
         removeClippedSubviews={Platform.OS === 'android'}
         maxToRenderPerBatch={8}
         windowSize={10}
       />
+      {/* Cohesive design compliant Response modal */}
+      <ResponseModal
+        visible={responseModalVisible}
+        variant={responseModalConfig.variant}
+        title={responseModalConfig.title}
+        message={responseModalConfig.message}
+        code={responseModalConfig.code}
+        onClose={() => setResponseModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };
-
 export default MyDonationsScreen;
-
 // ─────────────────────────────────────────────────────────────
 //  Screen-level styles
 // ─────────────────────────────────────────────────────────────
 const BACK_BTN_W = sp(32);
-
 const s = StyleSheet.create({
   safe: {
     flex: 1,
@@ -593,4 +598,8 @@ const s = StyleSheet.create({
     paddingBottom: sp(32),
     flexGrow: 1,
   },
+  loaderBox: {
+    paddingVertical: sp(8),
+    alignItems: 'center',
+  }
 });
