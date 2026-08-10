@@ -1,7 +1,7 @@
 // src/components/rating/RatingModal.jsx
 // PURE REACT NATIVE — no div / className / web tags.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal,
   View,
@@ -10,9 +10,11 @@ import {
   StyleSheet,
   Platform,
   Keyboard,
-  KeyboardAvoidingView,
+  Animated,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { sp, COLORS } from './ratingTheme';
 import {
@@ -43,6 +45,58 @@ const RatingModal = ({
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Keyboard-aware sheet positioning ─────────────────────────
+  // Replaces KeyboardAvoidingView, which is unreliable inside a
+  // React Native Modal (Android in particular: `behavior={undefined}`
+  // there means no keyboard handling happens at all, since a Modal
+  // renders in its own native window). Instead we track the real
+  // keyboard height from the OS event and animate the sheet's
+  // `bottom` offset to match it exactly, synced to the keyboard's own
+  // animation duration.
+  const kbOffset = useRef(new Animated.Value(0)).current;
+  const [kbHeight, setKbHeight] = useState(0);
+  const { height: screenH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    // `will` events fire pre-emptively on iOS for a smooth synced
+    // animation; they don't reliably fire on Android, so `did` events
+    // are used there instead.
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = e => {
+      const height = e?.endCoordinates?.height ?? 0;
+      const duration = e?.duration ?? 250;
+      setKbHeight(height);
+      Animated.timing(kbOffset, {
+        toValue: height,
+        duration,
+        useNativeDriver: false, // animating `bottom`, not a transform
+      }).start();
+    };
+
+    const onHide = e => {
+      const duration = e?.duration ?? 200;
+      setKbHeight(0);
+      Animated.timing(kbOffset, {
+        toValue: 0,
+        duration,
+        useNativeDriver: false,
+      }).start();
+    };
+
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [kbOffset]);
+
   useEffect(() => {
     if (visible) {
       setStep('prompt');
@@ -50,14 +104,16 @@ const RatingModal = ({
       setStars(0);
       setMessage('');
       setSubmitting(false);
+      setKbHeight(0);
+      kbOffset.setValue(0);
     }
-  }, [visible]);
+  }, [visible, kbOffset]);
 
   const isPositive = sentiment === 'like' || sentiment === 'love';
   const sentimentKey = isPositive ? 'positive' : 'negative';
 
   // Prompt: just select/highlight — do NOT advance yet (SUBMIT advances)
-  const handleSelectSentiment = useCallback((key) => {
+  const handleSelectSentiment = useCallback(key => {
     setSentiment(key);
   }, []);
 
@@ -103,7 +159,16 @@ const RatingModal = ({
     } catch (e) {
       setSubmitting(false);
     }
-  }, [stars, submitting, onSubmit, context, targetName, sentiment, message, onClose]);
+  }, [
+    stars,
+    submitting,
+    onSubmit,
+    context,
+    targetName,
+    sentiment,
+    message,
+    onClose,
+  ]);
 
   const resultConfig = RESULT_CONTENT[context]?.[sentimentKey];
   const feedbackConfig =
@@ -113,6 +178,16 @@ const RatingModal = ({
   const thankYouConfig = THANK_YOU_CONTENT[context];
 
   const isFeedback = step === 'feedback';
+
+  // Sheet never exceeds 90% of the screen normally, and shrinks further
+  // to stay above the keyboard when it's open — so on shorter devices
+  // with a tall keyboard, the sheet's own ScrollView (feedback step)
+  // takes over scrolling instead of content getting pushed off the top
+  // of the screen or clipped behind the keyboard.
+  const sheetMaxHeight = Math.min(
+    screenH * 0.9,
+    screenH - insets.top - sp(24) - kbHeight,
+  );
 
   return (
     <Modal
@@ -130,12 +205,11 @@ const RatingModal = ({
         <View style={s.overlay} />
       </TouchableWithoutFeedback>
 
-      <KeyboardAvoidingView
-        style={s.kavWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <Animated.View
+        style={[s.kavWrap, { bottom: kbOffset }]}
         pointerEvents="box-none"
       >
-        <View style={s.sheet}>
+        <View style={[s.sheet, { maxHeight: sheetMaxHeight }]}>
           <View style={s.grabber} />
 
           {step === 'prompt' && (
@@ -187,7 +261,7 @@ const RatingModal = ({
             />
           )}
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </Modal>
   );
 };
@@ -203,7 +277,8 @@ const s = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
+    // `bottom` is animated inline to track the real keyboard height —
+    // see kbOffset above.
   },
   sheet: {
     backgroundColor: COLORS.white,

@@ -16,6 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 import { useAppContext } from '../context/AppContext';
 import { useProfileDetails } from '../hooks/useProfile';
+import { useNotificationList } from '../hooks/useNotifications';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -39,6 +40,10 @@ const P = {
   orangeLight: 'rgba(245,158,11,0.10)',
 };
 
+// NOTE: 'notif' intentionally has no static `badge` value anymore — it's
+// computed at render time from live notification data (see menuItems
+// below), since a hardcoded number here would drift from reality the
+// moment the user reads/deletes a notification.
 const ALL_MENU_ITEMS = [
   {
     id: 'edit',
@@ -78,7 +83,6 @@ const ALL_MENU_ITEMS = [
     icon: 'bell',
     color: P.teal,
     bg: 'rgba(0,180,204,0.10)',
-    badge: 3,
     roles: ['donor', 'creator'],
   },
   {
@@ -130,6 +134,19 @@ const ProfileScreen = ({ navigation }) => {
   // header (image, name, verified badge), not just the login response.
   const { data: profileData, isLoading } = useProfileDetails(userId);
 
+  // Same notification data source as NotificationsScreen, used here only
+  // to derive the unread count for the menu badge.
+  const { data: rawNotifications = [] } = useNotificationList(userId);
+
+  // Unread count for the "Notifications" menu badge. Adjust the field
+  // check below if your API uses a different flag than `isRead`/`read`.
+  const unreadNotifCount = useMemo(() => {
+    if (!Array.isArray(rawNotifications)) return 0;
+    return rawNotifications.filter(
+      n => n?.isRead === false || n?.read === false,
+    ).length;
+  }, [rawNotifications]);
+
   // Prefer live API data, fall back to currentUser (login response) only
   // while the profile details request is still in flight / hasn't resolved.
   const firstName = profileData?.firstName ?? currentUser?.firstName ?? '';
@@ -144,43 +161,59 @@ const ProfileScreen = ({ navigation }) => {
     profileData?.profileImageUrl ?? currentUser?.profileImage ?? null;
 
   const menuItems = useMemo(() => {
-    return ALL_MENU_ITEMS.filter(item => item.roles.includes(userRole));
-  }, [userRole]);
+    return ALL_MENU_ITEMS.filter(item => item.roles.includes(userRole)).map(
+      item =>
+        item.id === 'notif'
+          ? {
+              ...item,
+              badge:
+                unreadNotifCount > 0
+                  ? unreadNotifCount > 99
+                    ? '99+'
+                    : unreadNotifCount
+                  : null,
+            }
+          : item,
+    );
+  }, [userRole, unreadNotifCount]);
 
   const handleBack = useCallback(() => {
     navigation?.goBack?.();
   }, [navigation]);
 
-  const handleMenu = useCallback(id => {
-    switch(id) {
-      case 'edit':
-        navigation.navigate('EditProfile', {
-          profileData: profileData || currentUser,
-          userId: userId,
-        });
-        break;
-      case 'donate':
-        navigation.navigate('MyDonationScreen');
-        break;
-      case 'camp':
-        navigation.navigate('MyCampaignsScreen');
-        break;
-      case 'with':
-        navigation.navigate('MyWithdrawalsScreen');
-        break;
-      case 'notif':
-        navigation.navigate('NotificationsScreen');
-        break;
-      case 'faq':
-        navigation.navigate('FAQScreen');
-        break;
-      case 'terms':
-        navigation.navigate('TermsConditions');
-        break;
-      default:
-        console.log('Menu:', id);
-    }
-  }, [navigation, profileData, currentUser, userId]);
+  const handleMenu = useCallback(
+    id => {
+      switch (id) {
+        case 'edit':
+          navigation.navigate('EditProfile', {
+            profileData: profileData || currentUser,
+            userId: userId,
+          });
+          break;
+        case 'donate':
+          navigation.navigate('MyDonationScreen');
+          break;
+        case 'camp':
+          navigation.navigate('MyCampaignsScreen');
+          break;
+        case 'with':
+          navigation.navigate('MyWithdrawalsScreen');
+          break;
+        case 'notif':
+          navigation.navigate('NotificationsScreen');
+          break;
+        case 'faq':
+          navigation.navigate('FAQScreen');
+          break;
+        case 'terms':
+          navigation.navigate('TermsConditions');
+          break;
+        default:
+          console.log('Menu:', id);
+      }
+    },
+    [navigation, profileData, currentUser, userId],
+  );
 
   const handleLogout = useCallback(() => {
     navigation?.reset?.({ index: 0, routes: [{ name: 'Login' }] });
@@ -239,12 +272,18 @@ const ProfileScreen = ({ navigation }) => {
         ) : (
           <View style={[styles.verifiedBadge, styles.notVerifiedBadge]}>
             <Icons name="x-circle" size={sp(11)} color={P.red} />
-            <Text style={[styles.verifiedTxt, styles.notVerifiedTxt]}>CNIC Not Verified</Text>
+            <Text style={[styles.verifiedTxt, styles.notVerifiedTxt]}>
+              CNIC Not Verified
+            </Text>
           </View>
         )}
 
         {isLoading && (
-          <ActivityIndicator size="small" color={P.white} style={styles.loader} />
+          <ActivityIndicator
+            size="small"
+            color={P.white}
+            style={styles.loader}
+          />
         )}
       </LinearGradient>
 
@@ -252,7 +291,12 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.statItem}>
           <View style={styles.statTopRow}>
             <Text style={styles.statVal}>PKR 75,000</Text>
-            <Icons name="copy" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+            <Icons
+              name="copy"
+              size={sp(13)}
+              color={P.light}
+              style={{ marginLeft: sp(4) }}
+            />
           </View>
           <Text style={styles.statLbl}>Donated</Text>
         </View>
@@ -262,7 +306,12 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.statItem}>
           <View style={styles.statTopRow}>
             <Text style={styles.statVal}>15</Text>
-            <Icons name="heart" size={sp(13)} color={P.light} style={{ marginLeft: sp(4) }} />
+            <Icons
+              name="heart"
+              size={sp(13)}
+              color={P.light}
+              style={{ marginLeft: sp(4) }}
+            />
           </View>
           <Text style={styles.statLbl}>Donations</Text>
         </View>

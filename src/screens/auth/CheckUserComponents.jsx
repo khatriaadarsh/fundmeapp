@@ -179,7 +179,7 @@ const btnSt = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: sp(52),
-    backgroundColor: GRAD_START,
+    backgroundColor: GRAD_MID,
     borderRadius: sp(12),
     elevation: 3,
     marginTop: sp(20),

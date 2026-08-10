@@ -1,4 +1,11 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  memo,
+} from 'react';
 import {
   View,
   Text,
@@ -12,6 +19,8 @@ import {
   Platform,
   Image,
   Alert,
+  Animated,
+  Keyboard,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
@@ -23,39 +32,42 @@ import DonationReceiptModal from '../../components/donation/DonationReceiptModal
 
 // ── API / context wiring ────────────────────────────────────
 import { useCampaignDetail } from '../../hooks/useCampaign';
-import { useInitiateDonation, useConfirmDonation } from '../../hooks/useDonation';
+import {
+  useInitiateDonation,
+  useConfirmDonation,
+} from '../../hooks/useDonation';
 import { useAppContext } from '../../context/AppContext';
 
 // ─── Scale ───────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
-const SB_H = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+const SB_H = Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0;
 
 // ─── Tokens ──────────────────────────────────────────────
 const C = {
-  bg:         '#F8FAFC',
-  white:      '#FFFFFF',
-  teal:       '#00B4CC',
-  tealLight:  'rgba(0,180,204,0.10)',
+  bg: '#F8FAFC',
+  white: '#FFFFFF',
+  teal: '#00B4CC',
+  tealLight: 'rgba(0,180,204,0.10)',
   tealBorder: 'rgba(0,180,204,0.35)',
-  green:      '#059669',
+  green: '#059669',
   greenLight: '#10B981',
-  dark:       '#0F172A',
-  mid:        '#334155',
-  gray:       '#64748B',
-  light:      '#94A3B8',
-  border:     '#E2E8F0',
-  red:        '#EF4444',
+  dark: '#0F172A',
+  mid: '#334155',
+  gray: '#64748B',
+  light: '#94A3B8',
+  border: '#E2E8F0',
+  red: '#EF4444',
 };
 
 // ─── Static data ─────────────────────────────────────────
 const AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 
 const METHODS = [
-  { id: 'easypaisa', label: 'EasyPaisa',         icon: 'smartphone'  },
-  { id: 'card',      label: 'Credit / Debit Card', icon: 'credit-card' },
-  { id: 'bank',      label: 'Bank Transfer',      icon: 'repeat'      },
+  { id: 'easypaisa', label: 'EasyPaisa', icon: 'smartphone' },
+  { id: 'card', label: 'Credit / Debit Card', icon: 'credit-card' },
+  { id: 'bank', label: 'Bank Transfer', icon: 'repeat' },
 ];
 
 // ⚠️ Only EASYPAISA was confirmed by the sample API payload.
@@ -108,7 +120,11 @@ const MethodRow = memo(({ item, selected, onSelect }) => (
     activeOpacity={0.75}
   >
     <View style={[s.methodIcon, selected && s.methodIconActive]}>
-      <Icons name={item.icon} size={sp(16)} color={selected ? C.teal : C.gray} />
+      <Icons
+        name={item.icon}
+        size={sp(16)}
+        color={selected ? C.teal : C.gray}
+      />
     </View>
     <Text style={[s.methodLabel, selected && s.methodLabelActive]}>
       {item.label}
@@ -125,7 +141,8 @@ const DonateScreen = ({ navigation, route }) => {
     ? String(route.params.campaignId)
     : null;
 
-  const { data: campaign, isLoading: campaignLoading } = useCampaignDetail(campaignId);
+  const { data: campaign, isLoading: campaignLoading } =
+    useCampaignDetail(campaignId);
 
   const { currentUser } = useAppContext();
   const donorId = currentUser?.id;
@@ -138,19 +155,94 @@ const DonateScreen = ({ navigation, route }) => {
   const initiateDonationMutation = useInitiateDonation();
   const confirmDonationMutation = useConfirmDonation();
 
-  const [selected,       setSelected      ] = useState(5000);
-  const [custom,         setCustom        ] = useState('5,000');
-  const [anonymous,      setAnonymous     ] = useState(true);
-  const [message,        setMessage       ] = useState('');
-  const [method,         setMethod        ] = useState('easypaisa');
-  const [accountNumber,  setAccountNumber ] = useState('');
-  const [accountError,   setAccountError  ] = useState('');
+  const [selected, setSelected] = useState(5000);
+  const [custom, setCustom] = useState('5,000');
+  const [anonymous, setAnonymous] = useState(true);
+  const [message, setMessage] = useState('');
+  const [method, setMethod] = useState('easypaisa');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountError, setAccountError] = useState('');
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [pinVisible,     setPinVisible    ] = useState(false);
+  const [pinVisible, setPinVisible] = useState(false);
   const [receiptVisible, setReceiptVisible] = useState(false);
 
   const [paymentReference, setPaymentReference] = useState(null);
-  const [receiptData,      setReceiptData     ] = useState(null);
+  const [receiptData, setReceiptData] = useState(null);
+
+  // ── Keyboard-aware scrolling ─────────────────────────────────
+  // No native resize behavior is assumed here (KeyboardAvoidingView's
+  // Android 'height' behavior can double-shrink the screen if
+  // windowSoftInputMode is already adjustResize, and can under-react
+  // if it isn't). Instead the real keyboard height is tracked directly
+  // and used to (a) shrink the space available to the ScrollView +
+  // footer so the footer stays above the keyboard, and (b) scroll
+  // whichever field is focused into view — this is deterministic
+  // regardless of platform/manifest configuration.
+  const scrollRef = useRef(null);
+  const fieldOffsets = useRef({});
+  const kbPad = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = e => {
+      const height = e?.endCoordinates?.height ?? 0;
+      const duration = e?.duration ?? 250;
+      Animated.timing(kbPad, {
+        toValue: height,
+        duration,
+        useNativeDriver: false, // animating layout padding, not a transform
+      }).start();
+    };
+
+    const onHide = e => {
+      const duration = e?.duration ?? 200;
+      Animated.timing(kbPad, {
+        toValue: 0,
+        duration,
+        useNativeDriver: false,
+      }).start();
+    };
+
+    const showSub = Keyboard.addListener(showEvt, onShow);
+    const hideSub = Keyboard.addListener(hideEvt, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [kbPad]);
+
+  // Each keyboard-relevant field's container reports its own y-offset
+  // within the ScrollView via onLayout; on focus, that field is
+  // scrolled just below the top of the (now keyboard-shrunk) visible
+  // area so it's always fully visible while typing.
+  const registerFieldY = useCallback(
+    key => e => {
+      fieldOffsets.current[key] = e.nativeEvent.layout.y;
+    },
+    [],
+  );
+
+  const scrollToField = useCallback(key => {
+    const y = fieldOffsets.current[key];
+    if (y == null) return;
+    // Small delay lets the keyboard's show animation begin first, so
+    // the scroll target is calculated against the final shrunk scroll
+    // area rather than the pre-keyboard one.
+    setTimeout(
+      () => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(y - sp(20), 0),
+          animated: true,
+        });
+      },
+      Platform.OS === 'ios' ? 260 : 120,
+    );
+  }, []);
 
   // Sync custom field when preset tapped
   const handleAmountPress = useCallback(amount => {
@@ -164,11 +256,16 @@ const DonateScreen = ({ navigation, route }) => {
     setSelected(clean ? Number(clean) : 0);
   }, []);
 
-  const handleAccountNumberChange = useCallback(text => {
-    const digits = text.replace(/[^0-9]/g, '').slice(0, ACCOUNT_NUMBER_LENGTH);
-    setAccountNumber(digits);
-    if (accountError) setAccountError('');
-  }, [accountError]);
+  const handleAccountNumberChange = useCallback(
+    text => {
+      const digits = text
+        .replace(/[^0-9]/g, '')
+        .slice(0, ACCOUNT_NUMBER_LENGTH);
+      setAccountNumber(digits);
+      if (accountError) setAccountError('');
+    },
+    [accountError],
+  );
 
   const handleMethodSelect = useCallback(id => {
     setMethod(id);
@@ -195,7 +292,9 @@ const DonateScreen = ({ navigation, route }) => {
         return;
       }
       if (accountNumber.length !== ACCOUNT_NUMBER_LENGTH) {
-        setAccountError(`Account number must be ${ACCOUNT_NUMBER_LENGTH} digits`);
+        setAccountError(
+          `Account number must be ${ACCOUNT_NUMBER_LENGTH} digits`,
+        );
         return;
       }
     }
@@ -205,7 +304,10 @@ const DonateScreen = ({ navigation, route }) => {
       return;
     }
     if (!donorId) {
-      Alert.alert('Error', 'Could not identify your account. Please log in again.');
+      Alert.alert(
+        'Error',
+        'Could not identify your account. Please log in again.',
+      );
       return;
     }
 
@@ -234,7 +336,11 @@ const DonateScreen = ({ navigation, route }) => {
       const response = await initiateDonationMutation.mutateAsync(payload);
 
       if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert('Error', response?.responseMessage || 'Could not initiate donation. Please try again.');
+        Alert.alert(
+          'Error',
+          response?.responseMessage ||
+            'Could not initiate donation. Please try again.',
+        );
         return;
       }
 
@@ -248,9 +354,16 @@ const DonateScreen = ({ navigation, route }) => {
       setConfirmVisible(false);
       setPinVisible(true);
     } catch (error) {
-      console.error('🔴 [DonateScreen] Initiate donation error:', error?.message);
+      console.error(
+        '🔴 [DonateScreen] Initiate donation error:',
+        error?.message,
+      );
       const backendMsg = error?.response?.data?.responseMessage;
-      Alert.alert('Error', backendMsg || 'Could not initiate donation. Please check your connection.');
+      Alert.alert(
+        'Error',
+        backendMsg ||
+          'Could not initiate donation. Please check your connection.',
+      );
     }
   }, [
     campaignId,
@@ -294,7 +407,11 @@ const DonateScreen = ({ navigation, route }) => {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} translucent={false} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={C.bg}
+        translucent={false}
+      />
 
       {/* Header */}
       <View style={s.header}>
@@ -308,135 +425,153 @@ const DonateScreen = ({ navigation, route }) => {
         <View style={s.headerSpacer} />
       </View>
 
-      <ScrollView
-        style={s.scroll}
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        bounces={false}
-        overScrollMode="never"
-      >
-        <CampaignCard
-          title={campaign?.title}
-          image={campaign?.image}
-          remaining={campaign ? campaign.goal - campaign.raised : 0}
-          loading={campaignLoading}
-        />
-
-        <Text style={s.sectionLabel}>Select Amount</Text>
-        <View style={s.pillGrid}>
-          {AMOUNTS.map(a => (
-            <AmountPill
-              key={a}
-              amount={a}
-              selected={selected === a}
-              onPress={handleAmountPress}
-            />
-          ))}
-        </View>
-
-        <Text style={s.orLabel}>Or enter amount</Text>
-        <View style={s.customWrap}>
-          <Text style={s.currencyPrefix}>PKR</Text>
-          <TextInput
-            style={s.customInput}
-            value={custom}
-            onChangeText={handleCustomChange}
-            keyboardType="numeric"
-            placeholder="0"
-            placeholderTextColor={C.light}
+      {/* Shrinks by the real keyboard height so the footer (Pay button)
+          always stays above the keyboard instead of being covered by
+          it, and the ScrollView above it has a correspondingly smaller
+          — but still fully scrollable — visible area. */}
+      <Animated.View style={[s.body, { paddingBottom: kbPad }]}>
+        <ScrollView
+          ref={scrollRef}
+          style={s.scroll}
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          overScrollMode="never"
+        >
+          <CampaignCard
+            title={campaign?.title}
+            image={campaign?.image}
+            remaining={campaign ? campaign.goal - campaign.raised : 0}
+            loading={campaignLoading}
           />
-        </View>
 
-        <View style={s.toggleRow}>
-          <Icons name="grid" size={sp(16)} color={C.gray} />
-          <Text style={s.toggleLabel}>Donate Anonymously</Text>
-          <Switch
-            value={anonymous}
-            onValueChange={setAnonymous}
-            trackColor={{ false: C.border, true: C.teal }}
-            thumbColor={C.white}
-            ios_backgroundColor={C.border}
-            style={s.switch}
-          />
-        </View>
-
-        <Text style={s.sectionLabel}>Message (optional)</Text>
-        <TextInput
-          style={s.messageInput}
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Leave an encouraging message..."
-          placeholderTextColor={C.light}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-
-        <Text style={s.sectionLabel}>Payment Method</Text>
-        <View style={s.methodGroup}>
-          {METHODS.map(m => (
-            <MethodRow
-              key={m.id}
-              item={m}
-              selected={method === m.id}
-              onSelect={handleMethodSelect}
-            />
-          ))}
-        </View>
-
-        {showAccountField && (
-          <>
-            <Text style={s.sectionLabel}>Account Number</Text>
-            <View style={[s.accountWrap, accountError && s.accountWrapError]}>
-              <Icons name="phone" size={sp(15)} color={accountError ? C.red : C.gray} />
-              <TextInput
-                style={s.accountInput}
-                value={accountNumber}
-                onChangeText={handleAccountNumberChange}
-                keyboardType="number-pad"
-                placeholder="e.g. 03451234567"
-                placeholderTextColor={C.light}
-                maxLength={ACCOUNT_NUMBER_LENGTH}
+          <Text style={s.sectionLabel}>Select Amount</Text>
+          <View style={s.pillGrid}>
+            {AMOUNTS.map(a => (
+              <AmountPill
+                key={a}
+                amount={a}
+                selected={selected === a}
+                onPress={handleAmountPress}
               />
-              <Text style={s.accountCounter}>
-                {accountNumber.length}/{ACCOUNT_NUMBER_LENGTH}
-              </Text>
-            </View>
-            {!!accountError && (
-              <View style={s.errorRow}>
-                <Icons name="alert-circle" size={sp(12)} color={C.red} />
-                <Text style={s.errorText}>{accountError}</Text>
+            ))}
+          </View>
+
+          <Text style={s.orLabel}>Or enter amount</Text>
+          <View style={s.customWrap} onLayout={registerFieldY('custom')}>
+            <Text style={s.currencyPrefix}>PKR</Text>
+            <TextInput
+              style={s.customInput}
+              value={custom}
+              onChangeText={handleCustomChange}
+              onFocus={() => scrollToField('custom')}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={C.light}
+            />
+          </View>
+
+          <View style={s.toggleRow}>
+            <Icons name="grid" size={sp(16)} color={C.gray} />
+            <Text style={s.toggleLabel}>Donate Anonymously</Text>
+            <Switch
+              value={anonymous}
+              onValueChange={setAnonymous}
+              trackColor={{ false: C.border, true: C.teal }}
+              thumbColor={C.white}
+              ios_backgroundColor={C.border}
+              style={s.switch}
+            />
+          </View>
+
+          <Text style={s.sectionLabel}>Message (optional)</Text>
+          <TextInput
+            style={s.messageInput}
+            value={message}
+            onChangeText={setMessage}
+            onLayout={registerFieldY('message')}
+            onFocus={() => scrollToField('message')}
+            placeholder="Leave an encouraging message..."
+            placeholderTextColor={C.light}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+
+          <Text style={s.sectionLabel}>Payment Method</Text>
+          <View style={s.methodGroup}>
+            {METHODS.map(m => (
+              <MethodRow
+                key={m.id}
+                item={m}
+                selected={method === m.id}
+                onSelect={handleMethodSelect}
+              />
+            ))}
+          </View>
+
+          {showAccountField && (
+            <>
+              <Text style={s.sectionLabel}>Account Number</Text>
+              <View
+                style={[s.accountWrap, accountError && s.accountWrapError]}
+                onLayout={registerFieldY('account')}
+              >
+                <Icons
+                  name="phone"
+                  size={sp(15)}
+                  color={accountError ? C.red : C.gray}
+                />
+                <TextInput
+                  style={s.accountInput}
+                  value={accountNumber}
+                  onChangeText={handleAccountNumberChange}
+                  onFocus={() => scrollToField('account')}
+                  keyboardType="number-pad"
+                  placeholder="e.g. 03451234567"
+                  placeholderTextColor={C.light}
+                  maxLength={ACCOUNT_NUMBER_LENGTH}
+                />
+                <Text style={s.accountCounter}>
+                  {accountNumber.length}/{ACCOUNT_NUMBER_LENGTH}
+                </Text>
               </View>
-            )}
-          </>
-        )}
+              {!!accountError && (
+                <View style={s.errorRow}>
+                  <Icons name="alert-circle" size={sp(12)} color={C.red} />
+                  <Text style={s.errorText}>{accountError}</Text>
+                </View>
+              )}
+            </>
+          )}
 
-        <View style={s.bottomPad} />
-      </ScrollView>
+          <View style={s.bottomPad} />
+        </ScrollView>
 
-      <View style={s.footer}>
-        <TouchableOpacity onPress={handlePay} activeOpacity={0.88}>
-          <LinearGradient
-            colors={[C.green, C.greenLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={s.payBtn}
-          >
-            <Text style={s.payBtnTxt}>
-              Pay PKR {selected > 0 ? fmt(selected) : '0'}
+        <View style={s.footer}>
+          <TouchableOpacity onPress={handlePay} activeOpacity={0.88}>
+            <LinearGradient
+              colors={[C.teal, C.tealborder]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.payBtn}
+            >
+              <Text style={s.payBtnTxt}>
+                Pay PKR {selected > 0 ? fmt(selected) : '0'}
+              </Text>
+              <Icons name="arrow-right" size={sp(18)} color={C.white} />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={s.secureRow}>
+            <Icons name="lock" size={sp(12)} color={C.light} />
+            <Text style={s.secureTxt}>
+              Secure · Zero Commission · 100% reaches campaign
             </Text>
-            <Icons name="arrow-right" size={sp(18)} color={C.white} />
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={s.secureRow}>
-          <Icons name="lock" size={sp(12)} color={C.light} />
-          <Text style={s.secureTxt}>
-            Secure · Zero Commission · 100% reaches campaign
-          </Text>
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Step 1 — review + triggers initiate donation */}
       <DonationConfirmModal
@@ -476,100 +611,105 @@ export default DonateScreen;
 
 // ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
-
   root: {
-    flex:            1,
+    flex: 1,
     backgroundColor: C.bg,
   },
 
   header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: sp(18),
-    paddingTop:        SB_H + sp(12),
-    paddingBottom:     sp(12),
-    backgroundColor:   C.bg,
+    paddingTop: SB_H + sp(12),
+    paddingBottom: sp(12),
+    backgroundColor: C.bg,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.border,
   },
   headerTitle: {
-    fontSize:           sp(17),
-    fontWeight:         '700',
-    color:              C.dark,
+    fontSize: sp(17),
+    fontWeight: '700',
+    color: C.dark,
     includeFontPadding: false,
   },
   headerSpacer: { width: sp(22) },
 
-  scroll:        { flex: 1 },
+  // Wraps ScrollView + footer so the animated keyboard padding above
+  // shrinks both together, keeping the footer above the keyboard.
+  body: {
+    flex: 1,
+  },
+
+  scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: sp(18),
-    paddingTop:        sp(16),
+    paddingTop: sp(16),
   },
 
   campaignCard: {
-    flexDirection:   'row',
-    alignItems:      'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: C.white,
-    borderRadius:    sp(12),
-    padding:         sp(12),
-    marginBottom:    sp(20),
-    borderWidth:     1,
-    borderColor:     C.border,
-    gap:             sp(12),
+    borderRadius: sp(12),
+    padding: sp(12),
+    marginBottom: sp(20),
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: sp(12),
   },
   campaignImg: {
-    width:        sp(54),
-    height:       sp(44),
+    width: sp(54),
+    height: sp(44),
     borderRadius: sp(8),
     backgroundColor: C.border,
   },
-  campaignInfo:      { flex: 1 },
+  campaignInfo: { flex: 1 },
   campaignTitle: {
-    fontSize:           sp(13),
-    fontWeight:         '700',
-    color:              C.dark,
-    marginBottom:       sp(4),
+    fontSize: sp(13),
+    fontWeight: '700',
+    color: C.dark,
+    marginBottom: sp(4),
     includeFontPadding: false,
   },
   campaignRemaining: {
-    fontSize:           sp(12),
-    fontWeight:         '600',
-    color:              C.green,
+    fontSize: sp(12),
+    fontWeight: '600',
+    color: C.green,
     includeFontPadding: false,
   },
 
   sectionLabel: {
-    fontSize:           sp(14),
-    fontWeight:         '700',
-    color:              C.dark,
-    marginBottom:       sp(10),
+    fontSize: sp(14),
+    fontWeight: '700',
+    color: C.dark,
+    marginBottom: sp(10),
     includeFontPadding: false,
   },
 
   pillGrid: {
-    flexDirection:  'row',
-    flexWrap:       'wrap',
-    gap:            sp(8),
-    marginBottom:   sp(14),
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: sp(8),
+    marginBottom: sp(14),
   },
   pill: {
-    width:             (SW - sp(36) - sp(16)) / 3,
-    paddingVertical:   sp(11),
-    borderRadius:      sp(8),
-    borderWidth:       1.5,
-    borderColor:       C.border,
-    backgroundColor:   C.white,
-    alignItems:        'center',
+    width: (SW - sp(36) - sp(16)) / 3,
+    paddingVertical: sp(11),
+    borderRadius: sp(8),
+    borderWidth: 1.5,
+    borderColor: C.border,
+    backgroundColor: C.white,
+    alignItems: 'center',
   },
   pillActive: {
     backgroundColor: C.teal,
-    borderColor:     C.teal,
+    borderColor: C.teal,
   },
   pillTxt: {
-    fontSize:           sp(13),
-    fontWeight:         '600',
-    color:              C.mid,
+    fontSize: sp(13),
+    fontWeight: '600',
+    color: C.mid,
     includeFontPadding: false,
   },
   pillTxtActive: {
@@ -577,175 +717,174 @@ const s = StyleSheet.create({
   },
 
   orLabel: {
-    fontSize:           sp(12),
-    color:              C.gray,
-    marginBottom:       sp(8),
+    fontSize: sp(12),
+    color: C.gray,
+    marginBottom: sp(8),
     includeFontPadding: false,
   },
   customWrap: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   C.white,
-    borderRadius:      sp(10),
-    borderWidth:       1.5,
-    borderColor:       C.teal,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: sp(10),
+    borderWidth: 1.5,
+    borderColor: C.teal,
     paddingHorizontal: sp(14),
-    height:            sp(52),
-    marginBottom:      sp(16),
-    gap:               sp(8),
+    height: sp(52),
+    marginBottom: sp(16),
+    gap: sp(8),
   },
   currencyPrefix: {
-    fontSize:           sp(15),
-    fontWeight:         '600',
-    color:              C.gray,
+    fontSize: sp(15),
+    fontWeight: '600',
+    color: C.gray,
     includeFontPadding: false,
   },
   customInput: {
-    flex:               1,
-    fontSize:           sp(20),
-    fontWeight:         '700',
-    color:              C.dark,
-    padding:            0,
+    flex: 1,
+    fontSize: sp(20),
+    fontWeight: '700',
+    color: C.dark,
+    padding: 0,
     includeFontPadding: false,
   },
 
   toggleRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   C.white,
-    borderRadius:      sp(10),
-    borderWidth:       1,
-    borderColor:       C.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: sp(10),
+    borderWidth: 1,
+    borderColor: C.border,
     paddingHorizontal: sp(14),
-    paddingVertical:   sp(12),
-    marginBottom:      sp(16),
-    gap:               sp(10),
+    paddingVertical: sp(12),
+    marginBottom: sp(16),
+    gap: sp(10),
   },
   toggleLabel: {
-    flex:               1,
-    fontSize:           sp(14),
-    fontWeight:         '500',
-    color:              C.dark,
+    flex: 1,
+    fontSize: sp(14),
+    fontWeight: '500',
+    color: C.dark,
     includeFontPadding: false,
   },
   switch: {
-    transform: Platform.OS === 'ios'
-      ? [{ scaleX: 0.85 }, { scaleY: 0.85 }]
-      : [],
+    transform:
+      Platform.OS === 'ios' ? [{ scaleX: 0.85 }, { scaleY: 0.85 }] : [],
   },
 
   messageInput: {
-    backgroundColor:   C.white,
-    borderRadius:      sp(10),
-    borderWidth:       1,
-    borderColor:       C.border,
+    backgroundColor: C.white,
+    borderRadius: sp(10),
+    borderWidth: 1,
+    borderColor: C.border,
     paddingHorizontal: sp(14),
-    paddingTop:        sp(12),
-    paddingBottom:     sp(12),
-    fontSize:          sp(14),
-    color:             C.dark,
-    minHeight:         sp(90),
-    marginBottom:      sp(20),
+    paddingTop: sp(12),
+    paddingBottom: sp(12),
+    fontSize: sp(14),
+    color: C.dark,
+    minHeight: sp(90),
+    marginBottom: sp(20),
     includeFontPadding: false,
   },
 
   methodGroup: {
-    gap:          sp(8),
+    gap: sp(8),
     marginBottom: sp(16),
   },
   methodRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   C.white,
-    borderRadius:      sp(10),
-    borderWidth:       1.5,
-    borderColor:       C.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: sp(10),
+    borderWidth: 1.5,
+    borderColor: C.border,
     paddingHorizontal: sp(14),
-    paddingVertical:   sp(13),
-    gap:               sp(12),
+    paddingVertical: sp(13),
+    gap: sp(12),
   },
   methodRowActive: {
-    borderColor:     C.teal,
+    borderColor: C.teal,
     backgroundColor: C.tealLight,
   },
   methodIcon: {
-    width:           sp(34),
-    height:          sp(34),
-    borderRadius:    sp(8),
+    width: sp(34),
+    height: sp(34),
+    borderRadius: sp(8),
     backgroundColor: C.bg,
-    alignItems:      'center',
-    justifyContent:  'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   methodIconActive: {
     backgroundColor: 'rgba(0,180,204,0.12)',
   },
   methodLabel: {
-    flex:               1,
-    fontSize:           sp(14),
-    fontWeight:         '500',
-    color:              C.mid,
+    flex: 1,
+    fontSize: sp(14),
+    fontWeight: '500',
+    color: C.mid,
     includeFontPadding: false,
   },
   methodLabelActive: {
-    color:      C.teal,
+    color: C.teal,
     fontWeight: '600',
   },
   radio: {
-    width:        sp(20),
-    height:       sp(20),
+    width: sp(20),
+    height: sp(20),
     borderRadius: sp(10),
-    borderWidth:  1.5,
-    borderColor:  C.border,
-    alignItems:   'center',
+    borderWidth: 1.5,
+    borderColor: C.border,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   radioActive: {
     borderColor: C.teal,
   },
   radioDot: {
-    width:           sp(10),
-    height:          sp(10),
-    borderRadius:    sp(5),
+    width: sp(10),
+    height: sp(10),
+    borderRadius: sp(5),
     backgroundColor: C.teal,
   },
 
   accountWrap: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   C.white,
-    borderRadius:      sp(10),
-    borderWidth:       1.5,
-    borderColor:       C.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: sp(10),
+    borderWidth: 1.5,
+    borderColor: C.border,
     paddingHorizontal: sp(14),
-    height:            sp(48),
-    marginBottom:      sp(6),
-    gap:               sp(8),
+    height: sp(48),
+    marginBottom: sp(6),
+    gap: sp(8),
   },
   accountWrapError: {
     borderColor: C.red,
   },
   accountInput: {
-    flex:               1,
-    fontSize:           sp(14),
-    color:              C.dark,
-    padding:            0,
+    flex: 1,
+    fontSize: sp(14),
+    color: C.dark,
+    padding: 0,
     includeFontPadding: false,
   },
   accountCounter: {
-    fontSize:           sp(11),
-    color:              C.light,
+    fontSize: sp(11),
+    color: C.light,
     includeFontPadding: false,
   },
   errorRow: {
     flexDirection: 'row',
-    alignItems:    'center',
-    gap:           sp(5),
-    marginBottom:  sp(16),
+    alignItems: 'center',
+    gap: sp(5),
+    marginBottom: sp(16),
   },
   errorText: {
-    fontSize:           sp(11.5),
-    color:              C.red,
-    flex:                1,
+    fontSize: sp(11.5),
+    color: C.red,
+    flex: 1,
     includeFontPadding: false,
   },
 
@@ -753,41 +892,41 @@ const s = StyleSheet.create({
 
   footer: {
     paddingHorizontal: sp(18),
-    paddingTop:        sp(12),
-    paddingBottom:     Platform.OS === 'ios' ? sp(28) : sp(16),
-    backgroundColor:   C.bg,
-    borderTopWidth:    StyleSheet.hairlineWidth,
-    borderTopColor:    C.border,
+    paddingTop: sp(12),
+    paddingBottom: Platform.OS === 'ios' ? sp(28) : sp(16),
+    backgroundColor: C.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.border,
   },
   payBtn: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    height:          sp(54),
-    borderRadius:    sp(14),
-    gap:             sp(10),
-    elevation:       4,
-    shadowColor:     C.green,
-    shadowOffset:    { width: 0, height: 4 },
-    shadowOpacity:   0.28,
-    shadowRadius:    8,
-    marginBottom:    sp(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: sp(54),
+    borderRadius: sp(14),
+    gap: sp(10),
+    elevation: 4,
+    shadowColor: C.green,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    marginBottom: sp(10),
   },
   payBtnTxt: {
-    fontSize:           sp(17),
-    fontWeight:         '800',
-    color:              C.white,
+    fontSize: sp(17),
+    fontWeight: '800',
+    color: C.white,
     includeFontPadding: false,
   },
   secureRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap:            sp(5),
+    gap: sp(5),
   },
   secureTxt: {
-    fontSize:           sp(11),
-    color:              C.light,
+    fontSize: sp(11),
+    color: C.light,
     includeFontPadding: false,
   },
 });

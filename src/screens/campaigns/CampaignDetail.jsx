@@ -1,5 +1,12 @@
 // src/screens/campaigns/CampaignDetail.jsx
-import React, { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  memo,
+} from 'react';
 import {
   View,
   Text,
@@ -27,7 +34,6 @@ import ResponseModal from '../../components/ResponseModal';
 import { useCampaignDetail } from '../../hooks/useCampaign';
 import { useRecentDonors, useDonorProfile } from '../../hooks/useDonor';
 import { useAppContext } from '../../context/AppContext';
-
 
 // ═══════════════════════════════════════════════════════════
 // Scale
@@ -57,6 +63,7 @@ const C = {
   light: '#94A3B8',
   border: '#E2E8F0',
   cardBg: '#F8FAFC',
+  GRAD_END: '#15AABF',
 };
 
 // ✅ Hero tall enough to show URGENT + title + category
@@ -69,9 +76,7 @@ const SHEET_R = scale(24);
 // the absolutely-positioned StickyBar at the bottom of the screen.
 // ═══════════════════════════════════════════════════════════
 const STICKY_BAR_H =
-  scale(56) +
-  (Platform.OS === 'ios' ? vscale(28) : scale(16)) +
-  scale(14);
+  scale(56) + (Platform.OS === 'ios' ? vscale(28) : scale(16)) + scale(14);
 const SCROLL_BOTTOM_PAD = STICKY_BAR_H + scale(-10);
 
 const fmtPK = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
@@ -79,12 +84,19 @@ const fmtPK = n => `PKR ${Number(n || 0).toLocaleString('en-PK')}`;
 // Formats an ISO date string into separate display date + time
 // strings, matching what DonorInfoModal's InfoRow expects
 // ("Jan 15, 2025" · "2:30 PM").
-const formatDonationDateTime = (iso) => {
+const formatDonationDateTime = iso => {
   if (!iso) return { date: '', time: '' };
   try {
     const d = new Date(iso);
-    const date = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const date = d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+    });
+    const time = d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     return { date, time };
   } catch {
     return { date: '', time: '' };
@@ -129,7 +141,9 @@ const AvatarOrInitial = memo(({ uri, name, size, bg, color }) => {
         },
       ]}
     >
-      <Text style={[avI.text, { fontSize: size * 0.4, color: color || C.indigo }]}>
+      <Text
+        style={[avI.text, { fontSize: size * 0.4, color: color || C.indigo }]}
+      >
         {(name || '?').charAt(0).toUpperCase()}
       </Text>
     </View>
@@ -584,7 +598,7 @@ const cr = StyleSheet.create({
     width: scale(17),
     height: scale(17),
     borderRadius: scale(8.5),
-    backgroundColor: C.indigo,
+    backgroundColor: C.green,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -593,7 +607,7 @@ const cr = StyleSheet.create({
   link: {
     fontSize: scale(13),
     fontWeight: '700',
-    color: C.indigo,
+    color: C.GRAD_END,
     includeFontPadding: false,
   },
 });
@@ -1233,7 +1247,8 @@ const CampaignDetail = ({ navigation, route }) => {
     useCampaignDetail(campaignId);
 
   // ── Recent donors — live data ────────────────────────────
-  const { data: donorsData, refetch: refetchDonors } = useRecentDonors(campaignId);
+  const { data: donorsData, refetch: refetchDonors } =
+    useRecentDonors(campaignId);
   const donorsList = donorsData?.donors || [];
   const totalDonors = donorsData?.totalDonors ?? 0;
 
@@ -1371,27 +1386,29 @@ const CampaignDetail = ({ navigation, route }) => {
     if (!selectedDonorBase) return null;
 
     const isAnon = selectedDonorBase.isAnonymous;
-    const { date, time } = formatDonationDateTime(selectedDonorBase.donationDate);
+    const { date, time } = formatDonationDateTime(
+      selectedDonorBase.donationDate,
+    );
 
     return {
       id: selectedDonorBase.id,
       name: selectedDonorBase.name,
       isAnonymous: isAnon,
       avatarUri: selectedDonorBase.avatar,
-      location: !isAnon ? (donorProfile?.location ?? null) : null,
-      age: !isAnon ? (donorProfile?.age ?? null) : null,
-      gender: !isAnon ? (donorProfile?.gender ?? null) : null,
-      occupation: !isAnon ? (donorProfile?.occupation ?? null) : null,
-      phone: !isAnon ? (donorProfile?.phone ?? null) : null,
-      totalDonated: !isAnon ? (donorProfile?.totalDonated ?? null) : null,
+      location: !isAnon ? donorProfile?.location ?? null : null,
+      age: !isAnon ? donorProfile?.age ?? null : null,
+      gender: !isAnon ? donorProfile?.gender ?? null : null,
+      occupation: !isAnon ? donorProfile?.occupation ?? null : null,
+      phone: !isAnon ? donorProfile?.phone ?? null : null,
+      totalDonated: !isAnon ? donorProfile?.totalDonated ?? null : null,
       amount: selectedDonorBase.amount,
       donationDate: date,
       donationTime: time,
       paymentMethod: selectedDonorBase.paymentMethod || '',
       message: selectedDonorBase.message,
       timeAgo: selectedDonorBase.time,
-      totalCampaigns: !isAnon ? (donorProfile?.totalCampaigns ?? 0) : 0,
-      memberSince: !isAnon ? (donorProfile?.memberSince ?? '') : '',
+      totalCampaigns: !isAnon ? donorProfile?.totalCampaigns ?? 0 : 0,
+      memberSince: !isAnon ? donorProfile?.memberSince ?? '' : '',
     };
   }, [selectedDonorBase, donorProfile]);
 
@@ -1462,10 +1479,7 @@ const CampaignDetail = ({ navigation, route }) => {
           <CreatorCard creator={data.creator} onViewProfile={handleProfile} />
           <StorySection story={data.story} />
           <MediaGallery media={data.media} onItemPress={handleGalleryPress} />
-          <SocialProof
-            donorsList={donorsList}
-            donorsCount={totalDonors}
-          />
+          <SocialProof donorsList={donorsList} donorsCount={totalDonors} />
           <UpdateCard updateText={DEMO.update} updateAge={DEMO.updateAge} />
 
           <View style={s.section}>
@@ -1556,5 +1570,3 @@ const s = StyleSheet.create({
     includeFontPadding: false,
   },
 });
-
-

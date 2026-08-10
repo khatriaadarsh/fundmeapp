@@ -1,8 +1,21 @@
 // src/screens/notifications/NotificationsScreen.jsx
 import React, { useState, useCallback, useMemo, useRef, memo } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, StatusBar, SectionList, ScrollView, Dimensions,
-  Animated, PanResponder, LayoutAnimation, Platform, UIManager, ActivityIndicator, Alert,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  StatusBar,
+  SectionList,
+  ScrollView,
+  Dimensions,
+  Animated,
+  PanResponder,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -40,14 +53,11 @@ const C = {
   textGray: '#6B7280',
   textLight: '#9CA3AF',
   border: '#E5E7EB',
-  // Notification category colors — icons match the original design
-  // exactly (gift=donation, check-circle=campaign, shield=security);
-  // withdrawal/promotional/system are new categories added alongside.
   campaign: '#16A34A',
   campaignBg: '#F0FDF4',
   donation: '#15AABF',
   donationBg: '#EEF9FC',
-  withdrawal: '#0891B2', // matches MyWithdrawalsScreen's header color for consistency
+  withdrawal: '#0891B2',
   withdrawalBg: '#ECFEFF',
   security: '#6B7280',
   securityBg: '#F9FAFB',
@@ -56,14 +66,9 @@ const C = {
   system: '#6366F1',
   systemBg: '#EEF2FF',
   markAll: '#15AABF',
-  // Delete / trash accent — reuses the same danger red already used
-  // elsewhere in the app (e.g. ProfileScreen logout), not a new color.
   danger: '#EF4444',
 };
 
-// Icons match your original screenshot exactly for the 3 existing
-// categories (donation=gift, campaign=check-circle, security=shield);
-// the 3 new categories get their own distinct icon/color.
 const TYPE_CONFIG = {
   campaign: {
     icon: 'check-circle',
@@ -107,7 +112,10 @@ const TYPE_CONFIG = {
 
 const Header = memo(({ onBack, onMarkAll }) => (
   <View style={styles.header}>
-    <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+    <TouchableOpacity
+      onPress={onBack}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
       <Icons name="arrow-left" size={sp(22)} color={C.textDark} />
     </TouchableOpacity>
     <Text style={styles.header_title}>Notifications</Text>
@@ -117,19 +125,13 @@ const Header = memo(({ onBack, onMarkAll }) => (
   </View>
 ));
 
-// Category filter row — uniform teal theme color for every chip
-// (matching the app's single accent color, same as "Mark All"), not
-// color-coded per category. Each chip still shows its category's icon
-// shape for quick recognition, just rendered in the theme color rather
-// than a unique hue. Horizontal scroll keeps this safe on any screen
-// width with 7 chips — nothing can overlap or get clipped, it just
-// scrolls.
 const FilterRow = memo(({ active, onChange }) => (
   <ScrollView
     horizontal
     showsHorizontalScrollIndicator={false}
     removeClippedSubviews={false}
     contentContainerStyle={styles.filter_row}
+    style={styles.filter_scrollView}
   >
     {NOTIFICATION_CATEGORIES.map(cat => {
       const isActive = active === cat.id;
@@ -158,7 +160,10 @@ const FilterRow = memo(({ active, onChange }) => (
             />
           )}
           <Text
-            style={[styles.filter_label, { color: isActive ? C.white : C.markAll }]}
+            style={[
+              styles.filter_label,
+              { color: isActive ? C.white : C.markAll },
+            ]}
             numberOfLines={1}
           >
             {cat.label}
@@ -170,25 +175,31 @@ const FilterRow = memo(({ active, onChange }) => (
 ));
 
 const NotifCard = memo(({ item, onPress }) => {
-  // Status (approved/rejected/submitted) takes priority over the
-  // category default — this is what gives "Campaign Approved",
-  // "Campaign Rejected", and "Campaign Submitted" each their own
-  // distinct icon/color instead of sharing one generic campaign icon.
   const categoryCfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.security;
   const statusOverride = getStatusVisual(item.raw?.notificationType);
   const cfg = statusOverride ?? categoryCfg;
   const barColor = statusOverride ? statusOverride.color : categoryCfg.barColor;
 
   return (
-    <TouchableOpacity style={[styles.card, item.unread && styles.card_unread]} onPress={() => onPress(item)} activeOpacity={0.75}>
-      {item.unread && <View style={[styles.card_unreadBar, { backgroundColor: barColor }]} />}
+    <TouchableOpacity
+      style={[styles.card, item.unread && styles.card_unread]}
+      onPress={() => onPress(item)}
+      activeOpacity={0.75}
+    >
+      {item.unread && (
+        <View style={[styles.card_unreadBar, { backgroundColor: barColor }]} />
+      )}
       <View style={styles.card_content}>
         <View style={[styles.card_iconWrap, { backgroundColor: cfg.bg }]}>
           <Icons name={cfg.icon} size={sp(16)} color={cfg.color} />
         </View>
         <View style={styles.card_text}>
-          <Text style={styles.card_title} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.card_body} numberOfLines={3}>{item.body}</Text>
+          <Text style={styles.card_title} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.card_body} numberOfLines={3}>
+            {item.body}
+          </Text>
           <Text style={styles.card_time}>{item.time}</Text>
         </View>
       </View>
@@ -213,7 +224,8 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) =>
-        Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+        Math.abs(gesture.dx) > 8 &&
+        Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
       onPanResponderMove: (_, gesture) => {
         if (gesture.dx < 0) {
           translateX.setValue(Math.max(gesture.dx, -TRASH_WIDTH - sp(24)));
@@ -300,9 +312,13 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
 
 const EmptyState = memo(() => (
   <View style={styles.empty_wrap}>
-    <View style={styles.empty_iconWrap}><Icons name="bell-off" size={sp(32)} color={C.textLight} /></View>
+    <View style={styles.empty_iconWrap}>
+      <Icons name="bell-off" size={sp(32)} color={C.textLight} />
+    </View>
     <Text style={styles.empty_title}>No Notifications</Text>
-    <Text style={styles.empty_sub}>You're all caught up! Check back later.</Text>
+    <Text style={styles.empty_sub}>
+      You're all caught up! Check back later.
+    </Text>
   </View>
 ));
 
@@ -317,7 +333,8 @@ const NotificationsScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
   const userId = currentUser?.id;
 
-  const { data: rawNotifications = [], isLoading } = useNotificationList(userId);
+  const { data: rawNotifications = [], isLoading } =
+    useNotificationList(userId);
   const markReadMutation = useMarkNotificationRead(userId);
   const markAllMutation = useMarkAllNotificationsRead(userId);
   const deleteMutation = useDeleteNotification(userId);
@@ -347,13 +364,7 @@ const NotificationsScreen = ({ navigation }) => {
     [filteredNotifications],
   );
 
-  const handleFilterChange = useCallback((id) => {
-    // Deliberately NOT wrapped in LayoutAnimation — animating the whole
-    // screen's layout here (including the chip row above) was what
-    // caused the jarring "jump" when switching to a category with zero
-    // results: the tall EmptyState block appearing mid-animation made
-    // it look like the filter chips themselves were growing. A filter
-    // tap should just swap content instantly and cleanly.
+  const handleFilterChange = useCallback(id => {
     setActiveFilter(id);
   }, []);
 
@@ -361,50 +372,98 @@ const NotificationsScreen = ({ navigation }) => {
     markAllMutation.mutate();
   }, [markAllMutation]);
 
-  const handleNotifPress = useCallback((item) => {
-    if (item.unread) {
-      markReadMutation.mutate(Number(item.id));
-    }
-  }, [markReadMutation]);
+  const handleNotifPress = useCallback(
+    item => {
+      if (item.unread) {
+        markReadMutation.mutate(Number(item.id));
+      }
+    },
+    [markReadMutation],
+  );
 
-  const handleDelete = useCallback((item) => {
-    const notificationId = Number(item.id);
+  const handleDelete = useCallback(
+    item => {
+      const notificationId = Number(item.id);
 
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setRemovedIds(prev => new Set(prev).add(notificationId));
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setRemovedIds(prev => new Set(prev).add(notificationId));
 
-    deleteMutation.mutate(notificationId, {
-      onError: () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setRemovedIds(prev => {
-          const next = new Set(prev);
-          next.delete(notificationId);
-          return next;
-        });
-        Alert.alert('Error', 'Failed to delete notification. Please try again.');
-      },
-    });
-  }, [deleteMutation]);
+      deleteMutation.mutate(notificationId, {
+        onError: () => {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setRemovedIds(prev => {
+            const next = new Set(prev);
+            next.delete(notificationId);
+            return next;
+          });
+          Alert.alert(
+            'Error',
+            'Failed to delete notification. Please try again.',
+          );
+        },
+      });
+    },
+    [deleteMutation],
+  );
 
   const hasAnyData = sections.length > 0;
 
+  const renderSectionHeader = useCallback(
+    ({ section }) => <Text style={styles.section_title}>{section.title}</Text>,
+    [],
+  );
+
+  const renderItem = useCallback(
+    ({ item }) => (
+      <SwipeableNotifCard
+        item={item}
+        onPress={handleNotifPress}
+        onDelete={handleDelete}
+      />
+    ),
+    [handleNotifPress, handleDelete],
+  );
+
+  const renderSeparator = useCallback(
+    () => <View style={styles.separator} />,
+    [],
+  );
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
-      <Header onBack={() => navigation.goBack()} onMarkAll={handleMarkAll} />
-      <FilterRow active={activeFilter} onChange={handleFilterChange} />
+
+      {/* Fixed, non-scrolling top block — Header + FilterRow always sit
+          flush together with no gap between them and the list below. */}
+      <View style={styles.topBlock}>
+        <Header onBack={() => navigation.goBack()} onMarkAll={handleMarkAll} />
+        <FilterRow active={activeFilter} onChange={handleFilterChange} />
+      </View>
+
+      {/* flex: 1 here is what makes the list actually fill the rest of
+          the screen instead of collapsing to its own content height —
+          that collapse was the root cause of the empty gap above it. */}
       <SectionList
+        style={styles.list}
         sections={sections}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.list_content, !hasAnyData && styles.list_contentEmpty]}
+        contentContainerStyle={[
+          styles.list_content,
+          !hasAnyData && styles.list_contentEmpty,
+        ]}
         stickySectionHeadersEnabled={false}
-        renderSectionHeader={({ section }) => <Text style={styles.section_title}>{section.title}</Text>}
-        renderItem={({ item }) => (
-          <SwipeableNotifCard item={item} onPress={handleNotifPress} onDelete={handleDelete} />
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderSectionHeader={renderSectionHeader}
+        renderItem={renderItem}
+        ItemSeparatorComponent={renderSeparator}
         ListEmptyComponent={isLoading ? <LoadingState /> : <EmptyState />}
+        // --- Virtualization tuning so this stays smooth with a long,
+        // ever-growing notification history instead of degrading. ---
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        updateCellsBatchingPeriod={50}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </SafeAreaView>
   );
@@ -416,43 +475,47 @@ export default NotificationsScreen;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.pageBg },
   separator: { height: vsp(8) },
-  
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: sp(16), paddingVertical: vsp(12), backgroundColor: C.pageBg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border },
-  header_title: { fontSize: sp(17), fontWeight: '700', color: C.textDark, letterSpacing: -0.2 },
+
+  // Groups Header + FilterRow so they stay tight against each other and
+  // against the list, with no ambiguous flex gaps between them.
+  topBlock: { backgroundColor: C.pageBg },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: sp(16),
+    paddingVertical: vsp(12),
+    backgroundColor: C.pageBg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
+  },
+  header_title: {
+    fontSize: sp(17),
+    fontWeight: '700',
+    color: C.textDark,
+    letterSpacing: -0.2,
+  },
   header_markAll: { fontSize: sp(13), fontWeight: '600', color: C.markAll },
 
   // ── Category filter row ──────────────────────────────────────
-  // NOTE: deliberately using marginRight on each chip instead of `gap`
-  // on the row — `gap` inside a horizontal ScrollView's
-  // contentContainerStyle has known reflow-timing issues on RN/Android,
-  // where it can recompute at the wrong moment when a sibling's style
-  // changes (like a chip switching active/inactive), causing chips to
-  // visibly reposition for a frame. Explicit margins never have this
-  // ambiguity.
+  filter_scrollView: { flexGrow: 0 },
   filter_row: {
     paddingHorizontal: sp(16),
-    paddingVertical: vsp(10),
-    alignItems: 'center', // vertical centering regardless of chip content
+    paddingVertical: vsp(8),
+    alignItems: 'center',
   },
   filter_chip: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: sp(34), // FIXED height — every chip is always identical, no
-                     // matter whether it has an icon, how bold its text
-                     // renders, or how long its label is.
+    height: sp(34),
     paddingHorizontal: sp(12),
     marginRight: sp(8),
     borderRadius: sp(17),
     borderWidth: 1,
   },
-  filter_chipActive: {
-    // No elevation/shadow here — Android's `elevation` can subtly
-    // affect a view's measured box in some renderer combinations,
-    // which was a candidate for the chip repositioning bug. The solid
-    // color fill vs. white/border already makes the active state
-    // clearly distinct without needing a shadow.
-  },
+  filter_chipActive: {},
   filter_icon: {
     marginRight: sp(5),
   },
@@ -461,18 +524,68 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  list_content: { paddingHorizontal: sp(16), paddingTop: vsp(16), paddingBottom: vsp(32) },
+  // The list now owns the remaining screen height — this is the key fix.
+  list: { flex: 1 },
+  list_content: {
+    paddingHorizontal: sp(16),
+    paddingTop: vsp(10),
+    paddingBottom: vsp(32),
+    flexGrow: 1,
+  },
   list_contentEmpty: { flexGrow: 1 },
-  section_title: { fontSize: sp(11), fontWeight: '700', color: C.textLight, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: vsp(8), marginTop: vsp(4) },
+  section_title: {
+    fontSize: sp(11),
+    fontWeight: '700',
+    color: C.textLight,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: vsp(8),
+    marginTop: vsp(4),
+  },
 
-  card: { backgroundColor: C.white, borderRadius: sp(12), overflow: 'hidden', flexDirection: 'row', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
+  card: {
+    backgroundColor: C.white,
+    borderRadius: sp(12),
+    overflow: 'hidden',
+    flexDirection: 'row',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
   card_unread: { backgroundColor: '#FAFCFF' },
   card_unreadBar: { width: sp(4) },
-  card_content: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', padding: sp(14), gap: sp(12) },
-  card_iconWrap: { width: sp(36), height: sp(36), borderRadius: sp(18), alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: vsp(1) },
+  card_content: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: sp(14),
+    gap: sp(12),
+  },
+  card_iconWrap: {
+    width: sp(36),
+    height: sp(36),
+    borderRadius: sp(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: vsp(1),
+  },
   card_text: { flex: 1 },
-  card_title: { fontSize: sp(13), fontWeight: '700', color: C.textDark, marginBottom: vsp(3), lineHeight: sp(18) },
-  card_body: { fontSize: sp(12), color: C.textGray, lineHeight: sp(17), marginBottom: vsp(6) },
+  card_title: {
+    fontSize: sp(13),
+    fontWeight: '700',
+    color: C.textDark,
+    marginBottom: vsp(3),
+    lineHeight: sp(18),
+  },
+  card_body: {
+    fontSize: sp(12),
+    color: C.textGray,
+    lineHeight: sp(17),
+    marginBottom: vsp(6),
+  },
   card_time: { fontSize: sp(11), fontWeight: '500', color: C.textLight },
 
   // ── Swipe-to-delete ──────────────────────────────────────────
@@ -488,9 +601,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
-  empty_wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: vsp(80), paddingHorizontal: sp(40) },
-  empty_iconWrap: { width: sp(72), height: sp(72), borderRadius: sp(36), backgroundColor: '#EEF2F7', alignItems: 'center', justifyContent: 'center', marginBottom: vsp(16) },
-  empty_title: { fontSize: sp(16), fontWeight: '700', color: C.textDark, marginBottom: vsp(6), textAlign: 'center' },
-  empty_sub: { fontSize: sp(13), color: C.textGray, textAlign: 'center', lineHeight: sp(19) },
+
+  empty_wrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: vsp(60),
+    paddingHorizontal: sp(40),
+  },
+  empty_iconWrap: {
+    width: sp(72),
+    height: sp(72),
+    borderRadius: sp(36),
+    backgroundColor: '#EEF2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: vsp(16),
+  },
+  empty_title: {
+    fontSize: sp(16),
+    fontWeight: '700',
+    color: C.textDark,
+    marginBottom: vsp(6),
+    textAlign: 'center',
+  },
+  empty_sub: {
+    fontSize: sp(13),
+    color: C.textGray,
+    textAlign: 'center',
+    lineHeight: sp(19),
+  },
 });

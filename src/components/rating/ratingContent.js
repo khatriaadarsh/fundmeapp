@@ -5,7 +5,8 @@ export const RESULT_CONTENT = {
     negative: {
       icon: 'frown',
       title: 'Sorry to hear that',
-      subtitle: () => "Would you like to tell us what went wrong so we can make it better for you?",
+      subtitle: () =>
+        'Would you like to tell us what went wrong so we can make it better for you?',
       primaryLabel: 'SHARE FEEDBACK',
       secondaryLabel: 'CANCEL',
     },
@@ -21,14 +22,15 @@ export const RESULT_CONTENT = {
     negative: {
       icon: 'frown',
       title: 'Sorry to hear that',
-      subtitle: (name) => `Would you like to tell us what went wrong with ${name}'s campaign?`,
+      subtitle: name =>
+        `Would you like to tell us what went wrong with ${name}'s campaign?`,
       primaryLabel: 'SHARE FEEDBACK',
       secondaryLabel: 'CANCEL',
     },
     positive: {
       icon: 'smile',
       title: 'Glad you had a great experience',
-      subtitle: (name) => `Would you like to rate ${name}?`,
+      subtitle: name => `Would you like to rate ${name}?`,
       primaryLabel: 'RATE NOW',
       secondaryLabel: 'MAYBE LATER',
     },
@@ -37,18 +39,18 @@ export const RESULT_CONTENT = {
 export const FEEDBACK_CONTENT = {
   app: {
     title: () => 'Share Feedback',
-    subtitle: () => "Tell us what went wrong so we can make it better for you",
+    subtitle: () => 'Tell us what went wrong so we can make it better for you',
     placeholder: 'Tell us more about the issue…',
   },
   creator: {
     negative: {
-      title: (name) => `Rate ${name}`,
-      subtitle: (name) => `Tell us what went wrong with ${name}'s campaign`,
+      title: name => `Rate ${name}`,
+      subtitle: name => `Tell us what went wrong with ${name}'s campaign`,
       placeholder: 'What could have gone better?',
     },
     positive: {
-      title: (name) => `Rate ${name}`,
-      subtitle: (name) => `Tell us what you loved about ${name}'s campaign`,
+      title: name => `Rate ${name}`,
+      subtitle: name => `Tell us what you loved about ${name}'s campaign`,
       placeholder: 'Share your experience…',
     },
   },
@@ -60,7 +62,7 @@ export const THANK_YOU_CONTENT = {
   },
   creator: {
     title: 'Thanks for rating!',
-    subtitle: (name) => `Your feedback on ${name} has been submitted.`,
+    subtitle: name => `Your feedback on ${name} has been submitted.`,
   },
 };
 export const DEFAULT_STARS_BY_SENTIMENT = {
