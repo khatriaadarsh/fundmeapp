@@ -131,7 +131,7 @@ const CheckUser = ({ navigation }) => {
         });
 
         const { screen, params } = resolveAuthRoute(result);
-        navigation.replace(screen, params);
+        navigation.navigate(screen, params);
       },
       onError: err => {
         setNetworkError(

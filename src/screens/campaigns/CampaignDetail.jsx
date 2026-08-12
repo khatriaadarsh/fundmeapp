@@ -63,7 +63,7 @@ const C = {
   light: '#94A3B8',
   border: '#E2E8F0',
   cardBg: '#F8FAFC',
-  GRAD_END: '#15AABF',
+  teal: '#15AABF',
 };
 
 // ✅ Hero tall enough to show URGENT + title + category
@@ -607,7 +607,7 @@ const cr = StyleSheet.create({
   link: {
     fontSize: scale(13),
     fontWeight: '700',
-    color: C.GRAD_END,
+    color: C.green,
     includeFontPadding: false,
   },
 });

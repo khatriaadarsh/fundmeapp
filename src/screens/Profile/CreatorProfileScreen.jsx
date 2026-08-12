@@ -256,7 +256,12 @@ const CreatorProfileScreen = ({ navigation, route }) => {
       case 'about':
         return <AboutTab creatorId={creatorId} />;
       case 'campaigns':
-        return <CampaignsTab creatorId={creatorId} onCampaignPress={handleCampaignPress} />;
+        return (
+          <CampaignsTab
+            creatorId={creatorId}
+            onCampaignPress={handleCampaignPress}
+          />
+        );
       case 'reviews':
         return <ReviewsTab creatorId={creatorId} />;
       default:
@@ -299,7 +304,11 @@ const CreatorProfileScreen = ({ navigation, route }) => {
           <Text style={s.centerStateTxt}>
             {profileErrorObj?.message || 'Could not load this profile.'}
           </Text>
-          <TouchableOpacity style={s.retryBtn} onPress={refetchProfile} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={s.retryBtn}
+            onPress={refetchProfile}
+            activeOpacity={0.8}
+          >
             <Text style={s.retryBtnTxt}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -328,18 +337,18 @@ const CreatorProfileScreen = ({ navigation, route }) => {
 
         {/* index 1 — Trust badges + Stats (not sticky) */}
         <TrustBadges
-  isVerified={creatorProfile.isVerified}
-  cnicVerified={creatorProfile.cnicVerified}
-  emailVerified={creatorProfile.emailVerified}
-  phoneVerified={creatorProfile.phoneVerified}
-/>
+          isVerified={creatorProfile.isVerified}
+          cnicVerified={creatorProfile.cnicVerified}
+          emailVerified={creatorProfile.emailVerified}
+          phoneVerified={creatorProfile.phoneVerified}
+        />
 
-<StatsRow
-  campaignCount={creatorProfile.campaignCount}
-  amountRaised={creatorProfile.amountRaised}
-  totalDonors={creatorProfile.totalDonors}
-  averageRating={creatorProfile.averageRating}
-/>
+        <StatsRow
+          campaignCount={creatorProfile.campaignCount}
+          amountRaised={creatorProfile.amountRaised}
+          totalDonors={creatorProfile.totalDonors}
+          averageRating={creatorProfile.averageRating}
+        />
 
         {/* index 2 — Tab switcher (STICKY) */}
         <TabSwitcher active={activeTab} onChange={handleTabChange} />

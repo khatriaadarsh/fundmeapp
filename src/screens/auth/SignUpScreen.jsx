@@ -14,14 +14,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 
-import Header           from '../../components/common/Header';
-import ProgressBar      from '../../components/common/ProgressBar';
-import InputField       from '../../components/common/InputField';
-import PasswordInput    from '../../components/common/PasswordInput';
-import PhoneInput       from '../../components/forms/PhoneInput';
-import RoleSelector     from '../../components/auth/RoleSelector';
-import GradientButton   from '../../components/common/GradientButton';
-import FieldLabel       from '../../components/common/FieldLabel';
+import Header from '../../components/common/Header';
+import ProgressBar from '../../components/common/ProgressBar';
+import InputField from '../../components/common/InputField';
+import PasswordInput from '../../components/common/PasswordInput';
+import PhoneInput from '../../components/forms/PhoneInput';
+import RoleSelector from '../../components/auth/RoleSelector';
+import GradientButton from '../../components/common/GradientButton';
+import FieldLabel from '../../components/common/FieldLabel';
 import { FullScreenLoader } from '../../components/common/Loader';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
@@ -36,39 +36,41 @@ import {
 } from '../../utils/validators';
 
 import { useRegisterStep1 } from '../../hooks/useRegistration';
-import { useAppContext }    from '../../context/AppContext';
-import { useToast }         from '../../components/common/Toast';
+import { useAppContext } from '../../context/AppContext';
+import { useToast } from '../../components/common/Toast';
 
 const SignUpScreen = ({ navigation, route }) => {
-  const insets   = useSafeAreaInsets();
-  const toast    = useToast();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
   const { saveUser, currentUser } = useAppContext();
   const { mutate: register, isPending } = useRegisterStep1();
 
   // Email comes from CheckUser screen (or AppContext if user resumes)
   const prefilledEmail = route?.params?.email || currentUser?.email || '';
 
-  const [firstName,       setFirstName]       = useState('');
-  const [lastName,        setLastName]        = useState('');
-  const [email,           setEmail]           = useState(prefilledEmail);
-  const [phone,           setPhone]           = useState('');
-  const [password,        setPassword]        = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState(prefilledEmail);
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role,            setRole]            = useState('');
+  const [role, setRole] = useState('');
 
   useEffect(() => {
     if (prefilledEmail) setEmail(prefilledEmail);
   }, [prefilledEmail]);
 
-  const isFormValid = useMemo(() => (
-    validateName(firstName) &&
-    validateEmail(email) &&
-    validatePhone(phone) &&
-    validatePassword(password) &&
-    confirmPassword &&
-    password === confirmPassword &&
-    role
-  ), [firstName, email, phone, password, confirmPassword, role]);
+  const isFormValid = useMemo(
+    () =>
+      validateName(firstName) &&
+      validateEmail(email) &&
+      validatePhone(phone) &&
+      validatePassword(password) &&
+      confirmPassword &&
+      password === confirmPassword &&
+      role,
+    [firstName, email, phone, password, confirmPassword, role],
+  );
 
   const handleContinue = useCallback(() => {
     const errors = [];
@@ -79,16 +81,18 @@ const SignUpScreen = ({ navigation, route }) => {
     const emailError = validateEmailWithMessage(email);
     if (emailError) errors.push(emailError);
 
-    if (!phone || phone.length !== 11)            errors.push('Phone number must be exactly 11 digits');
-    if (!password || password.length < 8)         errors.push('Password must be at least 8 characters');
-    if (!confirmPassword)                          errors.push('Please confirm your password');
-    else if (password !== confirmPassword)         errors.push('Passwords do not match');
+    if (!phone || phone.length !== 11)
+      errors.push('Phone number must be exactly 11 digits');
+    if (!password || password.length < 8)
+      errors.push('Password must be at least 8 characters');
+    if (!confirmPassword) errors.push('Please confirm your password');
+    else if (password !== confirmPassword)
+      errors.push('Passwords do not match');
 
     const roleError = validateRoleWithMessage(role);
     if (roleError) errors.push(roleError);
 
     if (errors.length > 0) {
-
       Alert.alert(
         'Validation Failed',
         errors.map((err, idx) => `${idx + 1}. ${err}`).join('\n\n'),
@@ -111,32 +115,45 @@ const SignUpScreen = ({ navigation, route }) => {
         userRole: role,
       },
       {
-        onSuccess: async (body) => {
+        onSuccess: async body => {
           const data = body?.data || {};
           await saveUser({
             email,
-            userId:     data.userId ?? null,
-            step:       data.step   ?? 1,
+            userId: data.userId ?? null,
+            step: data.step ?? 1,
             stepStatus: data.stepStatus ?? 'COMPLETED',
-            status:     'draft',
-            profile:    data,
+            status: 'draft',
+            profile: data,
           });
-          toast.success(body?.responseMessage || 'Account created. OTP sent to your email.');
+          toast.success(
+            body?.responseMessage || 'Account created. OTP sent to your email.',
+          );
           navigation.navigate('OTPVerificationScreen', { email });
         },
-        onError: (err) => {
+        onError: err => {
           toast.error(err?.message || 'Registration failed.');
         },
       },
     );
-  }, [firstName, lastName, email, phone, password, confirmPassword, role, register, saveUser, navigation, toast]);
+  }, [
+    firstName,
+    lastName,
+    email,
+    phone,
+    password,
+    confirmPassword,
+    role,
+    register,
+    saveUser,
+    navigation,
+    toast,
+  ]);
 
-  const footerPb     = insets.bottom > 0 ? insets.bottom : SPACING.xl;
+  const footerPb = insets.bottom > 0 ? insets.bottom : SPACING.xl;
   const footerHeight = SPACING.md + SPACING.buttonHeight + footerPb;
 
   return (
     <SafeAreaView style={styles.safe}>
-
       <StatusBar
         barStyle="dark-content"
         backgroundColor={COLORS.background}
@@ -154,7 +171,6 @@ const SignUpScreen = ({ navigation, route }) => {
       >
         <ScrollView
           style={styles.scroll}
-
           contentContainerStyle={[
             styles.scrollContent,
             {
@@ -172,7 +188,9 @@ const SignUpScreen = ({ navigation, route }) => {
         >
           <View style={styles.headlineContainer}>
             <Text style={styles.headline}>Create Account</Text>
-            <Text style={styles.subtitle}>Join thousands making a difference</Text>
+            <Text style={styles.subtitle}>
+              Join thousands making a difference
+            </Text>
           </View>
 
           <View>
@@ -217,7 +235,12 @@ const SignUpScreen = ({ navigation, route }) => {
             />
           </View>
 
-          <PhoneInput label="Phone" value={phone} onChangeText={setPhone} mandatory />
+          <PhoneInput
+            label="Phone"
+            value={phone}
+            onChangeText={setPhone}
+            mandatory
+          />
 
           <View>
             <FieldLabel label="Password" mandatory />
@@ -246,7 +269,6 @@ const SignUpScreen = ({ navigation, route }) => {
           <View style={styles.roleWrapper}>
             <RoleSelector value={role} onChange={setRole} />
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -314,11 +336,13 @@ const styles = StyleSheet.create({
   // headline:           { fontSize: TYPOGRAPHY.fontSize.xxxl, fontFamily: TYPOGRAPHY.fontFamily.extraBold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
   // subtitle:           { fontSize: TYPOGRAPHY.fontSize.sm, fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary },
   // noMargin:           { marginBottom: SPACING.md },
-  disabledField:      { opacity: 0.7 },
+  disabledField: { opacity: 0.7 },
 
   footer: {
     position: 'absolute',
-    left: 0, right: 0, bottom: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: SPACING.screenPadding,
     paddingTop: SPACING.md,
     backgroundColor: COLORS.background,
