@@ -9,6 +9,7 @@ import {
   Text,
   ActivityIndicator,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -37,6 +38,7 @@ const HomeScreen = ({ navigation }) => {
 
   const [activeCat, setActiveCat] = useState('all');
   const [search,    setSearch]    = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── TEMPORARY — for previewing RatingModal against the reference
   // screenshots only. Remove this block once you wire the real triggers:
@@ -53,18 +55,16 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   const handleRateNow = useCallback(() => {
-    console.log('[RatingModal] onRateNow → would open store link here');
+    // Would open store link here
   }, []);
 
   const handleRatingSubmit = useCallback(async (payload) => {
-    console.log('[RatingModal] onSubmit payload:', payload);
     // Simulate a network call so the SUBMIT button's loading state is
     // visible during testing too.
     await new Promise(resolve => setTimeout(resolve, 600));
   }, []);
 
   const handleRatingClose = useCallback((reason) => {
-    console.log('[RatingModal] onClose reason:', reason);
     setRatingVisible(false);
   }, []);
   // ── END TEMPORARY BLOCK ──────────────────────────────────────────
@@ -72,15 +72,19 @@ const HomeScreen = ({ navigation }) => {
   const {
     data: categories = [{ id: 'all', name: 'All', label: 'All' }],
     isLoading: categoriesLoading,
+    refetch: refetchCategories,
   } = useCategories();
 
   const {
     data: urgentData = { campaigns: [], isNotFound: false, message: '' },
     isLoading: urgentLoading,
     isError: urgentError,
+    refetch: refetchUrgentCampaigns,
   } = useUrgentCampaigns({
     category: activeCat,
     limit: URGENT_CAMPAIGN_LIMIT,
+    userId: currentUser?.id,
+    isUrgent: true,
   });
 
   // Build user object for TopBar from real API data
@@ -125,9 +129,24 @@ const HomeScreen = ({ navigation }) => {
     });
   }, [navigation]);
 
+  // Pull to refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchCategories(),
+        refetchUrgentCampaigns(),
+      ]);
+    } catch (error) {
+      // Error is handled by React Query states
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchCategories, refetchUrgentCampaigns]);
+
   // Render urgent campaigns section — vertical stacked list (image-left cards)
   const renderUrgentCampaigns = () => {
-    if (urgentLoading) {
+    if (urgentLoading && !refreshing) {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={P.teal} />
@@ -186,8 +205,14 @@ const HomeScreen = ({ navigation }) => {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        bounces={false}
-        overScrollMode="never"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[P.teal]}
+            tintColor={P.teal}
+          />
+        }
       >
         <SearchBar value={search} onChange={handleSearchChange} />
         <HeroBanner />
@@ -202,7 +227,7 @@ const HomeScreen = ({ navigation }) => {
           onPress={handleSeeAll}
         />
 
-        {categoriesLoading ? (
+        {categoriesLoading && !refreshing ? (
           <ActivityIndicator style={styles.catLoading} color={P.teal} />
         ) : (
           <CategoryChips
@@ -252,13 +277,13 @@ const HomeScreen = ({ navigation }) => {
       </View>
 
       <RatingModal
-  visible={ratingVisible}
-  context={ratingContext}
-  targetName="Ahmed Khan"
-  onRateNow={handleRateNow}
-  onSubmit={handleRatingSubmit}
-  onClose={handleRatingClose}
-/>
+        visible={ratingVisible}
+        context={ratingContext}
+        targetName="Ahmed Khan"
+        onRateNow={handleRateNow}
+        onSubmit={handleRatingSubmit}
+        onClose={handleRatingClose}
+      />
     </SafeAreaView>
   );
 };

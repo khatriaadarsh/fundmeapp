@@ -1,6 +1,11 @@
 // src/hooks/useSavedCampaigns.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSavedCampaigns, unsaveCampaign } from '../services/savedCampaignService';
+import {
+  getSavedCampaigns,
+  unsaveCampaign,
+  saveCampaign,
+  unsaveCampaignByCampaignId,
+} from '../services/savedCampaignService';
 
 const CATEGORY_COLORS = {
   Medical:   '#EF4444',
@@ -27,26 +32,19 @@ export const useSavedCampaigns = (userId) => {
   return useQuery({
     queryKey: ['saved-campaigns', userId],
     queryFn: async () => {
-      console.log(' [useSavedCampaigns] Fetching for userId:', userId);
-      
       const response = await getSavedCampaigns(userId);
 
-      // 023 = No saved campaigns — valid response, return empty array
       if (response?.responseCode === '023') {
-        console.log('🟡 [useSavedCampaigns] No saved campaigns (023), returning []');
         return [];
       }
 
-      // 000 = Success with data
       if (response?.responseCode === '000' && Array.isArray(response?.data)) {
-        console.log(' [useSavedCampaigns] Mapping', response.data.length, 'campaigns');
-        
         return response.data.map((item) => {
           const raisedNum = Number(item.totalRaised || 0);
           const goalNum   = Number(item.fundingGoal || 1);
           const pctVal    = Math.min(Math.round((raisedNum / goalNum) * 100), 100);
           const catName   = item.category || 'General';
-          
+
           return {
             id:          String(item.favouriteId),
             favouriteId: Number(item.favouriteId),
@@ -65,36 +63,120 @@ export const useSavedCampaigns = (userId) => {
         });
       }
 
-      // Fallback: return empty array
-      console.log('🟡 [useSavedCampaigns] Unexpected response, returning []');
       return [];
     },
     enabled:        !!userId,
     refetchOnMount: true,
     staleTime:      0,
-    retry:          false, // Don't retry on 023
+    retry:          false,
   });
 };
 
 /**
- * Hook to unsave a campaign
- * Accepts userId for proper cache invalidation
+ * Hook to unsave a campaign by favouriteId
  */
 export const useUnsaveCampaign = (userId) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (favouriteId) => unsaveCampaign(favouriteId),
-    onSuccess: (_data, favouriteId) => {
-      console.log(' [useUnsaveCampaign] Success for favouriteId:', favouriteId);
-      
-      // Invalidate cache for this user's saved campaigns
-      queryClient.invalidateQueries({ 
-        queryKey: ['saved-campaigns', userId] 
+    onSuccess: (_data, _favouriteId) => {
+      queryClient.invalidateQueries({
+        queryKey: ['saved-campaigns', userId],
       });
     },
-    onError: (error) => {
-      console.warn('🔴 [useUnsaveCampaign] Error:', error.message);
+  });
+};
+
+/**
+ * Hook to save a campaign by userId + campaignId
+ */
+export const useSaveCampaign = (userId) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars) => saveCampaign(vars),
+    onMutate: async ({ campaignId }) => {
+      // Optimistically update all campaign lists to avoid UI flicker
+      const queryKeys = ['urgent-campaigns', 'all-campaigns'];
+      const previousData = [];
+
+      queryKeys.forEach((key) => {
+        const queries = queryClient.getQueriesData({ queryKey: [key] });
+        queries.forEach(([queryKeyObj, oldData]) => {
+          if (oldData && Array.isArray(oldData.campaigns)) {
+            const newData = {
+              ...oldData,
+              campaigns: oldData.campaigns.map((c) =>
+                c.campaignId === campaignId ? { ...c, isSaved: true } : c
+              ),
+            };
+            queryClient.setQueryData(queryKeyObj, newData);
+            previousData.push({ queryKeyObj, oldData });
+          }
+        });
+      });
+
+      return { previousData };
+    },
+    onError: (error, vars, context) => {
+      // Revert cache on failure
+      if (context?.previousData) {
+        context.previousData.forEach(({ queryKeyObj, oldData }) => {
+          queryClient.setQueryData(queryKeyObj, oldData);
+        });
+      }
+    },
+    onSettled: () => {
+      // Refetch in background to ensure server sync
+      queryClient.invalidateQueries({ queryKey: ['urgent-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['all-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['saved-campaigns', userId] });
+    },
+  });
+};
+
+/**
+ * Hook to unsave a campaign by userId + campaignId
+ */
+export const useUnsaveCampaignByCampaignId = (userId) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars) => unsaveCampaignByCampaignId(vars),
+    onMutate: async ({ campaignId }) => {
+      const queryKeys = ['urgent-campaigns', 'all-campaigns'];
+      const previousData = [];
+
+      queryKeys.forEach((key) => {
+        const queries = queryClient.getQueriesData({ queryKey: [key] });
+        queries.forEach(([queryKeyObj, oldData]) => {
+          if (oldData && Array.isArray(oldData.campaigns)) {
+            const newData = {
+              ...oldData,
+              campaigns: oldData.campaigns.map((c) =>
+                c.campaignId === campaignId ? { ...c, isSaved: false } : c
+              ),
+            };
+            queryClient.setQueryData(queryKeyObj, newData);
+            previousData.push({ queryKeyObj, oldData });
+          }
+        });
+      });
+
+      return { previousData };
+    },
+    onError: (error, vars, context) => {
+      if (context?.previousData) {
+        context.previousData.forEach(({ queryKeyObj, oldData }) => {
+          queryClient.setQueryData(queryKeyObj, oldData);
+        });
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['urgent-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['all-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['saved-campaigns', userId] });
     },
   });
 };

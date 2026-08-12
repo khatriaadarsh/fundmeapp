@@ -1,6 +1,6 @@
 // src/components/UrgentCard.jsx
 
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,13 @@ import AntDesign from 'react-native-vector-icons/AntDesign';
 import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { P, sp } from '../theme/theme';
 import ProgressBar from './ProgressBar';
+import ResponseModal from './ResponseModal';
 import { getCategoryIcon } from '../utils/categoryIcons';
+import { useAppContext } from '../context/AppContext';
+import {
+  useSaveCampaign,
+  useUnsaveCampaignByCampaignId,
+} from '../hooks/useSavedCampaigns';
 
 const getProgressBarColor = (pct) => {
   const n = Number(pct);
@@ -24,107 +30,170 @@ const getProgressBarColor = (pct) => {
 };
 
 // ── Responsive thumbnail size ──────────────────────────────────
-// Tied to a % of actual device width (not a fixed sp value) and
-// clamped so it never gets too small on narrow phones or too huge
-// on tablets. Same square is reused for the fixed card height below.
 const { width: SW } = Dimensions.get('window');
 const THUMB = Math.round(Math.min(Math.max(SW * 0.24, 76), 108));
 
 // ── Fixed card height ───────────────────────────────────────────
-// All cards are the exact same height regardless of how much title/
-// description text they have — this is what keeps every card in the
-// list visually uniform, matching the reference design.
 const CARD_PAD = sp(10);
 const CARD_H = THUMB + CARD_PAD * 2;
 
 const UrgentCard = memo(({ item, onPress }) => {
-  const [isSaved, setIsSaved] = useState(false);
+  const { currentUser } = useAppContext();
+  const userId = currentUser?.id;
+
+  const [isSaved, setIsSaved] = useState(!!item.isSaved);
+
+  // Sync isSaved if API refetches and gives new item
+  useEffect(() => {
+    setIsSaved(!!item.isSaved);
+  }, [item.isSaved]);
+
+  // ResponseModal state
+  const [modal, setModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const showModal = useCallback((title, message) => {
+    setModal({ visible: true, title, message });
+  }, []);
+
+  const hideModal = useCallback(() => {
+    setModal((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  const saveMutation = useSaveCampaign(userId);
+  const unsaveMutation = useUnsaveCampaignByCampaignId(userId);
 
   const toggleSave = () => {
-    setIsSaved((prev) => !prev);
+    const prevSaved = isSaved;
+    const newSaved = !prevSaved;
+
+    // 1. Instant UI Update (Eye blink fast)
+    setIsSaved(newSaved);
+
+    // 2. Fire API Call
+    if (newSaved) {
+      saveMutation.mutate(
+        { userId, campaignId: item.campaignId },
+        {
+          onError: (error) => {
+            setIsSaved(prevSaved); // Revert on failure
+            showModal(
+              'Failed',
+              error?.message || 'Could not save campaign. Please try again.'
+            );
+          },
+        }
+      );
+    } else {
+      unsaveMutation.mutate(
+        { userId, campaignId: item.campaignId },
+        {
+          onError: (error) => {
+            setIsSaved(prevSaved); // Revert on failure
+            showModal(
+              'Failed',
+              error?.message || 'Could not unsave campaign. Please try again.'
+            );
+          },
+        }
+      );
+    }
   };
 
   const progressColor = getProgressBarColor(item.pct);
   const categoryIcon = getCategoryIcon(item.category);
 
   return (
-    <TouchableOpacity
-      style={ucSt.wrap}
-      activeOpacity={0.9}
-      onPress={() => onPress?.(item)}
-    >
-      {/* Thumbnail — resizeMode "contain" guarantees the FULL image is
-          always visible (never sliced/cropped), letterboxed on imgBg
-          if its aspect ratio doesn't match the square frame. */}
-      <View style={[ucSt.imgBox, { backgroundColor: item.imgBg || P.border }]}>
-        {item.coverImage ? (
-          <Image
-            source={{ uri: item.coverImage }}
-            style={ucSt.coverImage}
-            resizeMode="contain"
-          />
-        ) : (
-          <Text style={ucSt.imgEmoji}>{item.imgEmoji}</Text>
-        )}
+    <>
+      <TouchableOpacity
+        style={ucSt.wrap}
+        activeOpacity={0.9}
+        onPress={() => onPress?.(item)}
+      >
+        {/* Thumbnail — resizeMode "contain" guarantees the FULL image is
+            always visible (never sliced/cropped), letterboxed on imgBg
+            if its aspect ratio doesn't match the square frame. */}
+        <View style={[ucSt.imgBox, { backgroundColor: item.imgBg || P.border }]}>
+          {item.coverImage ? (
+            <Image
+              source={{ uri: item.coverImage }}
+              style={ucSt.coverImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={ucSt.imgEmoji}>{item.imgEmoji}</Text>
+          )}
 
-        {!!item.badge && (
-          <View style={ucSt.badge}>
-            <Text style={ucSt.badgeTxt} numberOfLines={1}>
-              {item.badge}
+          {!!item.badge && (
+            <View style={ucSt.badge}>
+              <Text style={ucSt.badgeTxt} numberOfLines={1}>
+                {item.badge}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={ucSt.heartBtn}
+            onPress={toggleSave}
+            activeOpacity={0.8}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <AntDesign
+              name={isSaved ? 'heart' : 'hearto'}
+              size={sp(12)}
+              color={isSaved ? P.red : P.white}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Content — every slot below is a FIXED height/line-count so
+          the card never grows or shrinks based on text length. */}
+        <View style={ucSt.body}>
+          <View style={ucSt.catRow}>
+            <MCIcons name={categoryIcon} size={sp(12)} color={item.catColor} />
+            <Text style={[ucSt.catTxt, { color: item.catColor }]} numberOfLines={1}>
+              {item.category?.toUpperCase()}
             </Text>
           </View>
-        )}
 
-        <TouchableOpacity
-          style={ucSt.heartBtn}
-          onPress={toggleSave}
-          activeOpacity={0.8}
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-        >
-          <AntDesign
-            name={isSaved ? 'heart' : 'hearto'}
-            size={sp(12)}
-            color={isSaved ? P.red : P.white}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Content — every slot below is a FIXED height/line-count so
-          the card never grows or shrinks based on text length. */}
-      <View style={ucSt.body}>
-        <View style={ucSt.catRow}>
-          <MCIcons name={categoryIcon} size={sp(12)} color={item.catColor} />
-          <Text style={[ucSt.catTxt, { color: item.catColor }]} numberOfLines={1}>
-            {item.category?.toUpperCase()}
+          <Text style={ucSt.title} numberOfLines={1}>
+            {item.title}
           </Text>
-        </View>
 
-        <Text style={ucSt.title} numberOfLines={1}>
-          {item.title}
-        </Text>
-
-        {/* Always rendered (even if empty) so every card reserves the
+          {/* Always rendered (even if empty) so every card reserves the
             same vertical space for this line — this is what previously
             made cards with/without a description different heights. */}
-        <Text style={ucSt.desc} numberOfLines={1}>
-          {item.description || ' '}
-        </Text>
-
-        <View style={ucSt.amtRow}>
-          <Text style={ucSt.amtCombined} numberOfLines={1}>
-            <Text style={ucSt.raised}>{item.raised}</Text>
-            <Text style={ucSt.goal}> of {item.goal}</Text>
+          <Text style={ucSt.desc} numberOfLines={1}>
+            {item.description || ' '}
           </Text>
 
-          <View style={ucSt.timeRow}>
-            <AntDesign name="clockcircleo" size={sp(9)} color={P.light} />
-            <Text style={ucSt.timeTxt}> {item.timeLeft}</Text>
-          </View>
-        </View>
+          <View style={ucSt.amtRow}>
+            <Text style={ucSt.amtCombined} numberOfLines={1}>
+              <Text style={ucSt.raised}>{item.raised}</Text>
+              <Text style={ucSt.goal}> of {item.goal}</Text>
+            </Text>
 
-        <ProgressBar pct={item.pct} color={progressColor} />
-      </View>
-    </TouchableOpacity>
+            <View style={ucSt.timeRow}>
+              <AntDesign name="clockcircleo" size={sp(9)} color={P.light} />
+              <Text style={ucSt.timeTxt}> {item.timeLeft}</Text>
+            </View>
+          </View>
+
+          <ProgressBar pct={item.pct} color={progressColor} />
+        </View>
+      </TouchableOpacity>
+
+      <ResponseModal
+        visible={modal.visible}
+        variant="error"
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
+      />
+    </>
   );
 });
 

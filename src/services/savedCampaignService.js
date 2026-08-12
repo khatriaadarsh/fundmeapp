@@ -23,73 +23,114 @@ const formatCurrency = (amount) => {
 /**
  * Fetch saved campaigns for a user
  * GET /saved/campaign/{userId}
- * 
- * Handles responseCode 023 (no saved campaigns) as valid empty response
- * even if axios throws it as an error
  */
 export const getSavedCampaigns = async (userId) => {
   if (!userId) {
-    console.error('🔴 [savedCampaignService] userId is required');
     throw new Error('userId is required');
   }
 
   const endpoint = ENDPOINTS.SAVED_CAMPAIGNS.LIST(userId);
-  console.log(' [savedCampaignService] GET', endpoint);
 
   try {
     const res = await apiClient.get(endpoint);
-    console.log('🟢 [savedCampaignService] Response:', res.data);
-    
-    // Check if backend returned 023 (no saved campaigns)
+
     if (res.data?.responseCode === '023') {
-      console.log(' [savedCampaignService] No saved campaigns (023) - returning empty array');
       return {
         responseCode: '023',
         responseMessage: res.data.responseMessage || 'No saved campaigns',
-        data: []
+        data: [],
       };
     }
 
-    // Return the raw response
     return res.data;
   } catch (error) {
-    // ✅ CRITICAL FIX: Check if error contains 023 response
     const errorResponse = error?.response?.data || error?.raw || error;
-    
+
     if (errorResponse?.responseCode === '023') {
-      console.log('🟡 [savedCampaignService] Caught 023 error - treating as empty list');
       return {
         responseCode: '023',
         responseMessage: errorResponse.responseMessage || 'No saved campaigns',
-        data: []
+        data: [],
       };
     }
-    
-    // Real error - throw it
-    console.error('🔴 [savedCampaignService] getSavedCampaigns error:', error.message);
+
     throw error;
   }
 };
 
 /**
- * Unsave a campaign
+ * Unsave a campaign by favouriteId
  * GET /unsaved/campaign/{favouriteId}
  */
 export const unsaveCampaign = async (favouriteId) => {
   if (!favouriteId) {
-    console.error(' [savedCampaignService] favouriteId is required');
     throw new Error('favouriteId is required');
   }
 
   const endpoint = ENDPOINTS.SAVED_CAMPAIGNS.UNSAVE(favouriteId);
-  console.log('🔵 [savedCampaignService] GET (unsave)', endpoint);
 
   try {
     const res = await apiClient.get(endpoint);
-    console.log('🟢 [savedCampaignService] Unsave response:', res.data);
     return res.data;
   } catch (error) {
-    console.error('🔴 [savedCampaignService] unsaveCampaign error:', error.message);
+    throw error;
+  }
+};
+
+/**
+ * Save a campaign 
+ * POST /api/v1/save/campaign
+ */
+export const saveCampaign = async ({ userId, campaignId }) => {
+  if (!userId || !campaignId) {
+    throw new Error('userId and campaignId are required');
+  }
+
+  const endpoint = '/save/campaign';
+
+  try {
+    const res = await apiClient.post(endpoint, { userId, campaignId });
+    const data = res.data;
+
+    if (data?.responseCode && data.responseCode !== '000') {
+      throw new Error(data.responseMessage || 'Failed to save campaign');
+    }
+
+    return data;
+  } catch (error) {
+    const errorData = error?.response?.data;
+    if (errorData?.responseMessage) {
+      throw new Error(errorData.responseMessage);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Unsave a campaign by campaignId
+ * GET /api/v1/campaign/{campaignId}/unsave?userId={userId}
+ */
+export const unsaveCampaignByCampaignId = async ({ userId, campaignId }) => {
+  if (!userId || !campaignId) {
+    throw new Error('userId and campaignId are required');
+  }
+
+  const endpoint = `/campaign/${campaignId}/unsave?userId=${userId}`;
+
+  try {
+    const res = await apiClient.get(endpoint);
+    const data = res.data;
+
+    if (data?.responseCode && data.responseCode !== '000') {
+      throw new Error(data.responseMessage || 'Failed to unsave campaign');
+    }
+
+    return data;
+  } catch (error) {
+    const errorData = error?.response?.data;
+    if (errorData?.responseMessage) {
+      throw new Error(errorData.responseMessage);
+    }
     throw error;
   }
 };

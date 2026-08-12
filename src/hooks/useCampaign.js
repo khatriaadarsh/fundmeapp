@@ -1,10 +1,9 @@
 // src/hooks/useCampaigns.js
 
 import { useQuery } from '@tanstack/react-query';
+import apiClient from '../api/client';
 import {
   getCategories,
-  getUrgentCampaigns,
-  getAllCampaigns,
   getMyCampaigns,
   getCampaignDetail,
 } from '../services/campaignService';
@@ -15,10 +14,20 @@ export const URGENT_CAMPAIGN_LIMIT = 6;
 export const useUrgentCampaigns = ({
   category = 'all',
   limit = URGENT_CAMPAIGN_LIMIT,
+  userId,
+  isUrgent = true,
 } = {}) => {
   return useQuery({
-    queryKey: ['urgent-campaigns', category, limit],
-    queryFn: () => getUrgentCampaigns({ category }),
+    queryKey: ['urgent-campaigns', category, limit, userId, isUrgent],
+    queryFn: async () => {
+      let url = `/urgent-campaigns?isUrgent=${isUrgent}&userId=${userId}`;
+      if (category && category !== 'all') {
+        url += `&category=${encodeURIComponent(category)}`;
+      }
+      const res = await apiClient.get(url);
+      return res.data;
+    },
+    enabled: !!userId,
     select: (body) => {
       // Handle "Campaign not found" response code 023
       if (body?.responseCode === '023') {
@@ -54,10 +63,18 @@ export const useUrgentCampaigns = ({
 
 
 // ─── All Campaigns Hook (Explore Screen) ────────────────────
-export const useAllCampaigns = ({ category = 'all' } = {}) => {
+export const useAllCampaigns = ({ category = 'all', userId, isUrgent = false } = {}) => {
   return useQuery({
-    queryKey: ['all-campaigns', category],
-    queryFn: () => getAllCampaigns({ category }),
+    queryKey: ['all-campaigns', category, userId, isUrgent],
+    queryFn: async () => {
+      let url = `/urgent-campaigns?isUrgent=${isUrgent}&userId=${userId}`;
+      if (category && category !== 'all') {
+        url += `&category=${encodeURIComponent(category)}`;
+      }
+      const res = await apiClient.get(url);
+      return res.data;
+    },
+    enabled: !!userId,
     select: (body) => {
       // Handle "Campaign not found" response code 023
       if (body?.responseCode === '023') {
@@ -198,6 +215,8 @@ const mapUrgentCampaignToCard = (item) => {
     imgEmoji: '!',
     coverImage: item?.coverImage || null,
 
+    isSaved: !!item?.isSaved, // Added isSaved flag
+
     raw: item,
   };
 };
@@ -233,6 +252,8 @@ const mapAllCampaignToCard = (item) => {
     verified: item?.verified || false,
     badge: item?.isUrgent ? 'URGENT' : null,
     
+    isSaved: !!item?.isSaved, // Added isSaved flag
+
     raw: item,
   };
 };
