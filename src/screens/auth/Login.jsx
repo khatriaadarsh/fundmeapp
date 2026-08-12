@@ -23,8 +23,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import InputField from '../../components/common/InputField';
 import GradientButton from '../../components/common/GradientButton';
 import { FullScreenLoader } from '../../components/common/Loader';
-import { useToast } from '../../components/common/Toast';
-import StatusPopup from '../../components/common/StatusPopup';
+import ResponseModal from '../../components/ResponseModal';
 
 import { useLogin } from '../../hooks/useAuth';
 import { useAppContext } from '../../context/AppContext';
@@ -66,7 +65,6 @@ const lerp = (min, max, t) => min + (max - min) * t;
 const clamp01 = v => Math.min(1, Math.max(0, v));
 
 const LoginScreen = ({ navigation, route }) => {
-  const toast = useToast();
   const { saveUser, currentUser } = useAppContext();
   const { mutate: doLogin, isPending } = useLogin();
   const insets = useSafeAreaInsets();
@@ -99,13 +97,25 @@ const LoginScreen = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const [popup, setPopup] = useState({
+  // Inline validation errors (synchronized with CheckUser screen)
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  // ResponseModal state
+  const [modal, setModal] = useState({
     visible: false,
     title: '',
     message: '',
-    code: '',
-    variant: 'warning',
+    variant: 'error',
   });
+
+  const showModal = useCallback((title, message, variant = 'error') => {
+    setModal({ visible: true, title, message, variant });
+  }, []);
+
+  const hideModal = useCallback(() => {
+    setModal(prev => ({ ...prev, visible: false }));
+  }, []);
 
   // Entrance fade/slide — Animated API, native driver, completely
   // separate from the compact-scaling logic below.
@@ -238,21 +248,61 @@ const LoginScreen = ({ navigation, route }) => {
     if (prefilledEmail) setEmail(prefilledEmail);
   }, [prefilledEmail]);
 
-  const closePopup = () => setPopup(p => ({ ...p, visible: false }));
+  // ── Frontend Validation Handlers (Synchronized with CheckUser) ──
+  const handleEmailChange = (text) => {
+    setEmail(text);
+    setEmailError('');
+    if (text.length === 0) return;
+    if (!EMAIL_RE.test(text) && text.length > 5) {
+      setEmailError('Please enter a valid email address');
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (email.trim() === '') {
+      setEmailError('Email address is required');
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError('Please enter a valid email address');
+    }
+  };
+
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    setPasswordError('');
+  };
+
+  const handlePasswordBlur = () => {
+    if (!password) {
+      setPasswordError('Password is required');
+    }
+  };
 
   const handleLogin = useCallback(() => {
-    if (!email.trim()) {
-      toast.error('Please enter your email.');
-      return;
+    let isValid = true;
+
+    // Validate Email
+    if (email.trim() === '') {
+      setEmailError('Email address is required');
+      isValid = false;
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError('Please enter a valid email address');
+      isValid = false;
+    } else {
+      setEmailError('');
     }
-    if (!EMAIL_RE.test(email)) {
-      toast.error('Please enter a valid email address.');
-      return;
-    }
+
+    // Validate Password
     if (!password) {
-      toast.error('Please enter your password.');
-      return;
+      setPasswordError('Password is required');
+      isValid = false;
+    } else {
+      setPasswordError('');
     }
+
+    // Do not call API until frontend data is completely and validly entered
+    if (!isValid) return;
+
+    Keyboard.dismiss();
 
     doLogin(
       { email: email.trim(), password },
@@ -260,7 +310,6 @@ const LoginScreen = ({ navigation, route }) => {
         onSuccess: async body => {
           const data = body?.data || {};
           const status = data.accountStatus; // ACTIVE | PENDING | …
-          const respCode = body?.responseCode;
           const respMsg = body?.responseMessage;
 
           await saveUser({
@@ -285,35 +334,26 @@ const LoginScreen = ({ navigation, route }) => {
           });
 
           if (status === 'ACTIVE') {
-            toast.success(respMsg || 'Welcome back!');
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
             return;
           }
 
-          setPopup({
-            visible: true,
-            title: status === 'PENDING' ? 'Account Pending' : 'Account Notice',
-            message: respMsg || 'Your account is not active yet.',
-            code: respCode || '',
-            variant: status === 'PENDING' ? 'warning' : 'info',
-          });
+          showModal(
+            status === 'PENDING' ? 'Account Pending' : 'Account Notice',
+            respMsg || 'Your account is not active yet.',
+            'error'
+          );
         },
         onError: err => {
-          if (err?.code && err?.message) {
-            setPopup({
-              visible: true,
-              title: 'Login Failed',
-              message: err.message,
-              code: err.code,
-              variant: 'error',
-            });
-          } else {
-            toast.error(err?.message || 'Login failed. Please try again.');
-          }
+          showModal(
+            'Login Failed',
+            err?.message || 'Login failed. Please try again.',
+            'error'
+          );
         },
       },
     );
-  }, [email, password, doLogin, saveUser, navigation, toast]);
+  }, [email, password, doLogin, saveUser, navigation, showModal]);
 
   const handleForgotPassword = useCallback(() => {
     navigation.navigate('EmailVerifyForResetPass');
@@ -393,43 +433,61 @@ const LoginScreen = ({ navigation, route }) => {
                 </View>
 
                 <View style={styles.inputsContainer}>
-                  <InputField
-                    label="Email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChangeText={setEmail}
-                    leftIcon="mail"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    editable={!isPending}
-                    returnKeyType="next"
-                  />
+                  <View style={styles.fieldGroup}>
+                    <InputField
+                      label="Email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChangeText={handleEmailChange}
+                      onBlur={handleEmailBlur}
+                      leftIcon="mail"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      returnKeyType="next"
+                    />
+                    {emailError ? (
+                      <View style={styles.errorRow}>
+                        <Icon name="alert-circle" size={scale(13)} color="#EF4444" style={styles.errorIcon} />
+                        <Text style={styles.errorTxt}>{emailError}</Text>
+                      </View>
+                    ) : null}
+                  </View>
 
-                  <InputField
-                    label="Password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChangeText={setPassword}
-                    leftIcon="lock"
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    editable={!isPending}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLogin}
-                    rightElement={
-                      <TouchableOpacity
-                        onPress={() => setShowPassword(!showPassword)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        disabled={isPending}
-                      >
-                        <Icon
-                          name={showPassword ? 'eye' : 'eye-off'}
-                          size={scale(20)}
-                          color={COLORS.textTertiary}
-                        />
-                      </TouchableOpacity>
-                    }
-                  />
+                  <View style={styles.fieldGroup}>
+                    <InputField
+                      label="Password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChangeText={handlePasswordChange}
+                      onBlur={handlePasswordBlur}
+                      leftIcon="lock"
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      editable={!isPending}
+                      returnKeyType="done"
+                      onSubmitEditing={handleLogin}
+                      rightElement={
+                        <TouchableOpacity
+                          onPress={() => setShowPassword(!showPassword)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          disabled={isPending}
+                        >
+                          <Icon
+                            name={showPassword ? 'eye' : 'eye-off'}
+                            size={scale(20)}
+                            color={COLORS.textTertiary}
+                          />
+                        </TouchableOpacity>
+                      }
+                    />
+                    {passwordError ? (
+                      <View style={styles.errorRow}>
+                        <Icon name="alert-circle" size={scale(13)} color="#EF4444" style={styles.errorIcon} />
+                        <Text style={styles.errorTxt}>{passwordError}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
 
                 <TouchableOpacity
@@ -474,15 +532,12 @@ const LoginScreen = ({ navigation, route }) => {
 
       <FullScreenLoader visible={isPending} message="Signing you in…" />
 
-      <StatusPopup
-        visible={popup.visible}
-        title={popup.title}
-        message={popup.message}
-        code={popup.code}
-        variant={popup.variant}
-        onClose={closePopup}
-        onButtonPress={closePopup}
-        buttonText="OK"
+      <ResponseModal
+        visible={modal.visible}
+        variant={modal.variant}
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
       />
     </SafeAreaView>
   );
@@ -514,6 +569,20 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   inputsContainer: { marginBottom: SPACING.xs },
+  fieldGroup: {
+    marginBottom: SPACING.md,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scale(7),
+  },
+  errorIcon: { marginRight: scale(5) },
+  errorTxt: {
+    fontSize: scale(12),
+    color: '#EF4444',
+    flex: 1,
+  },
   forgotButton: { alignSelf: 'flex-end', marginBottom: SPACING.xl },
   forgotText: {
     fontSize: TYPOGRAPHY.fontSize.sm,

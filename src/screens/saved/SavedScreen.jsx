@@ -1,114 +1,29 @@
-// // src/screens/saved/SavedScreen.jsx
-// import React, { useState, useCallback, useRef, useEffect } from 'react';
-// import { StyleSheet, FlatList, StatusBar, Animated } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { MOCK_SAVED } from '../../constants/mockData';
-// import { P, sp } from '../../theme/theme';
-
-// // Import screen-specific components
-// import SavedScreenHeader from '../../components/saved/SavedScreenHeader';
-// import SavedCampaignCard from '../../components/saved/SavedCampaignCard';
-
-// // ✅ REUSABILITY: Importing the generic, shared EmptyState component
-// import EmptyState from '../../components/shared/EmptyState';
-
-// const SavedScreen = ({ navigation }) => {
-//   const [saved, setSaved] = useState(MOCK_SAVED);
-
-//   const mountAnim = useRef(new Animated.Value(0)).current;
-//   const slideAnim = useRef(new Animated.Value(sp(16))).current;
-
-//   useEffect(() => {
-//     Animated.parallel([
-//       Animated.timing(mountAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-//       Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-//     ]).start();
-//   }, [mountAnim, slideAnim]);
-
-//   const handleUnsave = useCallback(id => {
-//     setSaved(prev => prev.filter(c => c.id !== id));
-//   }, []);
-
-//   const handleCardPress = useCallback(item => {
-//     navigation?.navigate?.('CampaignDetail', { id: item.id });
-//   }, [navigation]);
-
-//   return (
-//     <SafeAreaView style={styles.safe}>
-//       <StatusBar barStyle="dark-content" backgroundColor={P.white} />
-//       <SavedScreenHeader count={saved.length} />
-
-//       <Animated.View
-//         style={[
-//           styles.animatedWrapper,
-//           {
-//             opacity: mountAnim,
-//             transform: [{ translateY: slideAnim }],
-//           },
-//         ]}
-//       >
-//         <FlatList
-//           data={saved}
-//           keyExtractor={item => item.id}
-//           renderItem={({ item }) => (
-//             <SavedCampaignCard
-//               item={item}
-//               onPress={handleCardPress}
-//               onUnsave={handleUnsave}
-//             />
-//           )}
-//           // ✅ REUSABILITY: Using the shared EmptyState with custom props
-//           ListEmptyComponent={
-//             <EmptyState
-//               icon="heart"
-//               title="Nothing saved yet"
-//               subtitle="Tap the heart icon on any campaign to save it here."
-//             />
-//           }
-//           showsVerticalScrollIndicator={false}
-//           contentContainerStyle={styles.listContent}
-//           bounces={false}
-//           overScrollMode="never"
-//         />
-//       </Animated.View>
-//     </SafeAreaView>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   safe: {
-//     flex: 1,
-//     backgroundColor: P.bg,
-//   },
-//   animatedWrapper: {
-//     flex: 1,
-//   },
-//   listContent: {
-//     flexGrow: 1, // Ensures EmptyState can fill the space and center itself
-//     paddingTop: sp(8),
-//     paddingBottom: sp(16),
-//   },
-// });
-
-// export default SavedScreen;
-
 // src/screens/saved/SavedScreen.jsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  StyleSheet, FlatList, StatusBar, Animated,
-  View, ActivityIndicator, RefreshControl,
+  StyleSheet,
+  FlatList,
+  StatusBar,
+  Animated,
+  View,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { P, sp } from '../../theme/theme';
 import { useAppContext } from '../../context/AppContext';
-import { useSavedCampaigns, useUnsaveCampaign } from '../../hooks/useSavedCampaigns';
+import {
+  useSavedCampaigns,
+  useUnsaveCampaignByCampaignId,
+} from '../../hooks/useSavedCampaigns';
 import { getUserId } from '../../utils/storage';
 
 import SavedScreenHeader from '../../components/saved/SavedScreenHeader';
 import SavedCampaignCard from '../../components/saved/SavedCampaignCard';
 import EmptyState from '../../components/shared/EmptyState';
+import ResponseModal from '../../components/ResponseModal';
 
 const SavedScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
@@ -121,6 +36,19 @@ const SavedScreen = ({ navigation }) => {
 
   const [userId, setUserId] = useState(() => resolveId(currentUser));
   const [refreshing, setRefreshing] = useState(false);
+  const [modal, setModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const showModal = useCallback((title, message) => {
+    setModal({ visible: true, title, message });
+  }, []);
+
+  const hideModal = useCallback(() => {
+    setModal((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const mountAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(sp(16))).current;
@@ -140,45 +68,82 @@ const SavedScreen = ({ navigation }) => {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(mountAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      Animated.timing(mountAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, [mountAnim, slideAnim]);
 
-  // ── API ──
   const {
     data: saved = [],
     isLoading,
+    isError,
+    error,
     refetch,
   } = useSavedCampaigns(userId);
 
-  // ✅ Pass userId (not refetch) to the hook
-  const { mutate: unsaveCampaign } = useUnsaveCampaign(userId);
+  const { mutate: unsaveCampaign } = useUnsaveCampaignByCampaignId(userId);
 
-  // ── Pull-to-refresh ──
+  useEffect(() => {
+    if (isError) {
+      showModal(
+        'Error',
+        error?.message || 'Unable to load saved campaigns. Please try again.',
+      );
+    }
+  }, [isError, error, showModal]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+    try {
+      await refetch();
+    } catch (e) {
+      showModal(
+        'Error',
+        e?.message || 'Unable to refresh saved campaigns. Please try again.',
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch, showModal]);
 
-  // ── Handlers ──
   const handleUnsave = useCallback(
-    (favouriteId) => {
-      console.log('🔵 [SavedScreen] unsaving favouriteId:', favouriteId);
-      unsaveCampaign(favouriteId);
+    (item) => {
+      const campaignId = item?.campaignId;
+      if (!userId || !campaignId) {
+        showModal('Failed', 'Could not unsave campaign. Please try again.');
+        return;
+      }
+
+      unsaveCampaign(
+        { userId, campaignId },
+        {
+          onError: (err) => {
+            showModal(
+              'Failed',
+              err?.message || 'Could not unsave campaign. Please try again.',
+            );
+          },
+        },
+      );
     },
-    [unsaveCampaign]
+    [unsaveCampaign, userId, showModal],
   );
 
   const handleCardPress = useCallback(
     (item) => {
       navigation?.navigate?.('CampaignDetail', { id: item.campaignId });
     },
-    [navigation]
+    [navigation],
   );
 
-  // ── Render ──
   const renderContent = () => {
     if (isLoading && !refreshing) {
       return (
@@ -191,7 +156,7 @@ const SavedScreen = ({ navigation }) => {
     return (
       <FlatList
         data={saved}
-        keyExtractor={(item) => String(item.favouriteId)}
+        keyExtractor={(item) => String(item.favouriteId ?? item.id)}
         renderItem={({ item }) => (
           <SavedCampaignCard
             item={item}
@@ -235,15 +200,28 @@ const SavedScreen = ({ navigation }) => {
       >
         {renderContent()}
       </Animated.View>
+
+      <ResponseModal
+        visible={modal.visible}
+        variant="error"
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safe:            { flex: 1, backgroundColor: P.bg },
+  safe: { flex: 1, backgroundColor: P.bg },
   animatedWrapper: { flex: 1 },
-  listContent:     { flexGrow: 1, paddingTop: sp(8), paddingBottom: sp(16) },
-  centered:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: sp(80) },
+  listContent: { flexGrow: 1, paddingTop: sp(8), paddingBottom: sp(16) },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: sp(80),
+  },
 });
 
 export default SavedScreen;

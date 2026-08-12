@@ -1,64 +1,124 @@
 // src/components/saved/SavedCampaignCard.jsx
-import React, { memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import Feather    from 'react-native-vector-icons/Feather';
-import AntDesign  from 'react-native-vector-icons/AntDesign';
-import { P, sp }  from '../../theme/theme';
-import ProgressBar    from '../shared/ProgressBar';
-import CategoryBadge  from '../shared/CategoryBadge';
+import Feather   from 'react-native-vector-icons/Feather';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import { P, sp } from '../../theme/theme';
+import ProgressBar   from '../shared/ProgressBar';
+import CategoryBadge from '../shared/CategoryBadge';
+import ResponseModal from '../ResponseModal';
+import { useAppContext } from '../../context/AppContext';
+import { useUnsaveCampaignByCampaignId } from '../../hooks/useSavedCampaigns';
 
-const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => (
-  <TouchableOpacity
-    style={styles.card}
-    onPress={() => onPress?.(item)}
-    activeOpacity={0.88}
-  >
-    <View style={styles.imgWrap}>
-      <Image
-        source={{ uri: item.imageUri }}
-        style={styles.img}
-        resizeMode="cover"
-      />
+const SavedCampaignCard = memo(({ item, onPress, onUnsave }) => {
+  const { currentUser } = useAppContext();
+  const userId = currentUser?.id ?? currentUser?.userId;
+
+  const [hidden, setHidden] = useState(false);
+  const [modal, setModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const showModal = useCallback((title, message) => {
+    setModal({ visible: true, title, message });
+  }, []);
+
+  const hideModal = useCallback(() => {
+    setModal(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const unsaveMutation = useUnsaveCampaignByCampaignId(userId);
+
+  const handleUnsave = useCallback(() => {
+    const campaignId = item.campaignId;
+    if (!userId || !campaignId) {
+      showModal('Failed', 'Unable to unsave this campaign. Please try again.');
+      return;
+    }
+
+    // Instant hide — list feels instant, no flicker
+    setHidden(true);
+    onUnsave?.(item.favouriteId);
+
+    unsaveMutation.mutate(
+      { userId, campaignId },
+      {
+        onError: (error) => {
+          setHidden(false);
+          showModal(
+            'Failed',
+            error?.message || 'Could not unsave campaign. Please try again.',
+          );
+        },
+      },
+    );
+  }, [userId, item, onUnsave, unsaveMutation, showModal]);
+
+  if (hidden) return null;
+
+  return (
+    <>
       <TouchableOpacity
-        style={styles.heartBtn}
-        // ✅ FIX: pass favouriteId (number) — not item.id (string)
-        onPress={() => onUnsave?.(item.favouriteId)}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        activeOpacity={0.7}
+        style={styles.card}
+        onPress={() => onPress?.(item)}
+        activeOpacity={0.88}
       >
-        <AntDesign name="heart" size={sp(18)} color={P.red} />
-      </TouchableOpacity>
-    </View>
-
-    <View style={styles.body}>
-      <CategoryBadge category={item.category} />
-      <Text style={styles.title} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <ProgressBar pct={item.pct} />
-      <View style={styles.metaRow}>
-        {/* ✅ FIX: item.raised is now a plain number string; we add PKR prefix here once */}
-        <Text style={styles.raised}>PKR {item.raised}</Text>
-        <Text style={styles.sep}> / </Text>
-        <Text style={styles.goal}>{item.goal}</Text>
-        <View style={styles.spacer} />
-        <View style={styles.userRow}>
-          <View style={styles.avatar}>
-            <Feather name="user" size={sp(10)} color={P.white} />
-          </View>
-          <Text style={styles.userName} numberOfLines={1}>
-            {item.user}
-          </Text>
-          {item.verified && (
-            <View style={styles.verifiedDot}>
-              <Feather name="check" size={sp(7)} color={P.white} />
-            </View>
-          )}
+        <View style={styles.imgWrap}>
+          <Image
+            source={{ uri: item.imageUri || item.coverImage || item.image }}
+            style={styles.img}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            style={styles.heartBtn}
+            onPress={handleUnsave}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <AntDesign name="heart" size={sp(18)} color={P.red} />
+          </TouchableOpacity>
         </View>
-      </View>
-    </View>
-  </TouchableOpacity>
-));
+
+        <View style={styles.body}>
+          <CategoryBadge category={item.category} />
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <ProgressBar pct={item.pct} />
+          <View style={styles.metaRow}>
+            <Text style={styles.raised}>PKR {item.raised}</Text>
+            <Text style={styles.sep}> / </Text>
+            <Text style={styles.goal}>{item.goal}</Text>
+            <View style={styles.spacer} />
+            <View style={styles.userRow}>
+              <View style={styles.avatar}>
+                <Feather name="user" size={sp(10)} color={P.white} />
+              </View>
+              <Text style={styles.userName} numberOfLines={1}>
+                {item.user}
+              </Text>
+              {item.verified && (
+                <View style={styles.verifiedDot}>
+                  <Feather name="check" size={sp(7)} color={P.white} />
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <ResponseModal
+        visible={modal.visible}
+        variant="error"
+        title={modal.title}
+        message={modal.message}
+        onClose={hideModal}
+      />
+    </>
+  );
+});
 
 const styles = StyleSheet.create({
   card: {
