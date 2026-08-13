@@ -1,3 +1,4 @@
+// src/screens/campaigns/DonateScreen.jsx
 import React, {
   useState,
   useCallback,
@@ -18,19 +19,17 @@ import {
   Dimensions,
   Platform,
   Image,
-  Alert,
   Animated,
   Keyboard,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icons from 'react-native-vector-icons/Feather';
 
-// ── Modals ───────────────────────────────────────────────────
 import DonationConfirmModal from '../../components/donation/DonationConfirmModal';
 import PinEntryModal from '../../components/payment/PinEntryModal';
 import DonationReceiptModal from '../../components/donation/DonationReceiptModal';
+import ResponseModal from '../../components/ResponseModal';
 
-// ── API / context wiring ────────────────────────────────────
 import { useCampaignDetail } from '../../hooks/useCampaign';
 import {
   useInitiateDonation,
@@ -38,17 +37,16 @@ import {
 } from '../../hooks/useDonation';
 import { useAppContext } from '../../context/AppContext';
 
-// ─── Scale ───────────────────────────────────────────────
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
 
 const SB_H = Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0;
 
-// ─── Tokens ──────────────────────────────────────────────
 const C = {
   bg: '#F8FAFC',
   white: '#FFFFFF',
   teal: '#00B4CC',
+  tealDeep: '#008FA3',
   tealLight: 'rgba(0,180,204,0.10)',
   tealBorder: 'rgba(0,180,204,0.35)',
   green: '#059669',
@@ -61,7 +59,6 @@ const C = {
   red: '#EF4444',
 };
 
-// ─── Static data ─────────────────────────────────────────
 const AMOUNTS = [500, 1000, 2500, 5000, 10000, 25000];
 
 const METHODS = [
@@ -70,22 +67,16 @@ const METHODS = [
   { id: 'bank', label: 'Bank Transfer', icon: 'repeat' },
 ];
 
-// ⚠️ Only EASYPAISA was confirmed by the sample API payload.
-// CARD / BANK_TRANSFER are assumptions — confirm the exact enum
-// strings your backend expects and adjust here if different.
 const PAYMENT_METHOD_API = {
   easypaisa: 'EASYPAISA',
   card: 'CARD',
   bank: 'BANK_TRANSFER',
 };
 
-// Methods that need an "Account Number" to identify the sender
 const METHODS_NEEDING_ACCOUNT = ['easypaisa', 'bank'];
 const ACCOUNT_NUMBER_LENGTH = 11;
 
 const fmt = n => n.toLocaleString('en-PK');
-
-// ─── Sub-components ───────────────────────────────────────
 
 const CampaignCard = memo(({ title, image, remaining, loading }) => (
   <View style={s.campaignCard}>
@@ -135,7 +126,6 @@ const MethodRow = memo(({ item, selected, onSelect }) => (
   </TouchableOpacity>
 ));
 
-// ─── Main Screen ──────────────────────────────────────────
 const DonateScreen = ({ navigation, route }) => {
   const campaignId = route?.params?.campaignId
     ? String(route.params.campaignId)
@@ -169,15 +159,22 @@ const DonateScreen = ({ navigation, route }) => {
   const [paymentReference, setPaymentReference] = useState(null);
   const [receiptData, setReceiptData] = useState(null);
 
-  // ── Keyboard-aware scrolling ─────────────────────────────────
-  // No native resize behavior is assumed here (KeyboardAvoidingView's
-  // Android 'height' behavior can double-shrink the screen if
-  // windowSoftInputMode is already adjustResize, and can under-react
-  // if it isn't). Instead the real keyboard height is tracked directly
-  // and used to (a) shrink the space available to the ScrollView +
-  // footer so the footer stays above the keyboard, and (b) scroll
-  // whichever field is focused into view — this is deterministic
-  // regardless of platform/manifest configuration.
+  const [modal, setModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    code: '',
+    variant: 'error',
+  });
+
+  const showModal = useCallback((title, message, code = '', variant = 'error') => {
+    setModal({ visible: true, title, message, code, variant });
+  }, []);
+
+  const hideModal = useCallback(() => {
+    setModal(prev => ({ ...prev, visible: false }));
+  }, []);
+
   const scrollRef = useRef(null);
   const fieldOffsets = useRef({});
   const kbPad = useRef(new Animated.Value(0)).current;
@@ -194,7 +191,7 @@ const DonateScreen = ({ navigation, route }) => {
       Animated.timing(kbPad, {
         toValue: height,
         duration,
-        useNativeDriver: false, // animating layout padding, not a transform
+        useNativeDriver: false,
       }).start();
     };
 
@@ -216,10 +213,6 @@ const DonateScreen = ({ navigation, route }) => {
     };
   }, [kbPad]);
 
-  // Each keyboard-relevant field's container reports its own y-offset
-  // within the ScrollView via onLayout; on focus, that field is
-  // scrolled just below the top of the (now keyboard-shrunk) visible
-  // area so it's always fully visible while typing.
   const registerFieldY = useCallback(
     key => e => {
       fieldOffsets.current[key] = e.nativeEvent.layout.y;
@@ -230,9 +223,6 @@ const DonateScreen = ({ navigation, route }) => {
   const scrollToField = useCallback(key => {
     const y = fieldOffsets.current[key];
     if (y == null) return;
-    // Small delay lets the keyboard's show animation begin first, so
-    // the scroll target is calculated against the final shrunk scroll
-    // area rather than the pre-keyboard one.
     setTimeout(
       () => {
         scrollRef.current?.scrollTo({
@@ -244,7 +234,6 @@ const DonateScreen = ({ navigation, route }) => {
     );
   }, []);
 
-  // Sync custom field when preset tapped
   const handleAmountPress = useCallback(amount => {
     setSelected(amount);
     setCustom(fmt(amount));
@@ -282,7 +271,6 @@ const DonateScreen = ({ navigation, route }) => {
   const displayName = anonymous ? 'Anonymous' : donorName;
   const trimmedMessage = message.trim();
 
-  // ── Step 1: Pay button → validate → open confirm modal ──────
   const handlePay = useCallback(() => {
     if (!selected || selected <= 0) return;
 
@@ -300,11 +288,11 @@ const DonateScreen = ({ navigation, route }) => {
     }
 
     if (!campaignId) {
-      Alert.alert('Error', 'Missing campaign reference.');
+      showModal('Error', 'Missing campaign reference.');
       return;
     }
     if (!donorId) {
-      Alert.alert(
+      showModal(
         'Error',
         'Could not identify your account. Please log in again.',
       );
@@ -313,9 +301,8 @@ const DonateScreen = ({ navigation, route }) => {
 
     setAccountError('');
     setConfirmVisible(true);
-  }, [selected, showAccountField, accountNumber, campaignId, donorId]);
+  }, [selected, showAccountField, accountNumber, campaignId, donorId, showModal]);
 
-  // ── Step 2: "Confirm Payment" in the summary modal → initiate ──
   const handleInitiate = useCallback(async () => {
     try {
       const payload = {
@@ -336,17 +323,23 @@ const DonateScreen = ({ navigation, route }) => {
       const response = await initiateDonationMutation.mutateAsync(payload);
 
       if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert(
+        showModal(
           'Error',
           response?.responseMessage ||
             'Could not initiate donation. Please try again.',
+          response?.responseCode || '',
         );
         return;
       }
 
       const reference = response?.data?.paymentReference;
       if (!reference) {
-        Alert.alert('Error', 'Could not start the payment. Please try again.');
+        showModal(
+          'Error',
+          response?.responseMessage ||
+            'Could not start the payment. Please try again.',
+          response?.responseCode || '',
+        );
         return;
       }
 
@@ -354,15 +347,13 @@ const DonateScreen = ({ navigation, route }) => {
       setConfirmVisible(false);
       setPinVisible(true);
     } catch (error) {
-      console.error(
-        '🔴 [DonateScreen] Initiate donation error:',
-        error?.message,
-      );
-      const backendMsg = error?.response?.data?.responseMessage;
-      Alert.alert(
+      const data = error?.response?.data;
+      showModal(
         'Error',
-        backendMsg ||
+        data?.responseMessage ||
+          error?.message ||
           'Could not initiate donation. Please check your connection.',
+        data?.responseCode || error?.code || '',
       );
     }
   }, [
@@ -375,9 +366,9 @@ const DonateScreen = ({ navigation, route }) => {
     accountNumber,
     trimmedMessage,
     initiateDonationMutation,
+    showModal,
   ]);
 
-  // ── Step 3: PIN entered → confirm donation ──────────────────
   const handlePinSubmit = useCallback(
     async pin => {
       const response = await confirmDonationMutation.mutateAsync({
@@ -386,7 +377,6 @@ const DonateScreen = ({ navigation, route }) => {
       });
 
       if (response?.responseCode && response.responseCode !== '000') {
-        // Throwing here lets PinEntryModal shake + clear the input
         throw new Error(response?.responseMessage || 'Incorrect PIN');
       }
 
@@ -397,7 +387,6 @@ const DonateScreen = ({ navigation, route }) => {
     [paymentReference, confirmDonationMutation],
   );
 
-  // ── Step 4: Receipt "Done" → reset + navigate away ──────────
   const handleReceiptDone = useCallback(() => {
     setReceiptVisible(false);
     setReceiptData(null);
@@ -413,7 +402,6 @@ const DonateScreen = ({ navigation, route }) => {
         translucent={false}
       />
 
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity
           onPress={() => navigation?.goBack?.()}
@@ -425,10 +413,6 @@ const DonateScreen = ({ navigation, route }) => {
         <View style={s.headerSpacer} />
       </View>
 
-      {/* Shrinks by the real keyboard height so the footer (Pay button)
-          always stays above the keyboard instead of being covered by
-          it, and the ScrollView above it has a correspondingly smaller
-          — but still fully scrollable — visible area. */}
       <Animated.View style={[s.body, { paddingBottom: kbPad }]}>
         <ScrollView
           ref={scrollRef}
@@ -552,7 +536,7 @@ const DonateScreen = ({ navigation, route }) => {
         <View style={s.footer}>
           <TouchableOpacity onPress={handlePay} activeOpacity={0.88}>
             <LinearGradient
-              colors={[C.teal, C.tealborder]}
+              colors={[C.teal, C.tealDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.payBtn}
@@ -573,7 +557,6 @@ const DonateScreen = ({ navigation, route }) => {
         </View>
       </Animated.View>
 
-      {/* Step 1 — review + triggers initiate donation */}
       <DonationConfirmModal
         visible={confirmVisible}
         onClose={() => setConfirmVisible(false)}
@@ -589,19 +572,26 @@ const DonateScreen = ({ navigation, route }) => {
         message={trimmedMessage}
       />
 
-      {/* Step 2 — PIN, triggers confirm donation */}
       <PinEntryModal
         visible={pinVisible}
         onClose={() => setPinVisible(false)}
         onSubmit={handlePinSubmit}
       />
 
-      {/* Step 3 — animated success receipt */}
       <DonationReceiptModal
         visible={receiptVisible}
         onDone={handleReceiptDone}
         data={receiptData}
         message={trimmedMessage}
+      />
+
+      <ResponseModal
+        visible={modal.visible}
+        variant={modal.variant}
+        title={modal.title}
+        message={modal.message}
+        code={modal.code}
+        onClose={hideModal}
       />
     </View>
   );
@@ -609,7 +599,6 @@ const DonateScreen = ({ navigation, route }) => {
 
 export default DonateScreen;
 
-// ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
   root: {
     flex: 1,
@@ -635,8 +624,6 @@ const s = StyleSheet.create({
   },
   headerSpacer: { width: sp(22) },
 
-  // Wraps ScrollView + footer so the animated keyboard padding above
-  // shrinks both together, keeping the footer above the keyboard.
   body: {
     flex: 1,
   },

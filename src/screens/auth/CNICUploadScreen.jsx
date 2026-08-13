@@ -21,6 +21,7 @@ import SuccessModal     from '../../components/auth/SuccessModal';
 import GradientButton   from '../../components/common/GradientButton';
 import FieldLabel       from '../../components/common/FieldLabel';
 import { FullScreenLoader } from '../../components/common/Loader';
+import ResponseModal    from '../../components/ResponseModal';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
 import { formatCNIC }   from '../../utils/formatters';
@@ -29,15 +30,26 @@ import { fileFromUri }  from '../../utils/formData';
 
 import { useRegisterStep3 } from '../../hooks/useRegistration';
 import { useAppContext }    from '../../context/AppContext';
-import { useToast }         from '../../components/common/Toast';
+
+const isApiSuccess = (body) => String(body?.responseCode ?? '') === '000';
 
 const CNICUploadScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const toast  = useToast();
   const { currentUser } = useAppContext();
   const { mutate: submitStep3, isPending } = useRegisterStep3();
 
-  const email = route?.params?.email || currentUser?.email || '';
+  const isRejection = !!route?.params?.isRejection;
+  const rejectionReason = route?.params?.rejectionReason || '';
+  const notificationType =
+    route?.params?.notificationType ||
+    route?.params?.status ||
+    (isRejection ? 'REJECTED' : '');
+  const status = route?.params?.status || (isRejection ? 'REJECTED' : '');
+
+  const email =
+    route?.params?.email ||
+    currentUser?.email ||
+    '';
 
   const [cnic,       setCnic]       = useState('');
   const [frontUri,   setFrontUri]   = useState(null);
@@ -46,6 +58,25 @@ const CNICUploadScreen = ({ navigation, route }) => {
   const [showBanner, setShowBanner] = useState(true);
   const [showModal,  setShowModal]  = useState(false);
   const [errors,     setErrors]     = useState({});
+
+  const [modal, setModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    variant: 'error',
+  });
+
+  const showResponse = useCallback((title, message, variant = 'error') => {
+    setModal({ visible: true, title, message, variant });
+  }, []);
+
+  const hideResponse = useCallback(() => {
+    const shouldLeave = modal.variant === 'success' && isRejection;
+    setModal(prev => ({ ...prev, visible: false }));
+    if (shouldLeave && navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [modal.variant, isRejection, navigation]);
 
   const modalShown = useRef(false);
 
@@ -77,33 +108,72 @@ const CNICUploadScreen = ({ navigation, route }) => {
 
   const handleContinue = useCallback(() => {
     if (!validateForm()) return;
+
     if (!email) {
-      toast.error('Missing email. Please restart registration.');
+      showResponse(
+        'Error',
+        'Email is required to update CNIC. Please try again from the notification.',
+      );
       return;
     }
 
-    // UploadSlot may pass a string URI OR an object {uri,...}
     const frontUriValue = typeof frontUri === 'string' ? frontUri : frontUri?.uri;
     const backUriValue  = typeof backUri  === 'string' ? backUri  : backUri?.uri;
 
-    submitStep3(
-      {
-        email,
-        nicNumber: cnic.replace(/-/g, ''), // backend wants raw 13 digits
-        nicFront:  fileFromUri(frontUriValue, 'nic_front.jpg'),
-        nicBack:   fileFromUri(backUriValue,  'nic_back.jpg'),
+    const payload = {
+      email,
+      nicNumber: cnic.replace(/-/g, ''),
+      nicFront:  fileFromUri(frontUriValue, 'nic_front.jpg'),
+      nicBack:   fileFromUri(backUriValue,  'nic_back.jpg'),
+    };
+
+    // Rejection / notification flow only — normal registration is unchanged
+    if (isRejection) {
+      payload.notificationType = notificationType || 'REJECTED';
+      payload.status = status || 'REJECTED';
+    }
+
+    submitStep3(payload, {
+      onSuccess: (body) => {
+        if (!isApiSuccess(body)) {
+          showResponse(
+            'Error',
+            body?.responseMessage || 'Upload failed. Please try again.',
+          );
+          return;
+        }
+
+        if (isRejection) {
+          showResponse(
+            'Success',
+            body?.responseMessage || 'CNIC updated successfully.',
+            'success',
+          );
+          return;
+        }
+
+        navigation.navigate('ProfileCompletionScreen', { email });
       },
-      {
-        onSuccess: (body) => {
-          toast.success(body?.responseMessage || 'CNIC uploaded successfully.');
-          navigation.navigate('ProfileCompletionScreen', { email });
-        },
-        onError: (err) => {
-          toast.error(err?.message || 'Upload failed.');
-        },
+      onError: (err) => {
+        showResponse(
+          'Error',
+          err?.message || 'Upload failed. Please try again.',
+        );
       },
-    );
-  }, [validateForm, email, cnic, frontUri, backUri, submitStep3, navigation, toast]);
+    });
+  }, [
+    validateForm,
+    email,
+    cnic,
+    frontUri,
+    backUri,
+    submitStep3,
+    navigation,
+    isRejection,
+    notificationType,
+    status,
+    showResponse,
+  ]);
 
   const footerPb     = insets.bottom > 0 ? insets.bottom : SPACING.xl;
   const footerHeight = SPACING.md + SPACING.buttonHeight + footerPb;
@@ -129,6 +199,9 @@ const CNICUploadScreen = ({ navigation, route }) => {
           <View style={styles.headlineContainer}>
             <Text style={styles.headline}>Verify Your Identity</Text>
             <Text style={styles.subtitle}>Upload your CNIC for verification</Text>
+            {isRejection && !!rejectionReason && (
+              <Text style={styles.errorText}>{rejectionReason}</Text>
+            )}
           </View>
 
           <View style={styles.cnicFieldContainer}>
@@ -164,7 +237,7 @@ const CNICUploadScreen = ({ navigation, route }) => {
 
       <View style={[styles.footer, { paddingBottom: footerPb }]}>
         <GradientButton
-          title="Continue"
+          title={isRejection ? 'Update' : 'Continue'}
           onPress={handleContinue}
           disabled={!isFormValid || isPending}
         />
@@ -182,7 +255,18 @@ const CNICUploadScreen = ({ navigation, route }) => {
         ]}
       />
 
-      <FullScreenLoader visible={isPending} message="Uploading CNIC…" />
+      <FullScreenLoader
+        visible={isPending}
+        message={isRejection ? 'Updating CNIC…' : 'Uploading CNIC…'}
+      />
+
+      <ResponseModal
+        visible={modal.visible}
+        variant={modal.variant}
+        title={modal.title}
+        message={modal.message}
+        onClose={hideResponse}
+      />
     </SafeAreaView>
   );
 };

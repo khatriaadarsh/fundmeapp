@@ -119,13 +119,25 @@ export const registerStep2 = (p) => postRegistrationStep({
   otp:   p.otp,
 });
 
-export const registerStep3 = (p) => postRegistrationStep({
-  step:      3,
-  email:     p.email,
-  nicNumber: p.nicNumber,
-  nicFront:  p.nicFront,
-  nicBack:   p.nicBack,
-});
+export const registerStep3 = (p) => {
+  const fields = {
+    step:      3,
+    email:     p.email,
+    nicNumber: p.nicNumber,
+    nicFront:  p.nicFront,
+    nicBack:   p.nicBack,
+  };
+
+  if (p.notificationType) {
+    fields.notificationType = p.notificationType;
+  }
+  if (p.status) {
+    fields.status = p.status;
+  }
+
+  return postRegistrationStep(fields);
+};
+
 
 export const registerStep4 = (p) => postRegistrationStep({
   step:         4,

@@ -15,7 +15,7 @@ import {
   Platform,
   UIManager,
   ActivityIndicator,
-  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -33,6 +33,12 @@ import {
   getStatusVisual,
   NOTIFICATION_CATEGORIES,
 } from '../../utils/notificationTransform';
+import ResponseModal from '../../components/ResponseModal';
+import {
+  navigateFromNotification,
+  isSuccessNotification,
+  parseNotificationPayload,
+} from '../../routes/navigationRef';
 
 if (
   Platform.OS === 'android' &&
@@ -41,7 +47,6 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// --- Constants, Scaling & Theme (Self-contained) ---
 const { width: SW } = Dimensions.get('window');
 const sp = size => (SW / 375) * size;
 const vsp = size => (Dimensions.get('window').height / 812) * size;
@@ -108,7 +113,10 @@ const TYPE_CONFIG = {
   },
 };
 
-// --- Local Components ---
+const isCnicResubmitted = item => {
+  const payload = parseNotificationPayload(item);
+  return !!payload.cnicResubmitted;
+};
 
 const Header = memo(({ onBack, onMarkAll }) => (
   <View style={styles.header}>
@@ -174,7 +182,7 @@ const FilterRow = memo(({ active, onChange }) => (
   </ScrollView>
 ));
 
-const NotifCard = memo(({ item, onPress }) => {
+const NotifCard = memo(({ item, onPress, disabled }) => {
   const categoryCfg = TYPE_CONFIG[item.type] ?? TYPE_CONFIG.security;
   const statusOverride = getStatusVisual(item.raw?.notificationType);
   const cfg = statusOverride ?? categoryCfg;
@@ -182,9 +190,13 @@ const NotifCard = memo(({ item, onPress }) => {
 
   return (
     <TouchableOpacity
-      style={[styles.card, item.unread && styles.card_unread]}
+      style={[
+        styles.card,
+        item.unread && styles.card_unread,
+        disabled && styles.card_disabled,
+      ]}
       onPress={() => onPress(item)}
-      activeOpacity={0.75}
+      activeOpacity={disabled ? 1 : 0.75}
     >
       {item.unread && (
         <View style={[styles.card_unreadBar, { backgroundColor: barColor }]} />
@@ -207,19 +219,34 @@ const NotifCard = memo(({ item, onPress }) => {
   );
 });
 
-// ─────────────────────────────────────────────────────────────
-// SwipeableNotifCard — wraps NotifCard with a swipe-left-to-reveal-trash
-// gesture. Swiping past the threshold triggers a "thrown into the
-// trash" animation: the card slides further left while shrinking and
-// fading, landing on the trash icon, then calls onDelete.
-// ─────────────────────────────────────────────────────────────
-const TRASH_WIDTH = sp(64);
-const DELETE_THRESHOLD = -TRASH_WIDTH;
+const DELETE_THRESHOLD = -sp(64);
 
-const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
+const SwipeableNotifCard = memo(({ item, onPress, onDelete, disabled }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(1)).current;
   const cardOpacity = useRef(new Animated.Value(1)).current;
+
+  const triggerDelete = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -sp(240),
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardScale, {
+        toValue: 0.35,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onDelete(item);
+    });
+  }, [item, onDelete, translateX, cardScale, cardOpacity]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -228,7 +255,7 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
         Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
       onPanResponderMove: (_, gesture) => {
         if (gesture.dx < 0) {
-          translateX.setValue(Math.max(gesture.dx, -TRASH_WIDTH - sp(24)));
+          translateX.setValue(Math.max(gesture.dx, -sp(88)));
         }
       },
       onPanResponderRelease: (_, gesture) => {
@@ -253,60 +280,16 @@ const SwipeableNotifCard = memo(({ item, onPress, onDelete }) => {
     }),
   ).current;
 
-  const triggerDelete = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue: -sp(240),
-        duration: 260,
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardScale, {
-        toValue: 0.35,
-        duration: 260,
-        useNativeDriver: true,
-      }),
-      Animated.timing(cardOpacity, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onDelete(item);
-    });
-  }, [item, onDelete, translateX, cardScale, cardOpacity]);
-
-  const trashOpacity = translateX.interpolate({
-    inputRange: [-TRASH_WIDTH, -sp(16), 0],
-    outputRange: [1, 0.6, 0],
-    extrapolate: 'clamp',
-  });
-  const trashScale = translateX.interpolate({
-    inputRange: [-TRASH_WIDTH - sp(24), -TRASH_WIDTH, 0],
-    outputRange: [1.15, 1, 0.6],
-    extrapolate: 'clamp',
-  });
-
   return (
-    <View style={styles.swipe_wrap}>
-      <Animated.View
-        style={[
-          styles.swipe_trash,
-          { opacity: trashOpacity, transform: [{ scale: trashScale }] },
-        ]}
-      >
-        <Icons name="trash-2" size={sp(20)} color={C.white} />
-      </Animated.View>
-
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={{
-          transform: [{ translateX }, { scale: cardScale }],
-          opacity: cardOpacity,
-        }}
-      >
-        <NotifCard item={item} onPress={onPress} />
-      </Animated.View>
-    </View>
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={{
+        transform: [{ translateX }, { scale: cardScale }],
+        opacity: cardOpacity,
+      }}
+    >
+      <NotifCard item={item} onPress={onPress} disabled={disabled} />
+    </Animated.View>
   );
 });
 
@@ -328,30 +311,32 @@ const LoadingState = memo(() => (
   </View>
 ));
 
-// --- Main Screen ---
 const NotificationsScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
-  const userId = currentUser?.id;
+  const userId = currentUser?.id ?? currentUser?.userId;
 
-  const { data: rawNotifications = [], isLoading } =
-    useNotificationList(userId);
+  const {
+    data: rawNotifications = [],
+    isLoading,
+    refetch,
+  } = useNotificationList(userId);
   const markReadMutation = useMarkNotificationRead(userId);
   const markAllMutation = useMarkAllNotificationsRead(userId);
   const deleteMutation = useDeleteNotification(userId);
 
   const [activeFilter, setActiveFilter] = useState('all');
-
-  // Optimistic local removal so the swipe/trash animation never waits on
-  // the network — if the delete call fails, the id is un-hidden again.
   const [removedIds, setRemovedIds] = useState(() => new Set());
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    message: '',
+  });
 
   const visibleNotifications = useMemo(
     () => rawNotifications.filter(n => !removedIds.has(n.notificationId)),
     [rawNotifications, removedIds],
   );
 
-  // Frontend-only category filter — filters the raw list by mapped
-  // category before grouping into TODAY/YESTERDAY sections.
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'all') return visibleNotifications;
     return visibleNotifications.filter(
@@ -372,13 +357,43 @@ const NotificationsScreen = ({ navigation }) => {
     markAllMutation.mutate();
   }, [markAllMutation]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
+
   const handleNotifPress = useCallback(
     item => {
       if (item.unread) {
         markReadMutation.mutate(Number(item.id));
       }
+
+      const payload = parseNotificationPayload(item);
+
+      // Success / approved — not clickable
+      if (isSuccessNotification(payload)) {
+        return;
+      }
+
+      // Already resubmitted CNIC — not clickable
+      if (payload.cnicResubmitted) {
+        return;
+      }
+
+      navigateFromNotification({
+        ...item,
+        raw: item.raw || item,
+        email: payload.email || currentUser?.email || '',
+        notificationType: payload.notificationType,
+        status: payload.status,
+        cnicResubmitted: payload.cnicResubmitted,
+      });
     },
-    [markReadMutation],
+    [markReadMutation, currentUser],
   );
 
   const handleDelete = useCallback(
@@ -389,17 +404,19 @@ const NotificationsScreen = ({ navigation }) => {
       setRemovedIds(prev => new Set(prev).add(notificationId));
 
       deleteMutation.mutate(notificationId, {
-        onError: () => {
+        onError: error => {
           LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
           setRemovedIds(prev => {
             const next = new Set(prev);
             next.delete(notificationId);
             return next;
           });
-          Alert.alert(
-            'Error',
-            'Failed to delete notification. Please try again.',
-          );
+          setErrorModal({
+            visible: true,
+            message:
+              error?.message ||
+              'Failed to delete notification. Please try again.',
+          });
         },
       });
     },
@@ -419,6 +436,7 @@ const NotificationsScreen = ({ navigation }) => {
         item={item}
         onPress={handleNotifPress}
         onDelete={handleDelete}
+        disabled={isCnicResubmitted(item)}
       />
     ),
     [handleNotifPress, handleDelete],
@@ -433,16 +451,11 @@ const NotificationsScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
 
-      {/* Fixed, non-scrolling top block — Header + FilterRow always sit
-          flush together with no gap between them and the list below. */}
       <View style={styles.topBlock}>
         <Header onBack={() => navigation.goBack()} onMarkAll={handleMarkAll} />
         <FilterRow active={activeFilter} onChange={handleFilterChange} />
       </View>
 
-      {/* flex: 1 here is what makes the list actually fill the rest of
-          the screen instead of collapsing to its own content height —
-          that collapse was the root cause of the empty gap above it. */}
       <SectionList
         style={styles.list}
         sections={sections}
@@ -456,14 +469,30 @@ const NotificationsScreen = ({ navigation }) => {
         renderSectionHeader={renderSectionHeader}
         renderItem={renderItem}
         ItemSeparatorComponent={renderSeparator}
-        ListEmptyComponent={isLoading ? <LoadingState /> : <EmptyState />}
-        // --- Virtualization tuning so this stays smooth with a long,
-        // ever-growing notification history instead of degrading. ---
+        ListEmptyComponent={
+          isLoading && !refreshing ? <LoadingState /> : <EmptyState />
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[C.markAll]}
+            tintColor={C.markAll}
+          />
+        }
         initialNumToRender={12}
         maxToRenderPerBatch={12}
         updateCellsBatchingPeriod={50}
         windowSize={9}
         removeClippedSubviews={Platform.OS === 'android'}
+      />
+
+      <ResponseModal
+        visible={errorModal.visible}
+        variant="error"
+        title="Error"
+        message={errorModal.message}
+        onClose={() => setErrorModal({ visible: false, message: '' })}
       />
     </SafeAreaView>
   );
@@ -471,15 +500,10 @@ const NotificationsScreen = ({ navigation }) => {
 
 export default NotificationsScreen;
 
-// --- Consolidated Stylesheet ---
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.pageBg },
   separator: { height: vsp(8) },
-
-  // Groups Header + FilterRow so they stay tight against each other and
-  // against the list, with no ambiguous flex gaps between them.
   topBlock: { backgroundColor: C.pageBg },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,8 +521,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   header_markAll: { fontSize: sp(13), fontWeight: '600', color: C.markAll },
-
-  // ── Category filter row ──────────────────────────────────────
   filter_scrollView: { flexGrow: 0 },
   filter_row: {
     paddingHorizontal: sp(16),
@@ -523,8 +545,6 @@ const styles = StyleSheet.create({
     fontSize: sp(12.5),
     fontWeight: '700',
   },
-
-  // The list now owns the remaining screen height — this is the key fix.
   list: { flex: 1 },
   list_content: {
     paddingHorizontal: sp(16),
@@ -542,7 +562,6 @@ const styles = StyleSheet.create({
     marginBottom: vsp(8),
     marginTop: vsp(4),
   },
-
   card: {
     backgroundColor: C.white,
     borderRadius: sp(12),
@@ -555,6 +574,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   card_unread: { backgroundColor: '#FAFCFF' },
+  card_disabled: { opacity: 0.72 },
   card_unreadBar: { width: sp(4) },
   card_content: {
     flex: 1,
@@ -587,21 +607,6 @@ const styles = StyleSheet.create({
     marginBottom: vsp(6),
   },
   card_time: { fontSize: sp(11), fontWeight: '500', color: C.textLight },
-
-  // ── Swipe-to-delete ──────────────────────────────────────────
-  swipe_wrap: { position: 'relative' },
-  swipe_trash: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: TRASH_WIDTH,
-    borderRadius: sp(12),
-    backgroundColor: C.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
   empty_wrap: {
     flex: 1,
     alignItems: 'center',

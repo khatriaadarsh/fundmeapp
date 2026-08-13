@@ -8,8 +8,33 @@ import {
   resendOtp,
 } from '../services/authService';
 
-export const useRegisterStep1 = () => useMutation({ mutationFn: registerStep1 });
-export const useRegisterStep2 = () => useMutation({ mutationFn: registerStep2 });
-export const useRegisterStep3 = () => useMutation({ mutationFn: registerStep3 });
-export const useRegisterStep4 = () => useMutation({ mutationFn: registerStep4 });
-export const useResendOtp     = () => useMutation({ mutationFn: resendOtp });
+const unwrapStep = async (fn, payload) => {
+  const body = await fn(payload);
+  const code = String(body?.responseCode ?? '');
+
+  if (code && code !== '000') {
+    const err = new Error(
+      body?.responseMessage || 'Request failed. Please try again.',
+    );
+    err.code = code;
+    err.raw = body;
+    throw err;
+  }
+
+  return body;
+};
+
+export const useRegisterStep1 = () =>
+  useMutation({ mutationFn: (p) => unwrapStep(registerStep1, p) });
+
+export const useRegisterStep2 = () =>
+  useMutation({ mutationFn: (p) => unwrapStep(registerStep2, p) });
+
+export const useRegisterStep3 = () =>
+  useMutation({ mutationFn: (p) => unwrapStep(registerStep3, p) });
+
+export const useRegisterStep4 = () =>
+  useMutation({ mutationFn: (p) => unwrapStep(registerStep4, p) });
+
+export const useResendOtp = () =>
+  useMutation({ mutationFn: (email) => unwrapStep(resendOtp, email) });
