@@ -154,6 +154,7 @@ const DonateScreen = ({ navigation, route }) => {
   const [accountError, setAccountError] = useState('');
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [pinVisible, setPinVisible] = useState(false);
+  const [pinError, setPinError] = useState(null);
   const [receiptVisible, setReceiptVisible] = useState(false);
 
   const [paymentReference, setPaymentReference] = useState(null);
@@ -167,9 +168,12 @@ const DonateScreen = ({ navigation, route }) => {
     variant: 'error',
   });
 
-  const showModal = useCallback((title, message, code = '', variant = 'error') => {
-    setModal({ visible: true, title, message, code, variant });
-  }, []);
+  const showModal = useCallback(
+    (title, message, code = '', variant = 'error') => {
+      setModal({ visible: true, title, message, code, variant });
+    },
+    [],
+  );
 
   const hideModal = useCallback(() => {
     setModal(prev => ({ ...prev, visible: false }));
@@ -301,7 +305,14 @@ const DonateScreen = ({ navigation, route }) => {
 
     setAccountError('');
     setConfirmVisible(true);
-  }, [selected, showAccountField, accountNumber, campaignId, donorId, showModal]);
+  }, [
+    selected,
+    showAccountField,
+    accountNumber,
+    campaignId,
+    donorId,
+    showModal,
+  ]);
 
   const handleInitiate = useCallback(async () => {
     try {
@@ -371,20 +382,42 @@ const DonateScreen = ({ navigation, route }) => {
 
   const handlePinSubmit = useCallback(
     async pin => {
-      const response = await confirmDonationMutation.mutateAsync({
-        paymentReference,
-        pin,
-      });
+      try {
+        const response = await confirmDonationMutation.mutateAsync({
+          paymentReference,
+          pin,
+        });
 
-      if (response?.responseCode && response.responseCode !== '000') {
-        throw new Error(response?.responseMessage || 'Incorrect PIN');
+        if (response?.responseCode && response.responseCode !== '000') {
+          setPinError({
+            visible: true,
+            code: response.responseCode || '',
+            message:
+              response.responseMessage || 'Incorrect PIN. Please try again.',
+          });
+          throw new Error(response?.responseMessage || 'Incorrect PIN');
+        }
+
+        setReceiptData(response?.data || null);
+        setPinVisible(false);
+        setReceiptVisible(true);
+      } catch (error) {
+        // Network / unexpected errors
+        if (!pinError?.visible) {
+          const data = error?.response?.data;
+          setPinError({
+            visible: true,
+            code: data?.responseCode || error?.code || '',
+            message:
+              data?.responseMessage ||
+              error?.message ||
+              'Could not confirm payment. Please try again.',
+          });
+        }
+        throw error; // keep the shake + clear behaviour in PinEntryModal
       }
-
-      setReceiptData(response?.data || null);
-      setPinVisible(false);
-      setReceiptVisible(true);
     },
-    [paymentReference, confirmDonationMutation],
+    [paymentReference, confirmDonationMutation, pinError],
   );
 
   const handleReceiptDone = useCallback(() => {
@@ -574,8 +607,19 @@ const DonateScreen = ({ navigation, route }) => {
 
       <PinEntryModal
         visible={pinVisible}
-        onClose={() => setPinVisible(false)}
+        onClose={() => {
+          setPinVisible(false);
+          setPinError(null);
+        }}
         onSubmit={handlePinSubmit}
+        // ✅ Data from the same screen state used by DonationConfirmModal
+        amount={selected}
+        name={displayName}
+        accountNumber={showAccountField ? accountNumber : null}
+        attempts={5}
+        title="Enter MPIN to authorize payment"
+        error={pinError}
+        onErrorClose={() => setPinError(null)}
       />
 
       <DonationReceiptModal

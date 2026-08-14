@@ -23,9 +23,11 @@ import {
   ActivityIndicator,
   Keyboard,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DonationConfirmModal from '../donation/DonationConfirmModal';
 import ResponseModal from '../ResponseModal';
 
 const { width: SW } = Dimensions.get('window');
@@ -94,33 +96,59 @@ const PinEntryModal = ({
   const [submitting, setSubmitting] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef(null);
-
+  const insets = useSafeAreaInsets();
   const focusInput = useCallback(() => {
     inputRef.current?.focus();
   }, []);
 
   // Reset + auto-open the native keyboard when the modal appears
+  // useEffect(() => {
+  //   if (visible) {
+  //     setPin('');
+  //     setSubmitting(false);
+  //     const t = setTimeout(focusInput, 350);
+  //     return () => clearTimeout(t);
+  //   }
+  // }, [visible, focusInput]);
   useEffect(() => {
-    if (visible) {
+    if (!visible) {
+      Keyboard.dismiss();
       setPin('');
-      setSubmitting(false);
-      const t = setTimeout(focusInput, 350);
-      return () => clearTimeout(t);
     }
-  }, [visible, focusInput]);
+  }, [visible]);
 
   const triggerShake = useCallback(() => {
     Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 35, useNativeDriver: true }),
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 55,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 55,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 8,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -8,
+        duration: 45,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 35,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, [shakeAnim]);
 
   const runSubmit = useCallback(
-    async (pinStr) => {
+    async pinStr => {
       setSubmitting(true);
       Keyboard.dismiss();
       try {
@@ -140,7 +168,7 @@ const PinEntryModal = ({
   );
 
   const handleChange = useCallback(
-    (text) => {
+    text => {
       if (submitting) return;
       const digits = text.replace(/[^0-9]/g, '').slice(0, PIN_LENGTH);
       setPin(digits);
@@ -165,7 +193,11 @@ const PinEntryModal = ({
       statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={s.overlay}>
+      <KeyboardAvoidingView
+        style={s.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -285,7 +317,7 @@ const PinEntryModal = ({
             onClose={onErrorClose}
           />
         )}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -351,7 +383,11 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   recipientName: { fontSize: scale(18), fontWeight: '800', color: T.textDark },
-  recipientNumber: { fontSize: scale(15), color: T.textGray, marginTop: scale(2) },
+  recipientNumber: {
+    fontSize: scale(15),
+    color: T.textGray,
+    marginTop: scale(2),
+  },
 
   title: {
     fontSize: scale(16),

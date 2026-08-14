@@ -2,24 +2,22 @@ import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
+import Icons from 'react-native-vector-icons/Feather';
+import { P, sp } from '../../theme/theme';
 
-const Header = memo(({ 
-  onBackPress, 
-  title, 
-  rightText,
-  step,
-  totalSteps,
-}) => {
+const Header = memo(({ onBackPress, title, rightText, step, totalSteps }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + SPACING.gapSm }]}>
+    <View
+      style={[styles.container, { paddingTop: insets.top + SPACING.gapSm }]}
+    >
       <TouchableOpacity
         onPress={onBackPress}
         style={styles.backButton}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
-        <Text style={styles.backArrow}>←</Text>
+        <Icons name="arrow-left" size={sp(22)} color={P.dark} />
       </TouchableOpacity>
 
       {title && <Text style={styles.title}>{title}</Text>}
@@ -29,7 +27,7 @@ const Header = memo(({
           Step {step} of {totalSteps}
         </Text>
       )}
-      
+
       {rightText && <Text style={styles.rightText}>{rightText}</Text>}
     </View>
   );
@@ -45,7 +43,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   backButton: {
-    padding: SPACING.xs,
+    padding: SPACING.s,
   },
   backArrow: {
     fontSize: TYPOGRAPHY.fontSize.xl,

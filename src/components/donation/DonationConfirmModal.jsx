@@ -100,7 +100,7 @@ const DonationConfirmModal = ({
   paymentMethod,
   message,
 
-  error,        // { visible, code, message } | null
+  error, // { visible, code, message } | null
   onErrorClose,
 }) => {
   const insets = useSafeAreaInsets();
@@ -254,10 +254,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: scale(24), // decent, not oversized
+    fontSize: scale(22), // decent, not oversized
     fontWeight: '800',
     color: C.dark,
-    marginTop: scale(6),
+    marginTop: scale(5),
   },
 
   body: { flex: 1 },
@@ -327,7 +327,7 @@ const s = StyleSheet.create({
     maxWidth: '100%',
   },
   campaignPillTxt: {
-    fontSize: scale(12),
+    fontSize: scale(10),
     fontWeight: '700',
     color: C.tealText,
     flexShrink: 1,
@@ -339,10 +339,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: scale(7),
   },
-  amountLabel: { fontSize: scale(16), color: C.gray },
+  amountLabel: { fontSize: scale(14), color: C.gray },
   amountLabelBold: { color: C.dark, fontWeight: '800' },
-  amountValue: { fontSize: scale(16), fontWeight: '600', color: C.dark },
-  amountValueBold: { fontSize: scale(17), fontWeight: '800' },
+  amountValue: { fontSize: scale(14), fontWeight: '600', color: C.dark },
+  amountValueBold: { fontSize: scale(16), fontWeight: '800' },
 
   sectionLabel: {
     fontSize: scale(15),
@@ -377,7 +377,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   selectText: {
-    fontSize: scale(16),
+    fontSize: scale(12),
     fontWeight: '800',
     color: C.dark,
     flexShrink: 1,
