@@ -18,6 +18,7 @@ import {
   FlatList,
 } from 'react-native';
 import Icons from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ═══════════════════════════════════════════════════════════
 // Responsive Scale
@@ -405,22 +406,24 @@ const SettingsScreen = ({ navigation }) => {
     [navigation],
   );
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={s.safe}>
+    <View style={[s.safe, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
 
       <Header onBack={() => navigation.goBack()} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
+        contentContainerStyle={[
+          s.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, vscale(24)) + vscale(16) },
+        ]}
       >
         {/* ── ACCOUNT ───────────────────────────────────── */}
         <Section label="ACCOUNT">
-          <NavRow
-            label="Change Password"
-            onPress={go('NewPasswordScreen')}
-          />
+          <NavRow label="Change Password" onPress={go('NewPasswordScreen')} />
           <NavRow label="Email Preferences" onPress={go('FeedbackScreen')} />
           <NavRow
             icon="trash-2"
@@ -504,7 +507,7 @@ const SettingsScreen = ({ navigation }) => {
         onSelect={setTheme}
         onClose={() => setThemeSheet(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
