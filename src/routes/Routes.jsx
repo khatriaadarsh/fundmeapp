@@ -639,6 +639,7 @@ import FeedbackScreen from '../screens/feedback/FeedbackScreen';
 import CreateCampaign from '../screens/campaigncreation/CreateCampaign';
 import PaymentSuccessScreen from '../screens/notifications/PaymentSuccessScreen';
 import PinEntryScreen from '../screens/auth/PinEntryScreen';
+import DonationReceiptScreen from '../screens/donation/DonationReceiptScreen';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -858,6 +859,7 @@ const StackNavigator = () => (
     <Stack.Screen name="FeedbackScreen" component={FeedbackScreen} />
     <Stack.Screen name="PinEntryScreen" component={PinEntryScreen} />
     <Stack.Screen name="PaymentSuccessScreen" component={PaymentSuccessScreen} />
+    <Stack.Screen name="DonationReceiptScreen"component={DonationReceiptScreen}/>
   </Stack.Navigator>
 );
 

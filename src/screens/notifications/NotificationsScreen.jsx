@@ -35,9 +35,9 @@ import {
 } from '../../utils/notificationTransform';
 import ResponseModal from '../../components/ResponseModal';
 import {
-  navigateFromNotification,
-  isSuccessNotification,
+  navigationRef,
   parseNotificationPayload,
+  resolveNotificationRoute,
 } from '../../routes/navigationRef';
 
 if (
@@ -111,11 +111,6 @@ const TYPE_CONFIG = {
     bg: C.systemBg,
     barColor: C.system,
   },
-};
-
-const isCnicResubmitted = item => {
-  const payload = parseNotificationPayload(item);
-  return !!payload.cnicResubmitted;
 };
 
 const Header = memo(({ onBack, onMarkAll }) => (
@@ -366,6 +361,12 @@ const NotificationsScreen = ({ navigation }) => {
     }
   }, [refetch]);
 
+  /**
+   * The router owns ALL routing decisions — the screen no longer
+   * short-circuits on "success", which is what previously stopped
+   * donation notifications from opening (they are success-type, so the
+   * old guard returned right after marking them read).
+   */
   const handleNotifPress = useCallback(
     item => {
       if (item.unread) {
@@ -374,26 +375,31 @@ const NotificationsScreen = ({ navigation }) => {
 
       const payload = parseNotificationPayload(item);
 
-      // Success / approved — not clickable
-      if (isSuccessNotification(payload)) {
-        return;
-      }
-
-      // Already resubmitted CNIC — not clickable
-      if (payload.cnicResubmitted) {
-        return;
-      }
-
-      navigateFromNotification({
+      const route = resolveNotificationRoute({
         ...item,
         raw: item.raw || item,
-        email: payload.email || currentUser?.email || '',
-        notificationType: payload.notificationType,
-        status: payload.status,
-        cnicResubmitted: payload.cnicResubmitted,
       });
+
+      if (!route?.name) return;
+
+      const params = { ...(route.params || {}) };
+
+      if (route.name === 'DonationReceiptScreen') {
+        // payload userId wins; session id is only a fallback
+        params.userId = params.userId ?? payload.donationUserId ?? userId;
+      }
+
+      if (route.name === 'CNICUploadScreen') {
+        params.email = params.email || payload.email || currentUser?.email || '';
+      }
+
+      if (navigation?.navigate) {
+        navigation.navigate(route.name, params);
+      } else if (navigationRef.isReady()) {
+        navigationRef.navigate(route.name, params);
+      }
     },
-    [markReadMutation, currentUser],
+    [markReadMutation, navigation, userId, currentUser],
   );
 
   const handleDelete = useCallback(
@@ -414,6 +420,7 @@ const NotificationsScreen = ({ navigation }) => {
           setErrorModal({
             visible: true,
             message:
+              error?.response?.data?.responseMessage ||
               error?.message ||
               'Failed to delete notification. Please try again.',
           });
@@ -430,15 +437,24 @@ const NotificationsScreen = ({ navigation }) => {
     [],
   );
 
+  // A card is dimmed/inert only when the router says there's nowhere
+  // to go — so donation cards stay active even once read.
   const renderItem = useCallback(
-    ({ item }) => (
-      <SwipeableNotifCard
-        item={item}
-        onPress={handleNotifPress}
-        onDelete={handleDelete}
-        disabled={isCnicResubmitted(item)}
-      />
-    ),
+    ({ item }) => {
+      const route = resolveNotificationRoute({
+        ...item,
+        raw: item.raw || item,
+      });
+
+      return (
+        <SwipeableNotifCard
+          item={item}
+          onPress={handleNotifPress}
+          onDelete={handleDelete}
+          disabled={!route?.name}
+        />
+      );
+    },
     [handleNotifPress, handleDelete],
   );
 
@@ -459,7 +475,7 @@ const NotificationsScreen = ({ navigation }) => {
       <SectionList
         style={styles.list}
         sections={sections}
-        keyExtractor={item => item.id}
+        keyExtractor={item => String(item.id)}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.list_content,
@@ -538,13 +554,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filter_chipActive: {},
-  filter_icon: {
-    marginRight: sp(5),
-  },
-  filter_label: {
-    fontSize: sp(12.5),
-    fontWeight: '700',
-  },
+  filter_icon: { marginRight: sp(5) },
+  filter_label: { fontSize: sp(12.5), fontWeight: '700' },
   list: { flex: 1 },
   list_content: {
     paddingHorizontal: sp(16),

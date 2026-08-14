@@ -47,3 +47,19 @@ export const getDonationHistory = async (userId) => {
   const res = await apiClient.get(endpointUrl);
   return res.data;
 };
+
+
+export const getDonationDetail = async ({ donationId, userId }) => {
+  if (!donationId) throw new Error('donationId is required');
+  if (!userId) throw new Error('userId is required');
+
+  // DONATION (singular) — matches the key used by INITIATE / CONFIRM /
+  // HISTORY above. Using DONATIONS here throws
+  // "Cannot read property 'DETAIL' of undefined" synchronously, so the
+  // request never leaves the app and the screen shows that TypeError
+  // instead of a backend message.
+  const res = await apiClient.get(
+    ENDPOINTS.DONATION.DETAIL(donationId, userId),
+  );
+  return res?.data;
+};

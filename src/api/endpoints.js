@@ -48,6 +48,7 @@ DONATION: {
   INITIATE: '/campaign/donate',
   CONFIRM: '/campaign/donate/confirm',
   HISTORY: (userId) => `/donation/history/${userId}`,
+  DETAIL: (donationId, userId) => `/donation/${donationId}/user/${userId}`,
 },
   NOTIFICATION: {
   COUNT: '/notification/count',

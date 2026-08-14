@@ -39,6 +39,13 @@ const parseBool = (value) => {
   return s === 'true' || s === '1' || s === 'yes';
 };
 
+// FCM delivers everything as strings, so "25" must become 25.
+const parsePositiveId = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 export const parseNotificationPayload = (input) => {
   if (!input) {
     return {
@@ -51,6 +58,9 @@ export const parseNotificationPayload = (input) => {
       title: '',
       body: '',
       cnicResubmitted: false,
+      donationId: null,
+      donationUserId: null,
+      role: '',
     };
   }
 
@@ -69,6 +79,7 @@ export const parseNotificationPayload = (input) => {
     ...(input.title ? { title: input.title } : {}),
     ...(input.body ? { body: input.body } : {}),
     ...(input.email ? { email: input.email } : {}),
+    ...(input.donationId ? { donationId: input.donationId } : {}),
   };
 
   const type = String(
@@ -122,12 +133,7 @@ export const parseNotificationPayload = (input) => {
     stepNumber,
     notificationType: type || status,
     email: String(
-      pickFirst(
-        merged.email,
-        merged.userEmail,
-        merged.user_email,
-        input.email,
-      ),
+      pickFirst(merged.email, merged.userEmail, merged.user_email, input.email),
     ),
     title: String(pickFirst(merged.title, input.title)),
     body: String(pickFirst(merged.body, input.body)),
@@ -139,6 +145,30 @@ export const parseNotificationPayload = (input) => {
         input.cnicResubmitted,
       ),
     ),
+
+    // ── Donation receipt deep-link ────────────────────────────
+    // Both IDs feed GET /donation/{donationId}/user/{userId}.
+    // donationUserId comes from the PAYLOAD, not the session, because
+    // the backend returns a different projection per user (donor view
+    // vs creator view) for the very same donation.
+    donationId: parsePositiveId(
+      pickFirst(
+        merged.donationId,
+        merged.donation_id,
+        merged.donationID,
+        merged.referenceId,
+        merged.reference_id,
+      ),
+    ),
+    donationUserId: parsePositiveId(
+      pickFirst(
+        merged.userId,
+        merged.user_id,
+        merged.recipientUserId,
+        merged.recipient_user_id,
+      ),
+    ),
+    role: String(pickFirst(merged.role, merged.userRole)).toLowerCase(),
   };
 };
 
@@ -157,6 +187,11 @@ export const isSuccessNotification = (payload) => {
   );
 };
 
+export const isDonationNotification = (payload) => {
+  if (!payload) return false;
+  return !!payload.donationId;
+};
+
 export const isCnicRejection = (payload) => {
   if (!payload) return false;
 
@@ -173,14 +208,41 @@ export const isCnicRejection = (payload) => {
   return rejected && cnicRelated;
 };
 
+/**
+ * ORDER MATTERS.
+ *
+ * The donation check runs FIRST and deliberately bypasses the
+ * isSuccessNotification() guard below it: a donation notification
+ * carries status SUCCESS, so the success guard would otherwise swallow
+ * it and the card would appear "dead" — read but never navigating.
+ */
 export const resolveNotificationRoute = (input) => {
   const payload = parseNotificationPayload(input);
 
+  // 1) Donation → receipt
+  if (payload.donationId) {
+    return {
+      name: 'DonationReceiptScreen',
+      params: {
+        donationId: payload.donationId,
+        userId: payload.donationUserId || undefined,
+        role:
+          payload.role === 'creator' || payload.role === 'donor'
+            ? payload.role
+            : undefined,
+          notificationType: payload.notificationType || '',
+        notificationTitle: payload.title || '',
+      },
+    };
+  }
+
+  // 2) Other success notifications are informational only
   if (isSuccessNotification(payload)) return null;
 
-  // Already resubmitted CNIC — not clickable
+  // 3) CNIC already resubmitted — nothing left to action
   if (payload.cnicResubmitted) return null;
 
+  // 4) CNIC rejection → re-upload
   if (isCnicRejection(payload)) {
     return {
       name: 'CNICUploadScreen',
