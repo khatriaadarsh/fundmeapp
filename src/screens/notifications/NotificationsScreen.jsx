@@ -35,7 +35,6 @@ import {
 } from '../../utils/notificationTransform';
 import ResponseModal from '../../components/ResponseModal';
 import {
-  navigationRef,
   parseNotificationPayload,
   resolveNotificationRoute,
 } from '../../routes/navigationRef';
@@ -362,10 +361,9 @@ const NotificationsScreen = ({ navigation }) => {
   }, [refetch]);
 
   /**
-   * The router owns ALL routing decisions — the screen no longer
-   * short-circuits on "success", which is what previously stopped
-   * donation notifications from opening (they are success-type, so the
-   * old guard returned right after marking them read).
+   * The router owns every routing decision; this only fills in
+   * session-level defaults the payload may omit, and forwards the raw
+   * row so the receipt screen can re-extract ids the router missed.
    */
   const handleNotifPress = useCallback(
     item => {
@@ -373,35 +371,32 @@ const NotificationsScreen = ({ navigation }) => {
         markReadMutation.mutate(Number(item.id));
       }
 
-      const payload = parseNotificationPayload(item);
-
-      const route = resolveNotificationRoute({
-        ...item,
-        raw: item.raw || item,
-      });
+      const source = { ...item, raw: item.raw || item };
+      const payload = parseNotificationPayload(source);
+      const route = resolveNotificationRoute(source);
 
       if (!route?.name) return;
 
       const params = { ...(route.params || {}) };
 
       if (route.name === 'DonationReceiptScreen') {
-        // payload userId wins; session id is only a fallback
+        params.donationId = params.donationId ?? payload.donationId;
         params.userId = params.userId ?? payload.donationUserId ?? userId;
+        params.rawNotification = item.raw || item;
       }
 
       if (route.name === 'CNICUploadScreen') {
-        params.email = params.email || payload.email || currentUser?.email || '';
+        params.email =
+          params.email || payload.email || currentUser?.email || '';
       }
 
-      if (navigation?.navigate) {
-        navigation.navigate(route.name, params);
-      } else if (navigationRef.isReady()) {
-        navigationRef.navigate(route.name, params);
-      }
+      navigation.navigate(route.name, params);
     },
     [markReadMutation, navigation, userId, currentUser],
   );
 
+  // Declared BEFORE renderItem — renderItem closes over it, and a const
+  // referenced above its definition throws at module evaluation time.
   const handleDelete = useCallback(
     item => {
       const notificationId = Number(item.id);
@@ -437,8 +432,8 @@ const NotificationsScreen = ({ navigation }) => {
     [],
   );
 
-  // A card is dimmed/inert only when the router says there's nowhere
-  // to go — so donation cards stay active even once read.
+  // A card is dimmed/inert only when the router says there's nowhere to
+  // go — donation cards stay active even once read.
   const renderItem = useCallback(
     ({ item }) => {
       const route = resolveNotificationRoute({

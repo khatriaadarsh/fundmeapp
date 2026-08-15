@@ -3,16 +3,14 @@
 //  Review & Submit — Step 4 of 4
 //  FundMe App  ·  React Native CLI  ·  100% responsive
 //
-//  NOTE: This screen makes NO API call of its own. Steps 1-3 each
-//  persist their data to the backend individually via their own
-//  Next buttons. By the time the user reaches this screen, the
-//  campaign is already fully saved server-side. This screen exists
-//  purely so the user can review everything in one place and jump
-//  back to any step to correct it (via the "Edit" links) before
-//  finishing. "Submit for Review" is a local confirmation only.
+//  Steps 1-3 each persist their own data as the user advances, so by the
+//  time this screen renders the campaign already exists server-side as a
+//  draft. This screen lets the user review everything, jump back to
+//  correct any step, and then flip the campaign to PENDING review via
+//  POST /campaign/{id}/submit-review.
 // ─────────────────────────────────────────────────────────────
 
-import React, { useRef, useEffect, memo, useCallback } from 'react';
+import React, { useRef, useEffect, useState, memo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,14 +19,16 @@ import {
   ScrollView,
   StatusBar,
   Animated,
-  Alert,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StepHeader } from '../../components/shared/StepHeader';
 import { P } from '../../theme/theme';
 import { C } from './Shared';
+import ResponseModal from '../../components/ResponseModal';
+import { useSubmitCampaignForReview } from '../../hooks/useCreateCampaign';
 
 // ── Section card ───────────────────────────────────────────
 const SectionCard = ({ label, onEdit, children }) => (
@@ -191,6 +191,49 @@ const ReviewSubmit = ({ navigation, route }) => {
   const images = p.images || [];
   const docs = p.docs || [];
 
+  const { mutate: submitForReview, isPending } = useSubmitCampaignForReview();
+
+  // closeAction lets the modal's OK button double as the flow's exit:
+  // on success it resets to MainTabs, on failure it simply dismisses so
+  // the user can correct something and retry.
+  const [responseModal, setResponseModal] = useState({
+    visible: false,
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+    closeAction: null,
+  });
+
+  const closeResponseModal = useCallback(() => {
+    const action = responseModal.closeAction;
+    setResponseModal(prev => ({ ...prev, visible: false, closeAction: null }));
+
+    if (action === 'exit') {
+      navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  }, [responseModal.closeAction, navigation]);
+
+  const showResponse = useCallback(
+    ({
+      variant = 'error',
+      title: modalTitle,
+      message,
+      code = '',
+      closeAction = null,
+    }) => {
+      setResponseModal({
+        visible: true,
+        variant,
+        title: modalTitle || (variant === 'success' ? 'Success' : 'Error'),
+        message: message || 'Something went wrong. Please try again.',
+        code: code ? String(code) : '',
+        closeAction,
+      });
+    },
+    [],
+  );
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -202,27 +245,55 @@ const ReviewSubmit = ({ navigation, route }) => {
 
   const goStep = screen => navigation.navigate(screen, p);
 
-  // No API call here — steps 1-3 already saved everything to the
-  // backend. This is a local confirmation that closes out the
-  // creation flow and takes the user back to the main app.
   const handleSubmit = useCallback(() => {
     if (!campaignId) {
-      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      showResponse({
+        variant: 'error',
+        title: 'Error',
+        message: 'Missing campaign reference. Please start again from Step 1.',
+      });
       return;
     }
 
-    Alert.alert(
-      'Submitted',
-      'Your application is submitted for review.\nYou will receive a notification.',
-      [
-        {
-          text: 'OK',
-          onPress: () =>
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] }),
-        },
-      ],
-    );
-  }, [campaignId, navigation]);
+    submitForReview(campaignId, {
+      onSuccess: body => {
+        // HTTP 200 alone is not success — the backend returns failures
+        // with a 200 and a non-"000" responseCode, so a resolved promise
+        // must never be treated as confirmation on its own.
+        if (body?.responseCode !== '000') {
+          showResponse({
+            variant: 'error',
+            title: 'Submission Failed',
+            message:
+              body?.responseMessage ||
+              'Could not submit your campaign. Please try again.',
+            code: body?.responseCode || '',
+          });
+          return;
+        }
+
+        showResponse({
+          variant: 'success',
+          title: 'Campaign Submitted',
+          message:
+            'Your campaign has been created successfully and is now under review. You will be notified once it is approved.',
+          closeAction: 'exit',
+        });
+      },
+      onError: err => {
+        const data = err?.response?.data;
+        showResponse({
+          variant: 'error',
+          title: 'Submission Failed',
+          message:
+            data?.responseMessage ||
+            err?.message ||
+            'Could not submit your campaign. Please try again.',
+          code: data?.responseCode || '',
+        });
+      },
+    });
+  }, [campaignId, submitForReview, showResponse]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -338,6 +409,7 @@ const ReviewSubmit = ({ navigation, route }) => {
               style={s.draftBtn}
               onPress={() => navigation.goBack()}
               activeOpacity={0.8}
+              disabled={isPending}
             >
               <Text style={s.draftTxt}>Save Draft</Text>
             </TouchableOpacity>
@@ -347,15 +419,31 @@ const ReviewSubmit = ({ navigation, route }) => {
               style={s.submitBtn}
               onPress={handleSubmit}
               activeOpacity={0.85}
+              disabled={isPending}
             >
-              <Text style={s.submitTxt}>Submit for Review</Text>
-              <Icon name="check" size={15} color={C.white} />
+              {isPending ? (
+                <ActivityIndicator size="small" color={C.white} />
+              ) : (
+                <>
+                  <Text style={s.submitTxt}>Submit for Review</Text>
+                  <Icon name="check" size={15} color={C.white} />
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
           <Text style={s.footerNote}>Reviewed within 24-48 hours</Text>
         </View>
       </Animated.View>
+
+      <ResponseModal
+        visible={responseModal.visible}
+        variant={responseModal.variant}
+        title={responseModal.title}
+        message={responseModal.message}
+        code={responseModal.code}
+        onClose={closeResponseModal}
+      />
     </SafeAreaView>
   );
 };

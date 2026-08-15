@@ -18,8 +18,8 @@ import LinearGradient from 'react-native-linear-gradient';
 
 import { useRegisterStep2, useResendOtp } from '../../hooks/useRegistration';
 import { useAppContext } from '../../context/AppContext';
-import { useToast } from '../../components/common/Toast';
 import { FullScreenLoader } from '../../components/common/Loader';
+import ResponseModal from '../../components/ResponseModal';
 import Icons from 'react-native-vector-icons/Feather';
 import { P, sp } from '../../theme/theme';
 const { width: SW } = Dimensions.get('window');
@@ -40,6 +40,29 @@ const C = {
 
 const OTP_LENGTH = 5;
 const RESEND_SECONDS = 272;
+
+/**
+ * CNIC upload is step 3 of the normal registration flow.
+ *
+ * Passed explicitly on navigation because React Navigation MERGES params
+ * into an existing route instance rather than replacing them. If the user
+ * has previously opened CNICUploadScreen from a CNIC-rejection
+ * notification, that instance still carries isRejection:true and
+ * stepNumber:2 — and a bare navigate('CNICUploadScreen', { email }) would
+ * inherit both, making the normal flow submit as a rejection re-upload.
+ */
+const CNIC_STEP = 3;
+
+const CNIC_NORMAL_FLOW_PARAMS = {
+  isRejection: false,
+  stepNumber: CNIC_STEP,
+  rejectedStep: null,
+  rejectionReason: '',
+  notificationType: '',
+  notificationStatus: '',
+  userStatus: '',
+  rawNotification: null,
+};
 
 const OTPBox = ({
   value,
@@ -66,7 +89,6 @@ const OTPBox = ({
 
 const OTPVerificationScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const toast = useToast();
   const { currentUser } = useAppContext();
 
   const { mutate: verifyOtp, isPending: isVerifying } = useRegisterStep2();
@@ -86,6 +108,41 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   );
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
+
+  // Errors only. This is step 2 of 4 — a success dialog would just add a
+  // tap between the user and the next step. Verification advances
+  // silently; resend confirms itself through the reset timer and boxes.
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    code: '',
+    refocus: false,
+  });
+
+  const closeErrorModal = useCallback(() => {
+    const shouldRefocus = errorModal.refocus;
+    setErrorModal(prev => ({ ...prev, visible: false, refocus: false }));
+
+    if (shouldRefocus) {
+      // Deferred until the modal has finished dismissing — focusing
+      // mid-animation gets swallowed on Android.
+      setTimeout(() => {
+        inputRefs.current[0]?.current?.focus();
+        setFocused(0);
+      }, 250);
+    }
+  }, [errorModal.refocus]);
+
+  const showError = useCallback(({ title, message, code = '', refocus = false }) => {
+    setErrorModal({
+      visible: true,
+      title: title || 'Error',
+      message: message || 'Something went wrong. Please try again.',
+      code: code ? String(code) : '',
+      refocus,
+    });
+  }, []);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -146,11 +203,11 @@ const OTPVerificationScreen = ({ navigation, route }) => {
   const handleVerify = useCallback(() => {
     const otpValue = otp.join('');
     if (otpValue.length !== OTP_LENGTH) {
-      toast.error(`Please enter the ${OTP_LENGTH}-digit OTP.`);
+      showError({ message: `Please enter the ${OTP_LENGTH}-digit OTP.` });
       return;
     }
     if (!email) {
-      toast.error('Missing email. Please restart registration.');
+      showError({ message: 'Missing email. Please restart registration.' });
       return;
     }
 
@@ -158,42 +215,86 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       { email, otp: otpValue },
       {
         onSuccess: body => {
-          toast.success(body?.responseMessage || 'OTP verified successfully.');
-          navigation.navigate('CNICUploadScreen', { email });
+          // HTTP 200 alone isn't success — the backend returns failures
+          // with a 200 and a non-"000" responseCode.
+          if (body?.responseCode && body.responseCode !== '000') {
+            setOtp(Array(OTP_LENGTH).fill(''));
+            showError({
+              title: 'Verification Failed',
+              message:
+                body?.responseMessage ||
+                'Verification failed. Please try again.',
+              code: body?.responseCode,
+              refocus: true,
+            });
+            return;
+          }
+
+          // Silent success — straight to CNIC upload (step 3).
+          // The rejection params are reset explicitly; see
+          // CNIC_NORMAL_FLOW_PARAMS above for why.
+          navigation.navigate('CNICUploadScreen', {
+            ...CNIC_NORMAL_FLOW_PARAMS,
+            email,
+          });
         },
         onError: err => {
-          toast.error(err?.message || 'Verification failed.');
+          const data = err?.response?.data || err?.raw;
           setOtp(Array(OTP_LENGTH).fill(''));
-          inputRefs.current[0]?.current?.focus();
-          setFocused(0);
+          showError({
+            title: 'Verification Failed',
+            message:
+              data?.responseMessage ||
+              err?.message ||
+              'Verification failed. Please try again.',
+            code: data?.responseCode || err?.code || '',
+            refocus: true,
+          });
         },
       },
     );
-  }, [otp, email, verifyOtp, navigation, toast]);
+  }, [otp, email, verifyOtp, navigation, showError]);
 
   // ─── Resend OTP ──────────────────────────────────────────
   const handleResend = useCallback(() => {
     if (!email) {
-      toast.error('Missing email. Please restart registration.');
+      showError({ message: 'Missing email. Please restart registration.' });
       return;
     }
     if (seconds > 0) return; // safety — button is disabled too
 
     resendOtp(email, {
       onSuccess: body => {
-        toast.success(
-          body?.responseMessage || 'A new OTP has been sent to your email.',
-        );
+        if (body?.responseCode && body.responseCode !== '000') {
+          showError({
+            title: 'Resend Failed',
+            message:
+              body?.responseMessage ||
+              'Failed to resend OTP. Please try again.',
+            code: body?.responseCode,
+          });
+          return;
+        }
+
+        // The cleared boxes and restarted countdown are the confirmation.
         setOtp(Array(OTP_LENGTH).fill(''));
         setSeconds(RESEND_SECONDS);
         inputRefs.current[0]?.current?.focus();
         setFocused(0);
       },
       onError: err => {
-        toast.error(err?.message || 'Failed to resend OTP. Please try again.');
+        const data = err?.response?.data || err?.raw;
+        showError({
+          title: 'Resend Failed',
+          message:
+            data?.responseMessage ||
+            err?.message ||
+            'Failed to resend OTP. Please try again.',
+          code: data?.responseCode || err?.code || '',
+        });
       },
     });
-  }, [email, seconds, resendOtp, toast]);
+  }, [email, seconds, resendOtp, showError]);
 
   const otpComplete = otp.every(Boolean);
   const isBusy = isVerifying || isResending;
@@ -309,6 +410,15 @@ const OTPVerificationScreen = ({ navigation, route }) => {
       <FullScreenLoader
         visible={isVerifying || isResending}
         message={isResending ? 'Sending new OTP…' : 'Verifying OTP…'}
+      />
+
+      <ResponseModal
+        visible={errorModal.visible}
+        variant="error"
+        title={errorModal.title}
+        message={errorModal.message}
+        code={errorModal.code}
+        onClose={closeErrorModal}
       />
     </SafeAreaView>
   );

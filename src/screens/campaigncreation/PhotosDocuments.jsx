@@ -7,10 +7,10 @@ import {
   ScrollView,
   StatusBar,
   Image,
-  Alert,
   Platform,
   ActionSheetIOS,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -29,9 +29,13 @@ import {
 // ── Shared Imports ──────────────────────────────────────────
 import { StepHeader } from '../../components/shared/StepHeader';
 import { P, sp, SW } from '../../theme/theme';
+import ResponseModal from '../../components/ResponseModal';
 
 // ── API wiring ──────────────────────────────────────────────
-import { useCreateCampaignStep3 } from '../../hooks/useCreateCampaign';
+import {
+  useCreateCampaignStep3,
+  useResubmitCampaignStep3,
+} from '../../hooks/useCreateCampaign';
 
 // ── Constants ───────────────────────────────────────────────
 const THUMB_SIZE = Math.floor((SW - sp(18) * 2 - sp(8) * 3) / 4);
@@ -199,24 +203,121 @@ const dc = StyleSheet.create({
   closeBtn: { padding: sp(4) },
 });
 
+/**
+ * SourceSheet — replaces the Android Alert-based source chooser.
+ *
+ * Alert was the only remaining non-ResponseModal dialog on this screen,
+ * and it isn't an error/response at all — it's a picker. A small sheet
+ * keeps ResponseModal reserved for actual API/validation outcomes.
+ */
+const SourceSheet = memo(({ visible, onClose, onSelect }) => (
+  <Modal
+    visible={visible}
+    transparent
+    animationType="slide"
+    onRequestClose={onClose}
+  >
+    <TouchableOpacity style={ss.overlay} activeOpacity={1} onPress={onClose} />
+    <View style={ss.sheet}>
+      <View style={ss.handle} />
+      <Text style={ss.title}>Select Image</Text>
+
+      <TouchableOpacity
+        style={ss.row}
+        onPress={() => onSelect('camera')}
+        activeOpacity={0.7}
+      >
+        <MCIcons name="camera-outline" size={sp(20)} color={P.teal} />
+        <Text style={ss.rowTxt}>Take Photo</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={ss.row}
+        onPress={() => onSelect('library')}
+        activeOpacity={0.7}
+      >
+        <MCIcons name="image-outline" size={sp(20)} color={P.teal} />
+        <Text style={ss.rowTxt}>Choose from Gallery</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={ss.cancel} onPress={onClose} activeOpacity={0.7}>
+        <Text style={ss.cancelTxt}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </Modal>
+));
+
+const ss = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: P.white,
+    borderTopLeftRadius: sp(20),
+    borderTopRightRadius: sp(20),
+    paddingBottom: Platform.OS === 'android' ? sp(20) : sp(34),
+  },
+  handle: {
+    width: sp(36),
+    height: sp(4),
+    borderRadius: sp(2),
+    backgroundColor: P.border,
+    alignSelf: 'center',
+    marginTop: sp(10),
+    marginBottom: sp(4),
+  },
+  title: {
+    fontSize: sp(15),
+    fontWeight: '700',
+    color: P.dark,
+    textAlign: 'center',
+    paddingVertical: sp(12),
+    borderBottomWidth: 1,
+    borderBottomColor: P.border,
+    marginHorizontal: sp(20),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp(12),
+    paddingVertical: sp(15),
+    paddingHorizontal: sp(22),
+  },
+  rowTxt: { fontSize: sp(15), color: P.dark },
+  cancel: {
+    marginTop: sp(4),
+    paddingVertical: sp(14),
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: P.border,
+  },
+  cancelTxt: { fontSize: sp(15), fontWeight: '600', color: P.gray },
+});
+
 // ════════════════════════════════════════════════════════════
 //  Main Screen
+//
+//  Doubles as the fix-up screen for a CAMPAIGN_REJECTED notification
+//  whose rejectedStep is 3. In that mode the CTA reads "Update" and
+//  submits to /campaigns/resubmit/step-3.
+//
+//  No campaign-detail fetch happens here by design: the stored media
+//  are remote URLs, which cannot be re-uploaded as multipart files, so
+//  prefilling them would only create the illusion that the creator
+//  doesn't need to re-pick. They re-select their files, exactly like
+//  the CNIC re-upload flow.
 // ════════════════════════════════════════════════════════════
 const PhotosDocuments = ({ navigation, route }) => {
   const params = useMemo(() => route?.params || {}, [route?.params]);
   const campaignId = params.campaignId ? String(params.campaignId) : null;
 
-  // campaignId is mandatory from Step 1 onward
-  useEffect(() => {
-    if (!campaignId) {
-      Alert.alert(
-        'Error',
-        'Missing campaign reference. Please start again from Step 1.',
-        [{ text: 'OK', onPress: () => navigation.navigate('CreateCampaign') }],
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isRejection = params.isRejection === true;
+  const rejectionReason = params.rejectionReason || '';
 
   // ── State — PREFILLED from params so a remount (e.g. after
   //    editing an earlier step from Review and pressing Next again)
@@ -232,31 +333,65 @@ const PhotosDocuments = ({ navigation, route }) => {
   const [docs, setDocs] = useState(params.docs || []);
   const [errors, setErrors] = useState({});
 
+  const [sourceSheet, setSourceSheet] = useState({
+    visible: false,
+    target: null,
+  });
+
+  const [responseModal, setResponseModal] = useState({
+    visible: false,
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+    closeAction: null,
+  });
+
+  const closeResponseModal = useCallback(() => {
+    const action = responseModal.closeAction;
+    setResponseModal(prev => ({ ...prev, visible: false, closeAction: null }));
+
+    if (action === 'exit') {
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    } else if (action === 'restart') {
+      navigation.navigate('CreateCampaign');
+    }
+  }, [responseModal.closeAction, navigation]);
+
+  const showResponse = useCallback(
+    ({ variant = 'error', title, message, code = '', closeAction = null }) => {
+      setResponseModal({
+        visible: true,
+        variant,
+        title: title || (variant === 'success' ? 'Success' : 'Error'),
+        message: message || 'Something went wrong. Please try again.',
+        code: code ? String(code) : '',
+        closeAction,
+      });
+    },
+    [],
+  );
+
+  // campaignId is mandatory from Step 1 onward
+  useEffect(() => {
+    if (!campaignId) {
+      showResponse({
+        variant: 'error',
+        title: 'Error',
+        message: 'Missing campaign reference. Please start again from Step 1.',
+        closeAction: 'restart',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submitStep3 = useCreateCampaignStep3();
+  const resubmitStep3 = useResubmitCampaignStep3();
+  const isSubmitting = submitStep3.isPending || resubmitStep3.isPending;
 
   // ── Image picker ────────────────────────────────────────
-  const showImagePicker = onSelect => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Take Photo', 'Choose from Library'],
-          cancelButtonIndex: 0,
-        },
-        buttonIndex => {
-          if (buttonIndex === 1) onSelect('camera');
-          if (buttonIndex === 2) onSelect('library');
-        },
-      );
-    } else {
-      Alert.alert('Select Image', 'Choose a source for your image', [
-        { text: 'Camera', onPress: () => onSelect('camera') },
-        { text: 'Gallery', onPress: () => onSelect('library') },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
-    }
-  };
-
-  const handleImageSelection = async (source, target) => {
+  const handleImageSelection = useCallback(async (source, target) => {
     const launch = source === 'camera' ? launchCamera : launchImageLibrary;
     try {
       const result = await launch(IMAGE_OPTIONS);
@@ -272,32 +407,66 @@ const PhotosDocuments = ({ navigation, route }) => {
           type: asset.type || 'image/jpeg',
         });
         setErrors(prev => ({ ...prev, coverUri: undefined }));
-      } else if (images.length < MAX_IMAGES) {
-        setImages(prev => [
-          ...prev,
-          {
-            id: Date.now().toString(),
-            uri: asset.uri,
-            name: asset.fileName || `image_${Date.now()}.jpg`,
-            type: asset.type || 'image/jpeg',
-          },
-        ]);
+      } else {
+        setImages(prev =>
+          prev.length < MAX_IMAGES
+            ? [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  uri: asset.uri,
+                  name: asset.fileName || `image_${Date.now()}.jpg`,
+                  type: asset.type || 'image/jpeg',
+                },
+              ]
+            : prev,
+        );
       }
     } catch (err) {
-      Alert.alert(
-        'Error',
-        'Could not open image picker. Please check your permissions.',
-      );
+      showResponse({
+        message: 'Could not open image picker. Please check your permissions.',
+      });
     }
-  };
+  }, [showResponse]);
+
+  const openImagePicker = useCallback(
+    target => {
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: ['Cancel', 'Take Photo', 'Choose from Library'],
+            cancelButtonIndex: 0,
+          },
+          buttonIndex => {
+            if (buttonIndex === 1) handleImageSelection('camera', target);
+            if (buttonIndex === 2) handleImageSelection('library', target);
+          },
+        );
+      } else {
+        setSourceSheet({ visible: true, target });
+      }
+    },
+    [handleImageSelection],
+  );
+
+  const handleSourceSelect = useCallback(
+    source => {
+      const target = sourceSheet.target;
+      setSourceSheet({ visible: false, target: null });
+      // Let the sheet finish dismissing before the native picker opens,
+      // otherwise Android can drop the picker intent entirely.
+      setTimeout(() => handleImageSelection(source, target), 250);
+    },
+    [sourceSheet.target, handleImageSelection],
+  );
 
   // ── Document picker — @react-native-documents/picker ────
   const pickDocument = useCallback(async () => {
     if (docs.length >= MAX_DOCS) {
-      Alert.alert(
-        'Limit Reached',
-        `You can upload a maximum of ${MAX_DOCS} documents.`,
-      );
+      showResponse({
+        title: 'Limit Reached',
+        message: `You can upload a maximum of ${MAX_DOCS} documents.`,
+      });
       return;
     }
 
@@ -315,7 +484,10 @@ const PhotosDocuments = ({ navigation, route }) => {
 
       // Duplicate check
       if (docs.some(d => d.name === fileName)) {
-        Alert.alert('Duplicate File', 'This document has already been added.');
+        showResponse({
+          title: 'Duplicate File',
+          message: 'This document has already been added.',
+        });
         return;
       }
 
@@ -332,16 +504,13 @@ const PhotosDocuments = ({ navigation, route }) => {
       setErrors(prev => ({ ...prev, docs: undefined }));
     } catch (err) {
       if (isCancel(err)) return; // user dismissed picker — not an error
+      if (isErrorWithCode(err, errorCodes.IN_PROGRESS)) return;
 
-      if (isErrorWithCode(err, errorCodes.IN_PROGRESS)) {
-        console.warn('Document picker already open.');
-        return;
-      }
-
-      console.error('Document pick error:', err);
-      Alert.alert('Error', 'Could not select document. Please try again.');
+      showResponse({
+        message: 'Could not select document. Please try again.',
+      });
     }
-  }, [docs]);
+  }, [docs, showResponse]);
 
   // ── Remove handlers ─────────────────────────────────────
   const removeImage = id => setImages(prev => prev.filter(i => i.id !== id));
@@ -359,13 +528,59 @@ const PhotosDocuments = ({ navigation, route }) => {
 
   const handleNext = useCallback(async () => {
     if (!validate()) return;
-    if (submitStep3.isPending) return;
+    if (isSubmitting) return;
 
     if (!campaignId) {
-      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      showResponse({
+        message: 'Missing campaign reference. Please start again from Step 1.',
+        closeAction: 'restart',
+      });
       return;
     }
 
+    // ── Rejection fix-up: update this step only, then leave. ──
+    // The other steps are already complete server-side, so continuing
+    // into Review would just re-walk work the creator already did.
+    if (isRejection) {
+      try {
+        const body = await resubmitStep3.mutateAsync({
+          campaignId,
+          coverPhoto: coverFile,
+          additionalImages: images,
+          campaignDocuments: docs,
+        });
+
+        if (body?.responseCode !== '000') {
+          showResponse({
+            title: 'Update Failed',
+            message: body?.responseMessage || 'Could not update your campaign.',
+            code: body?.responseCode || '',
+          });
+          return;
+        }
+
+        showResponse({
+          variant: 'success',
+          title: 'Campaign Updated',
+          message:
+            'Your campaign has been updated successfully and is now under review. You will be notified once it is approved.',
+          closeAction: 'exit',
+        });
+      } catch (error) {
+        const data = error?.response?.data;
+        showResponse({
+          title: 'Update Failed',
+          message:
+            data?.responseMessage ||
+            error?.message ||
+            'Could not update your campaign. Please try again.',
+          code: data?.responseCode || '',
+        });
+      }
+      return;
+    }
+
+    // ── Normal creation flow (unchanged) ──
     try {
       const response = await submitStep3.mutateAsync({
         campaignId,
@@ -375,7 +590,12 @@ const PhotosDocuments = ({ navigation, route }) => {
       });
 
       if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert('Error', response?.responseMessage || 'Could not upload files. Please try again.');
+        showResponse({
+          message:
+            response?.responseMessage ||
+            'Could not upload files. Please try again.',
+          code: response?.responseCode || '',
+        });
         return;
       }
 
@@ -391,13 +611,29 @@ const PhotosDocuments = ({ navigation, route }) => {
         docs,
       });
     } catch (error) {
-      console.error('🔴 [PhotosDocuments] Step3 submit error:', error?.message);
-      Alert.alert(
-        'Error',
-        'Could not upload your files. Please check your connection and try again.',
-      );
+      const data = error?.response?.data;
+      showResponse({
+        message:
+          data?.responseMessage ||
+          'Could not upload your files. Please check your connection and try again.',
+        code: data?.responseCode || '',
+      });
     }
-  }, [validate, campaignId, coverFile, coverUri, images, docs, navigation, params, submitStep3]);
+  }, [
+    validate,
+    isSubmitting,
+    isRejection,
+    campaignId,
+    coverFile,
+    coverUri,
+    images,
+    docs,
+    navigation,
+    params,
+    submitStep3,
+    resubmitStep3,
+    showResponse,
+  ]);
 
   // ── Render ───────────────────────────────────────────────
   return (
@@ -407,7 +643,7 @@ const PhotosDocuments = ({ navigation, route }) => {
       <StepHeader
         step={3}
         total={4}
-        title="Create Campaign"
+        title={isRejection ? 'Update Campaign' : 'Create Campaign'}
         onLeft={() => navigation.goBack()}
       />
       <ProgressLine pct={75} />
@@ -419,6 +655,28 @@ const PhotosDocuments = ({ navigation, route }) => {
       >
         <Text style={s.pageTitle}>Photos & Documents</Text>
 
+        {isRejection && !!rejectionReason && (
+          <View style={s.rejectionBox}>
+            <Text style={s.rejectionLabel}>REJECTION REASON</Text>
+            <Text style={s.rejectionText}>{rejectionReason}</Text>
+          </View>
+        )}
+
+        {isRejection && (
+          <View style={s.noticeBox}>
+            <MCIcons
+              name="information-outline"
+              size={sp(16)}
+              color={P.teal}
+              style={{ marginRight: sp(8), marginTop: sp(1) }}
+            />
+            <Text style={s.noticeTxt}>
+              Please re-upload your cover photo and supporting documents to
+              resubmit this campaign for review.
+            </Text>
+          </View>
+        )}
+
         {/* ── Cover Photo ──────────────────────────────────── */}
         <FieldLabel text="Cover Photo" />
         <TouchableOpacity
@@ -427,9 +685,7 @@ const PhotosDocuments = ({ navigation, route }) => {
             coverUri && s.uploadBoxDone,
             errors.coverUri && s.uploadBoxError,
           ]}
-          onPress={() =>
-            showImagePicker(src => handleImageSelection(src, 'cover'))
-          }
+          onPress={() => openImagePicker('cover')}
           activeOpacity={0.8}
         >
           {coverUri ? (
@@ -473,11 +729,7 @@ const PhotosDocuments = ({ navigation, route }) => {
             />
           ))}
           {images.length < MAX_IMAGES && (
-            <AddBtn
-              onPress={() =>
-                showImagePicker(src => handleImageSelection(src, 'additional'))
-              }
-            />
+            <AddBtn onPress={() => openImagePicker('additional')} />
           )}
         </View>
 
@@ -531,21 +783,40 @@ const PhotosDocuments = ({ navigation, route }) => {
       {/* ── Footer ─────────────────────────────────────────── */}
       <View style={s.footer}>
         <TouchableOpacity
-          style={[s.nextBtn, submitStep3.isPending && s.nextBtnDisabled]}
+          style={[s.nextBtn, isSubmitting && s.nextBtnDisabled]}
           onPress={handleNext}
           activeOpacity={0.85}
-          disabled={submitStep3.isPending}
+          disabled={isSubmitting}
         >
-          {submitStep3.isPending ? (
+          {isSubmitting ? (
             <ActivityIndicator size="small" color={P.white} />
           ) : (
             <>
-              <Text style={s.nextTxt}>Next</Text>
-              <Icons name="arrow-right" size={sp(16)} color={P.white} />
+              <Text style={s.nextTxt}>{isRejection ? 'Update' : 'Next'}</Text>
+              <Icons
+                name={isRejection ? 'check' : 'arrow-right'}
+                size={sp(16)}
+                color={P.white}
+              />
             </>
           )}
         </TouchableOpacity>
       </View>
+
+      <SourceSheet
+        visible={sourceSheet.visible}
+        onClose={() => setSourceSheet({ visible: false, target: null })}
+        onSelect={handleSourceSelect}
+      />
+
+      <ResponseModal
+        visible={responseModal.visible}
+        variant={responseModal.variant}
+        title={responseModal.title}
+        message={responseModal.message}
+        code={responseModal.code}
+        onClose={closeResponseModal}
+      />
     </SafeAreaView>
   );
 };
@@ -567,6 +838,33 @@ const s = StyleSheet.create({
     color: P.dark,
     marginBottom: sp(20),
   },
+
+  rejectionBox: {
+    borderWidth: 1,
+    borderColor: P.red,
+    borderRadius: sp(10),
+    backgroundColor: '#FEF2F2',
+    padding: sp(12),
+    marginBottom: sp(12),
+  },
+  rejectionLabel: {
+    fontSize: sp(11),
+    fontWeight: '700',
+    color: P.red,
+    marginBottom: sp(4),
+  },
+  rejectionText: { fontSize: sp(13), color: P.dark, lineHeight: sp(19) },
+
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: P.tealLight,
+    borderWidth: 1,
+    borderColor: P.border,
+    borderRadius: sp(10),
+    padding: sp(12),
+  },
+  noticeTxt: { flex: 1, fontSize: sp(12.5), color: P.dark, lineHeight: sp(18) },
 
   labelRow: {
     flexDirection: 'row',

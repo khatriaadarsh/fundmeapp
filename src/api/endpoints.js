@@ -29,6 +29,10 @@ export const ENDPOINTS = {
     MY_CAMPAIGNS: '/my/campaigns',
      CREATE: '/create-campaign',
      DETAIL: (campaignId) => `/campaign/detail/${campaignId}`,
+     SUBMIT_REVIEW: (campaignId) => `/campaign/${campaignId}/submit-review`,
+     RESUBMIT_STEP1: '/campaign/rejected/step-one',
+     RESUBMIT_STEP2: '/campaign/rejected/step-two',
+     RESUBMIT_STEP3: '/campaign/rejected/step-three',
   },
 
   CATEGORY: {

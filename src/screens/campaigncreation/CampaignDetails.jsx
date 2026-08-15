@@ -11,7 +11,6 @@ import {
   Dimensions,
   Modal,
   FlatList,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,10 +21,15 @@ import MCIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StepHeader } from '../../components/shared/StepHeader';
 // ── Import from Shared Theme ──────────────────────────────────
 import { P, sp } from '../../theme/theme'; // Using shared theme file
+import ResponseModal from '../../components/ResponseModal';
 
 // ── API wiring ──────────────────────────────────────────────
 import { useProvinces, useCities } from '../../hooks/useLocation';
-import { useCreateCampaignStep2 } from '../../hooks/useCreateCampaign';
+import { useCampaignDetail } from '../../hooks/useCampaign';
+import {
+  useCreateCampaignStep2,
+  useResubmitCampaignStep2,
+} from '../../hooks/useCreateCampaign';
 
 // ── Static options (not covered by an API) ────────────────────
 const RELATIONSHIPS = ['Family', 'Friend', 'Self', 'Community', 'NGO', 'Other'];
@@ -311,23 +315,18 @@ const plSt = StyleSheet.create({
 
 // ════════════════════════════════════════════════════════════
 //  CampaignDetails — main screen
+//
+//  Doubles as the fix-up screen for a CAMPAIGN_REJECTED notification
+//  whose rejectedStep is 2. In that mode the screen prefills itself
+//  from the campaign detail API, the CTA reads "Update", and Next
+//  posts to /campaigns/resubmit/step-2 instead of advancing the wizard.
 // ════════════════════════════════════════════════════════════
 const CampaignDetails = ({ navigation, route }) => {
   const params = useMemo(() => route?.params || {}, [route?.params]);
   const campaignId = params.campaignId ? String(params.campaignId) : null;
 
-  // campaignId is mandatory from Step 1 onward — if it's missing,
-  // send the user back rather than letting Step 2 fail silently.
-  useEffect(() => {
-    if (!campaignId) {
-      Alert.alert(
-        'Error',
-        'Missing campaign reference. Please start again from Step 1.',
-        [{ text: 'OK', onPress: () => navigation.navigate('CreateCampaign') }],
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isRejection = params.isRejection === true;
+  const rejectionReason = params.rejectionReason || '';
 
   // ── Form state — PREFILLED from params so that whenever this
   //    screen remounts (e.g. after editing Step 1 from the Review
@@ -348,6 +347,55 @@ const CampaignDetails = ({ navigation, route }) => {
     italic: false,
     list: false,
   });
+
+  const [responseModal, setResponseModal] = useState({
+    visible: false,
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+    closeAction: null,
+  });
+
+  const closeResponseModal = useCallback(() => {
+    const action = responseModal.closeAction;
+    setResponseModal(prev => ({ ...prev, visible: false, closeAction: null }));
+
+    if (action === 'exit') {
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    } else if (action === 'restart') {
+      navigation.navigate('CreateCampaign');
+    }
+  }, [responseModal.closeAction, navigation]);
+
+  const showResponse = useCallback(
+    ({ variant = 'error', title, message, code = '', closeAction = null }) => {
+      setResponseModal({
+        visible: true,
+        variant,
+        title: title || (variant === 'success' ? 'Success' : 'Error'),
+        message: message || 'Something went wrong. Please try again.',
+        code: code ? String(code) : '',
+        closeAction,
+      });
+    },
+    [],
+  );
+
+  // campaignId is mandatory from Step 1 onward — if it's missing,
+  // send the user back rather than letting Step 2 fail silently.
+  useEffect(() => {
+    if (!campaignId) {
+      showResponse({
+        variant: 'error',
+        title: 'Error',
+        message: 'Missing campaign reference. Please start again from Step 1.',
+        closeAction: 'restart',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setFocused = key => setFocus(f => ({ ...f, [key]: true }));
   const setBlurred = key => setFocus(f => ({ ...f, [key]: false }));
@@ -375,21 +423,58 @@ const CampaignDetails = ({ navigation, route }) => {
     [citiesData],
   );
 
+  // ── Rejection prefill ─────────────────────────────────────────
+  // The notification only carries an id, so without this the creator
+  // would have to retype the entire step. Runs once and never
+  // overwrites a field the creator has already touched — otherwise a
+  // slow detail response would wipe their edits mid-typing.
+  const { data: campaignDetail } = useCampaignDetail(
+    isRejection ? campaignId : null,
+  );
+
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (!isRejection || prefilled.current || !campaignDetail) return;
+
+    const raw = campaignDetail.raw || {};
+    prefilled.current = true;
+
+    setShortDesc(prev => prev || raw.shortDescription || '');
+    setFullDesc(prev => prev || raw.description || campaignDetail.story || '');
+    setBeneficiary(prev => prev || raw.beneficiaryName || '');
+    setRelationship(prev => prev || raw.relationships || '');
+    setProvince(prev => prev || raw.province || campaignDetail.province || '');
+    setCity(prev => prev || raw.city || campaignDetail.city || '');
+  }, [isRejection, campaignDetail]);
+
   // ✅ Reset city whenever the user CHANGES province — but skip the
   // very first run on mount, otherwise a prefilled city (from params,
   // when editing) gets wiped out immediately before the user ever
   // sees it.
   const isFirstProvinceRender = useRef(true);
+  const lastProvinceRef = useRef(province);
+
   useEffect(() => {
     if (isFirstProvinceRender.current) {
       isFirstProvinceRender.current = false;
+      lastProvinceRef.current = province;
       return;
     }
+
+    // The rejection prefill sets province asynchronously, well after
+    // mount. Comparing against the previous value keeps that write from
+    // being mistaken for a user selection and clearing the city with it.
+    if (lastProvinceRef.current === province) return;
+
+    lastProvinceRef.current = province;
     setCity('');
     setErrors(prev => ({ ...prev, city: undefined }));
   }, [province]);
 
   const submitStep2 = useCreateCampaignStep2();
+  const resubmitStep2 = useResubmitCampaignStep2();
+  const isSubmitting = submitStep2.isPending || resubmitStep2.isPending;
 
   const validate = useCallback(() => {
     const e = {};
@@ -409,13 +494,62 @@ const CampaignDetails = ({ navigation, route }) => {
 
   const handleNext = useCallback(async () => {
     if (!validate()) return;
-    if (submitStep2.isPending) return;
+    if (isSubmitting) return;
 
     if (!campaignId) {
-      Alert.alert('Error', 'Missing campaign reference. Please start again from Step 1.');
+      showResponse({
+        message: 'Missing campaign reference. Please start again from Step 1.',
+        closeAction: 'restart',
+      });
       return;
     }
 
+    // ── Rejection fix-up: update this step only, then leave. ──
+    // The remaining steps are already complete server-side, so walking
+    // the creator through the rest of the wizard would be pointless.
+    if (isRejection) {
+      try {
+        const body = await resubmitStep2.mutateAsync({
+          campaignId,
+          shortDescription: shortDesc.trim(),
+          description: fullDesc.trim(),
+          beneficiaryName: beneficiary.trim(),
+          relationships: relationship,
+          province,
+          city,
+        });
+
+        if (body?.responseCode !== '000') {
+          showResponse({
+            title: 'Update Failed',
+            message: body?.responseMessage || 'Could not update your campaign.',
+            code: body?.responseCode || '',
+          });
+          return;
+        }
+
+        showResponse({
+          variant: 'success',
+          title: 'Campaign Updated',
+          message:
+            'Your campaign has been updated successfully and is now under review. You will be notified once it is approved.',
+          closeAction: 'exit',
+        });
+      } catch (error) {
+        const data = error?.response?.data;
+        showResponse({
+          title: 'Update Failed',
+          message:
+            data?.responseMessage ||
+            error?.message ||
+            'Could not update your campaign. Please try again.',
+          code: data?.responseCode || '',
+        });
+      }
+      return;
+    }
+
+    // ── Normal creation flow (unchanged) ──
     try {
       const response = await submitStep2.mutateAsync({
         campaignId,
@@ -428,7 +562,12 @@ const CampaignDetails = ({ navigation, route }) => {
       });
 
       if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert('Error', response?.responseMessage || 'Could not save details. Please try again.');
+        showResponse({
+          message:
+            response?.responseMessage ||
+            'Could not save details. Please try again.',
+          code: response?.responseCode || '',
+        });
         return;
       }
 
@@ -443,14 +582,18 @@ const CampaignDetails = ({ navigation, route }) => {
         province,
       });
     } catch (error) {
-      console.error('🔴 [CampaignDetails] Step2 submit error:', error?.message);
-      Alert.alert(
-        'Error',
-        'Could not save campaign details. Please check your connection and try again.',
-      );
+      const data = error?.response?.data;
+      showResponse({
+        message:
+          data?.responseMessage ||
+          'Could not save campaign details. Please check your connection and try again.',
+        code: data?.responseCode || '',
+      });
     }
   }, [
     validate,
+    isSubmitting,
+    isRejection,
     navigation,
     params,
     campaignId,
@@ -461,6 +604,8 @@ const CampaignDetails = ({ navigation, route }) => {
     city,
     province,
     submitStep2,
+    resubmitStep2,
+    showResponse,
   ]);
 
   const handleFormatChange = useCallback(type => {
@@ -476,7 +621,7 @@ const CampaignDetails = ({ navigation, route }) => {
       <StepHeader
         step={2}
         total={4}
-        title="Create Campaign"
+        title={isRejection ? 'Update Campaign' : 'Create Campaign'}
         onLeft={() => navigation.goBack()}
       />
       <ProgressLine pct={50} />
@@ -491,6 +636,13 @@ const CampaignDetails = ({ navigation, route }) => {
         <Text style={s.pageSub}>
           All fields marked with <Text style={s.star}>*</Text> are required
         </Text>
+
+        {isRejection && !!rejectionReason && (
+          <View style={s.rejectionBox}>
+            <Text style={s.rejectionLabel}>REJECTION REASON</Text>
+            <Text style={s.rejectionText}>{rejectionReason}</Text>
+          </View>
+        )}
 
         <View style={s.fieldBlock}>
           <FieldLabel
@@ -630,21 +782,34 @@ const CampaignDetails = ({ navigation, route }) => {
 
       <View style={s.footer}>
         <TouchableOpacity
-          style={[s.nextBtn, submitStep2.isPending && s.nextBtnDisabled]}
+          style={[s.nextBtn, isSubmitting && s.nextBtnDisabled]}
           onPress={handleNext}
           activeOpacity={0.85}
-          disabled={submitStep2.isPending}
+          disabled={isSubmitting}
         >
-          {submitStep2.isPending ? (
+          {isSubmitting ? (
             <ActivityIndicator size="small" color={P.white} />
           ) : (
             <>
-              <Text style={s.nextTxt}>Next</Text>
-              <Icons name="arrow-right" size={sp(16)} color={P.white} />
+              <Text style={s.nextTxt}>{isRejection ? 'Update' : 'Next'}</Text>
+              <Icons
+                name={isRejection ? 'check' : 'arrow-right'}
+                size={sp(16)}
+                color={P.white}
+              />
             </>
           )}
         </TouchableOpacity>
       </View>
+
+      <ResponseModal
+        visible={responseModal.visible}
+        variant={responseModal.variant}
+        title={responseModal.title}
+        message={responseModal.message}
+        code={responseModal.code}
+        onClose={closeResponseModal}
+      />
     </SafeAreaView>
   );
 };
@@ -670,6 +835,23 @@ const s = StyleSheet.create({
   },
   pageSub: { fontSize: sp(12), color: P.light, marginBottom: sp(20) },
   star: { color: P.red, fontWeight: '700' },
+
+  rejectionBox: {
+    borderWidth: 1,
+    borderColor: P.red,
+    borderRadius: sp(10),
+    backgroundColor: '#FEF2F2',
+    padding: sp(12),
+    marginBottom: sp(18),
+  },
+  rejectionLabel: {
+    fontSize: sp(11),
+    fontWeight: '700',
+    color: P.red,
+    marginBottom: sp(4),
+  },
+  rejectionText: { fontSize: sp(13), color: P.dark, lineHeight: sp(19) },
+
   fieldBlock: { marginBottom: sp(16) },
   inputFocused: { borderColor: P.teal, borderWidth: 1.5 },
   inputError: { borderColor: P.red, borderWidth: 1.5 },

@@ -10,7 +10,6 @@ import {
   Dimensions,
   Platform,
   Image,
-  Share,
   ActivityIndicator,
   RefreshControl,
   LayoutAnimation,
@@ -22,6 +21,11 @@ import Icons from 'react-native-vector-icons/Feather';
 import ResponseModal from '../../components/ResponseModal';
 import { useDonationDetail } from '../../hooks/useDonation';
 import { useAppContext } from '../../context/AppContext';
+import { ViewShot, shareReceiptImage } from '../../utils/shareReceipt';
+import {
+  parseNotificationPayload,
+  listPayloadKeys,
+} from '../../routes/navigationRef';
 import LogoImg from '../../assets/logo.png';
 
 if (
@@ -74,11 +78,6 @@ const fmtDateTime = iso => {
   }
 };
 
-// ── Optional native modules ─────────────────────────────────
-// Loaded defensively, but UNLIKE before the failure is now reported to
-// the user instead of silently degrading to a text share — a missing
-// module here almost always means the app wasn't rebuilt after install,
-// and a silent fallback makes that look like a code bug.
 let ClipboardModule = null;
 try {
   // eslint-disable-next-line global-require
@@ -86,26 +85,6 @@ try {
 } catch {
   ClipboardModule = null;
 }
-
-let ViewShot = null;
-try {
-  // eslint-disable-next-line global-require
-  const mod = require('react-native-view-shot');
-  ViewShot = mod?.default || mod?.ViewShot || null;
-} catch {
-  ViewShot = null;
-}
-
-let RNShare = null;
-try {
-  // eslint-disable-next-line global-require
-  const mod = require('react-native-share');
-  RNShare = mod?.default || mod || null;
-} catch {
-  RNShare = null;
-}
-
-const CAN_SHARE_IMAGE = !!ViewShot && !!RNShare;
 
 const InfoRow = memo(({ label, value, valueStyle }) => {
   if (value === null || value === undefined || value === '') return null;
@@ -122,18 +101,36 @@ const InfoRow = memo(({ label, value, valueStyle }) => {
 const DonationReceiptScreen = ({ navigation, route }) => {
   const { currentUser } = useAppContext();
 
-  const donationId = route?.params?.donationId
-    ? String(route.params.donationId)
+  // The original notification row travels with the route so this screen
+  // can recover ids the router failed to extract, instead of dead-ending
+  // on an error state the user can do nothing about.
+  const rawNotification = route?.params?.rawNotification || null;
+
+  const fallbackPayload = rawNotification
+    ? parseNotificationPayload(rawNotification)
     : null;
 
-  const userId = route?.params?.userId
-    ? String(route.params.userId)
-    : currentUser?.id != null
-      ? String(currentUser.id)
-      : null;
+  const donationId =
+    (route?.params?.donationId
+      ? String(route.params.donationId)
+      : fallbackPayload?.donationId
+        ? String(fallbackPayload.donationId)
+        : null) || null;
+
+  const userId =
+    (route?.params?.userId
+      ? String(route.params.userId)
+      : fallbackPayload?.donationUserId
+        ? String(fallbackPayload.donationUserId)
+        : currentUser?.id != null
+          ? String(currentUser.id)
+          : null) || null;
 
   const roleParam = route?.params?.role;
 
+  // An anonymous donation arrives with donor === null in the creator
+  // projection too, so payload shape alone can't distinguish the two
+  // sides — the notification that opened this screen is authoritative.
   const notificationHint = `${route?.params?.notificationType || ''} ${
     route?.params?.notificationTitle || ''
   }`.toUpperCase();
@@ -155,10 +152,6 @@ const DonationReceiptScreen = ({ navigation, route }) => {
 
   const detail = data?.detail || null;
 
-  // ViewShot's own ref + capture() is used instead of captureRef(view),
-  // because captureRef against a plain <View> inside a ScrollView is the
-  // combination that most often returns a blank/failed snapshot on
-  // Android — the component wrapper measures itself and is reliable.
   const shotRef = useRef(null);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -226,84 +219,20 @@ const DonationReceiptScreen = ({ navigation, route }) => {
 
   const isCreatorView = !!detail && (isReceivedNotification || detail.isCreator);
 
-  const buildShareText = useCallback(() => {
-    if (!detail) return '';
-    const lines = [
-      isCreatorView ? 'Donation Received' : 'Donation Successful',
-      `Campaign: ${detail.campaignTitle}`,
-      `Amount: ${fmtPKR(detail.amount)}`,
-    ];
-    if (detail.totalChargedAmount != null) {
-      lines.push(`Total: ${fmtPKR(detail.totalChargedAmount)}`);
-    }
-    if (detail.transactionId) {
-      lines.push(`Transaction ID: ${detail.transactionId}`);
-    }
-    lines.push(`Date: ${fmtDateTime(detail.donationDate)}`);
-    lines.push('— FundMe');
-    return lines.join('\n');
-  }, [detail, isCreatorView]);
-
-  /**
-   * Shares the receipt as a PNG file.
-   *
-   * Three details make the difference between an image share and the
-   * text-only share that was happening before:
-   *   1. capture() on the <ViewShot> instance (not captureRef on a View)
-   *   2. result: 'tmpfile' — a real file path; data-uri strings are
-   *      frequently rejected/ignored by receiving apps on Android
-   *   3. the path is prefixed with file:// on Android, which RNShare
-   *      requires before it will hand the file to the share sheet
-   *
-   * `message` is intentionally omitted when sharing the image: several
-   * targets (WhatsApp in particular) will drop the attachment and send
-   * only the caption when both are supplied.
-   */
   const handleShare = useCallback(async () => {
     if (!detail || sharing) return;
 
-    if (!CAN_SHARE_IMAGE) {
-      showError(
-        'Image sharing is unavailable. Please rebuild the app after installing react-native-view-shot and react-native-share.',
-      );
-      return;
-    }
-
-    if (!shotRef.current?.capture) {
-      showError('Receipt is not ready to share yet. Please try again.');
-      return;
-    }
-
     setSharing(true);
     try {
-      // Two passes: the first warms up the surface, the second is the
-      // one that reliably contains fully-rendered content on Android.
-      await shotRef.current.capture();
-      const rawUri = await shotRef.current.capture();
-
-      if (!rawUri) {
-        throw new Error('Could not capture the receipt.');
-      }
-
-      const fileUri =
-        Platform.OS === 'android' && !rawUri.startsWith('file://')
-          ? `file://${rawUri}`
-          : rawUri;
-
-      await RNShare.open({
+      await shareReceiptImage({
+        shotRef,
         title: 'Donation Receipt',
-        url: fileUri,
-        type: 'image/png',
         filename: `fundme-receipt-${detail.transactionId || Date.now()}`,
-        failOnCancel: false,
       });
     } catch (err) {
-      const msg = String(err?.message || '').toLowerCase();
-      // A dismissed share sheet isn't an error worth reporting.
-      if (msg.includes('cancel') || msg.includes('dismiss') || msg.includes('user did not share')) {
-        return;
-      }
-      showError(err?.message || 'Could not share the receipt image.');
+      // Reported verbatim with its stage tag so a linking problem is
+      // never mistaken for a capture or share-sheet problem.
+      showError(err?.message || 'Could not share the receipt image.', err?.step);
     } finally {
       setSharing(false);
     }
@@ -311,6 +240,10 @@ const DonationReceiptScreen = ({ navigation, route }) => {
 
   // ── Guard: missing reference ────────────────────────────────
   if (!donationId || !userId) {
+    const availableKeys = rawNotification
+      ? Array.from(listPayloadKeys(rawNotification)).join(', ')
+      : 'no payload received';
+
     return (
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
         <StatusBar barStyle="dark-content" backgroundColor={C.pageBg} />
@@ -321,6 +254,11 @@ const DonationReceiptScreen = ({ navigation, route }) => {
             {!donationId
               ? 'Missing donation reference.'
               : 'Missing user reference.'}
+          </Text>
+          {/* Names the keys the backend actually sent, so a field-name
+              mismatch is identifiable without attaching a debugger. */}
+          <Text style={s.stateKeys} numberOfLines={6}>
+            {`Payload keys: ${availableKeys}`}
           </Text>
           <TouchableOpacity style={s.stateBtn} onPress={handleBack}>
             <Text style={s.stateBtnTxt}>Go Back</Text>
@@ -380,9 +318,10 @@ const DonationReceiptScreen = ({ navigation, route }) => {
     ? `From ${detail.donorName}`
     : detail.campaignTitle;
 
-  // The exact block that becomes the shared PNG.
+  // collapsable={false} is required on Android: without it the view can
+  // be flattened away at native level and the snapshot comes back blank.
   const receiptBody = (
-    <View style={s.captureArea}>
+    <View style={s.captureArea} collapsable={false}>
       <View style={s.heroWrap}>
         <View style={s.logoCircle}>
           <Image source={LogoImg} style={s.logo} resizeMode="contain" />
@@ -533,13 +472,9 @@ const DonationReceiptScreen = ({ navigation, route }) => {
         {ViewShot ? (
           <ViewShot
             ref={shotRef}
-            options={{
-              fileName: `fundme-receipt-${detail.transactionId || 'receipt'}`,
-              format: 'png',
-              quality: 1,
-              result: 'tmpfile',
-            }}
+            options={{ format: 'png', quality: 1, result: 'base64' }}
             style={s.shotWrap}
+            collapsable={false}
           >
             {receiptBody}
           </ViewShot>
@@ -764,6 +699,13 @@ const s = StyleSheet.create({
     color: C.textGray,
     textAlign: 'center',
     marginTop: sp(6),
+  },
+  stateKeys: {
+    fontSize: sp(10),
+    color: C.textLight,
+    textAlign: 'center',
+    marginTop: sp(10),
+    paddingHorizontal: sp(8),
   },
   stateBtnRow: {
     flexDirection: 'row',

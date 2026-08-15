@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -23,6 +22,7 @@ import RoleSelector from '../../components/auth/RoleSelector';
 import GradientButton from '../../components/common/GradientButton';
 import FieldLabel from '../../components/common/FieldLabel';
 import { FullScreenLoader } from '../../components/common/Loader';
+import ResponseModal from '../../components/ResponseModal';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
 import {
@@ -37,11 +37,9 @@ import {
 
 import { useRegisterStep1 } from '../../hooks/useRegistration';
 import { useAppContext } from '../../context/AppContext';
-import { useToast } from '../../components/common/Toast';
 
 const SignUpScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const toast = useToast();
   const { saveUser, currentUser } = useAppContext();
   const { mutate: register, isPending } = useRegisterStep1();
 
@@ -55,6 +53,29 @@ const SignUpScreen = ({ navigation, route }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('');
+
+  // Errors only. This is step 1 of 4, so a success dialog here would
+  // announce an account that isn't usable until OTP, CNIC and profile
+  // are done — the screen just advances instead.
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    code: '',
+  });
+
+  const closeErrorModal = useCallback(() => {
+    setErrorModal(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const showError = useCallback(({ title, message, code = '' }) => {
+    setErrorModal({
+      visible: true,
+      title: title || 'Error',
+      message: message || 'Something went wrong. Please try again.',
+      code: code ? String(code) : '',
+    });
+  }, []);
 
   useEffect(() => {
     if (prefilledEmail) setEmail(prefilledEmail);
@@ -93,14 +114,10 @@ const SignUpScreen = ({ navigation, route }) => {
     if (roleError) errors.push(roleError);
 
     if (errors.length > 0) {
-      Alert.alert(
-        'Validation Failed',
-        errors.map((err, idx) => `${idx + 1}. ${err}`).join('\n\n'),
-        [{ text: 'OK' }],
-      );
-
-      toast.error(errors[0]); // show first error
-
+      showError({
+        title: 'Validation Failed',
+        message: errors.map((err, idx) => `${idx + 1}. ${err}`).join('\n'),
+      });
       return;
     }
 
@@ -116,22 +133,54 @@ const SignUpScreen = ({ navigation, route }) => {
       },
       {
         onSuccess: async body => {
-          const data = body?.data || {};
-          await saveUser({
-            email,
-            userId: data.userId ?? null,
-            step: data.step ?? 1,
-            stepStatus: data.stepStatus ?? 'COMPLETED',
-            status: 'draft',
-            profile: data,
-          });
-          toast.success(
-            body?.responseMessage || 'Account created. OTP sent to your email.',
-          );
-          navigation.navigate('OTPVerificationScreen', { email });
+          try {
+            // HTTP 200 alone isn't success — the backend returns
+            // failures with a 200 and a non-"000" responseCode.
+            if (body?.responseCode && body.responseCode !== '000') {
+              showError({
+                title: 'Registration Failed',
+                message:
+                  body?.responseMessage ||
+                  'Registration failed. Please try again.',
+                code: body?.responseCode,
+              });
+              return;
+            }
+
+            const data = body?.data || {};
+            await saveUser({
+              email,
+              userId: data.userId ?? null,
+              step: data.step ?? 1,
+              stepStatus: data.stepStatus ?? 'COMPLETED',
+              status: 'draft',
+              profile: data,
+            });
+
+            // Silent success — straight to OTP.
+            navigation.navigate('OTPVerificationScreen', { email });
+          } catch (e) {
+            const data = e?.response?.data || e?.raw;
+            showError({
+              title: 'Registration Failed',
+              message:
+                data?.responseMessage ||
+                e?.message ||
+                'Registration failed. Please try again.',
+              code: data?.responseCode || '',
+            });
+          }
         },
         onError: err => {
-          toast.error(err?.message || 'Registration failed.');
+          const data = err?.response?.data || err?.raw;
+          showError({
+            title: 'Registration Failed',
+            message:
+              data?.responseMessage ||
+              err?.message ||
+              'Registration failed. Please try again.',
+            code: data?.responseCode || err?.code || '',
+          });
         },
       },
     );
@@ -146,7 +195,7 @@ const SignUpScreen = ({ navigation, route }) => {
     register,
     saveUser,
     navigation,
-    toast,
+    showError,
   ]);
 
   const footerPb = insets.bottom > 0 ? insets.bottom : SPACING.xl;
@@ -178,8 +227,6 @@ const SignUpScreen = ({ navigation, route }) => {
               flexGrow: 1,
             },
           ]}
-          // contentContainerStyle={[styles.scrollContent, { paddingBottom: footerHeight + SPACING.lg }]}
-
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
@@ -289,6 +336,15 @@ const SignUpScreen = ({ navigation, route }) => {
       </View>
 
       <FullScreenLoader visible={isPending} message="Creating your account…" />
+
+      <ResponseModal
+        visible={errorModal.visible}
+        variant="error"
+        title={errorModal.title}
+        message={errorModal.message}
+        code={errorModal.code}
+        onClose={closeErrorModal}
+      />
     </SafeAreaView>
   );
 };
@@ -327,15 +383,6 @@ const styles = StyleSheet.create({
   roleWrapper: {
     marginBottom: SPACING.xs,
   },
-
-  // safe:               { flex: 1, backgroundColor: COLORS.background },
-  // keyboardView:       { flex: 1 },
-  // scroll:             { flex: 1 },
-  // scrollContent:      { paddingHorizontal: SPACING.screenPadding },
-  // headlineContainer:  { marginBottom: SPACING.xl },
-  // headline:           { fontSize: TYPOGRAPHY.fontSize.xxxl, fontFamily: TYPOGRAPHY.fontFamily.extraBold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
-  // subtitle:           { fontSize: TYPOGRAPHY.fontSize.sm, fontFamily: TYPOGRAPHY.fontFamily.regular, color: COLORS.textSecondary },
-  // noMargin:           { marginBottom: SPACING.md },
   disabledField: { opacity: 0.7 },
 
   footer: {

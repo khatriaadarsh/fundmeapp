@@ -22,6 +22,7 @@ import Dropdown         from '../../components/forms/Dropdown';
 import GradientButton   from '../../components/common/GradientButton';
 import FieldLabel       from '../../components/common/FieldLabel';
 import { FullScreenLoader } from '../../components/common/Loader';
+import ResponseModal    from '../../components/ResponseModal';
 
 import { COLORS, SPACING, TYPOGRAPHY } from '../../theme';
 import { formatDateOfBirth, dobUiToApi } from '../../utils/formatters';
@@ -34,11 +35,9 @@ import { fileFromUri } from '../../utils/formData';
 import { useRegisterStep4 }            from '../../hooks/useRegistration';
 import { useProvinces, useCities }     from '../../hooks/useLocation';
 import { useAppContext }               from '../../context/AppContext';
-import { useToast }                    from '../../components/common/Toast';
 
 const ProfileCompletionScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const toast  = useToast();
   const { currentUser } = useAppContext();
   const { mutate: submitStep4, isPending } = useRegisterStep4();
 
@@ -58,21 +57,54 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
   const [city,       setCity]       = useState('');
   const [errors,     setErrors]     = useState({});
 
+  // Unlike steps 1-3, this IS the end of registration, so success gets a
+  // real confirmation — the account now exists but is pending review, and
+  // the user needs to know that before being dropped on the login screen.
+  const [responseModal, setResponseModal] = useState({
+    visible: false,
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+    closeAction: null,
+  });
+
+  const closeResponseModal = useCallback(() => {
+    const action = responseModal.closeAction;
+    setResponseModal(prev => ({ ...prev, visible: false, closeAction: null }));
+
+    if (action === 'login') {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    }
+  }, [responseModal.closeAction, navigation]);
+
+  const showResponse = useCallback(
+    ({ variant = 'error', title, message, code = '', closeAction = null }) => {
+      setResponseModal({
+        visible: true,
+        variant,
+        title: title || (variant === 'success' ? 'Success' : 'Error'),
+        message: message || 'Something went wrong. Please try again.',
+        code: code ? String(code) : '',
+        closeAction,
+      });
+    },
+    [],
+  );
+
   const { data: cities = [], isLoading: loadingCities } = useCities(provinceId);
 
   // Convert backend list → Dropdown options
   // Your existing Dropdown receives string[]. We'll pass names and look up IDs separately.
-  // 
   const provinceNames = useMemo(
-  () => Array.isArray(provinces) ? provinces.map(p => p.name) : [],
-  [provinces]
-);
+    () => Array.isArray(provinces) ? provinces.map(p => p.name) : [],
+    [provinces]
+  );
 
-  // const cityNames     = useMemo(() => cities.map(c => c.name), [cities]);
   const cityNames = useMemo(
-  () => Array.isArray(cities) ? cities.map(c => c.name) : [],
-  [cities]
-);
+    () => Array.isArray(cities) ? cities.map(c => c.name) : [],
+    [cities]
+  );
 
   const handleDobChange = useCallback((text) => {
     setDob(formatDateOfBirth(text));
@@ -113,12 +145,22 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
     if (!city)       validationErrors.push('Please select your city');
 
     if (validationErrors.length > 0) {
-      toast.error(validationErrors[0]);
+      showResponse({
+        variant: 'error',
+        title: 'Validation Failed',
+        message: validationErrors
+          .map((err, idx) => `${idx + 1}. ${err}`)
+          .join('\n'),
+      });
       return;
     }
 
     if (!email) {
-      toast.error('Missing email. Please restart registration.');
+      showResponse({
+        variant: 'error',
+        title: 'Error',
+        message: 'Missing email. Please restart registration.',
+      });
       return;
     }
 
@@ -136,17 +178,42 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
       },
       {
         onSuccess: (body) => {
-          toast.success(body?.responseMessage || 'Profile completed successfully!');
-          setTimeout(() => {
-            navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-          }, 1200);
+          // HTTP 200 alone isn't success — the backend returns failures
+          // with a 200 and a non-"000" responseCode.
+          if (body?.responseCode && body.responseCode !== '000') {
+            showResponse({
+              variant: 'error',
+              title: 'Submission Failed',
+              message:
+                body?.responseMessage || 'Submission failed. Please try again.',
+              code: body?.responseCode,
+            });
+            return;
+          }
+
+          showResponse({
+            variant: 'success',
+            title: 'Account Created',
+            message:
+              'Your account has been created successfully and is now under review. You will be notified once it is approved.',
+            closeAction: 'login',
+          });
         },
         onError: (err) => {
-          toast.error(err?.message || 'Submission failed.');
+          const data = err?.response?.data || err?.raw;
+          showResponse({
+            variant: 'error',
+            title: 'Submission Failed',
+            message:
+              data?.responseMessage ||
+              err?.message ||
+              'Submission failed. Please try again.',
+            code: data?.responseCode || err?.code || '',
+          });
         },
       },
     );
-  }, [dob, gender, province, city, email, photoUri, bio, submitStep4, navigation, toast]);
+  }, [dob, gender, province, city, email, photoUri, bio, submitStep4, showResponse]);
 
   const footerPb     = insets.bottom > 0 ? insets.bottom : SPACING.xl;
   const footerHeight = SPACING.md + SPACING.buttonHeight + footerPb;
@@ -245,6 +312,15 @@ const ProfileCompletionScreen = ({ navigation, route }) => {
       </View>
 
       <FullScreenLoader visible={isPending} message="Completing your profile…" />
+
+      <ResponseModal
+        visible={responseModal.visible}
+        variant={responseModal.variant}
+        title={responseModal.title}
+        message={responseModal.message}
+        code={responseModal.code}
+        onClose={closeResponseModal}
+      />
     </SafeAreaView>
   );
 };

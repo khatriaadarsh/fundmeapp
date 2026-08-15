@@ -2,6 +2,11 @@
 // ─────────────────────────────────────────────────────────────
 //  Basic Information — Step 1 of 4
 //  FundMe App  ·  React Native CLI  ·  100% responsive
+//
+//  Doubles as the fix-up screen for a CAMPAIGN_REJECTED notification
+//  whose rejectedStep is 1. In that mode the screen prefills itself from
+//  the campaign detail API, the CTA reads "Update", and Next posts to
+//  /campaigns/resubmit/step-1 instead of continuing the wizard.
 // ─────────────────────────────────────────────────────────────
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
@@ -17,7 +22,6 @@ import {
   Platform,
   Modal,
   Keyboard,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,12 +29,15 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { P, sp } from '../../theme/theme';
 import { StepHeader } from '../../components/shared/StepHeader';
-// ✅ Named imports from Shared — C, FieldLabel, ErrorMsg, Dropdown
 import { C, FieldLabel, ErrorMsg, Dropdown } from './Shared';
+import ResponseModal from '../../components/ResponseModal';
 // ── API wiring ──────────────────────────────────────────────
 import { getUserId } from '../../config/session';
-import { useCategories } from '../../hooks/useCampaign';
-import { useCreateCampaignStep1 } from '../../hooks/useCreateCampaign';
+import { useCategories, useCampaignDetail } from '../../hooks/useCampaign';
+import {
+  useCreateCampaignStep1,
+  useResubmitCampaignStep1,
+} from '../../hooks/useCreateCampaign';
 
 // ─────────────────────────────────────────────────────────────
 //  Constants
@@ -40,9 +47,6 @@ const TITLE_MIN = 5;
 const GOAL_MIN = 1000;
 const GOAL_MAX = 99999999;
 
-// ─────────────────────────────────────────────────────────────
-//  Helper — format Date → "DD Mon YYYY" (used for on-screen display)
-// ─────────────────────────────────────────────────────────────
 const formatDate = date => {
   if (!date) return '';
   const months = [
@@ -54,10 +58,6 @@ const formatDate = date => {
   } ${date.getFullYear()}`;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Helper — format Date → "Mon D, YYYY" (used for the API payload,
-//  matches the sample curl exactly, e.g. "Mar 20, 2026")
-// ─────────────────────────────────────────────────────────────
 const formatDateForApi = date => {
   if (!date) return '';
   const months = [
@@ -67,11 +67,20 @@ const formatDateForApi = date => {
   return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Helper — reliably rebuild a Date from either an ISO string
-//  (preferred, machine-readable) or a display string (fallback,
-//  may fail to parse depending on format — hence the ISO field).
-// ─────────────────────────────────────────────────────────────
+/**
+ * Resubmit expects "2026-09-30T23:59:59".
+ *
+ * Built from local date parts rather than toISOString(), which converts
+ * to UTC and can roll the date back a day for users behind GMT.
+ */
+const formatDateForResubmit = date => {
+  if (!date) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate(),
+  )}T23:59:59`;
+};
+
 const parseDateSafely = (isoValue, displayValue) => {
   if (isoValue) {
     const parsed = new Date(isoValue);
@@ -84,9 +93,6 @@ const parseDateSafely = (isoValue, displayValue) => {
   return null;
 };
 
-// ─────────────────────────────────────────────────────────────
-//  ProgressLine styles — defined BEFORE the component
-// ─────────────────────────────────────────────────────────────
 const plSt = StyleSheet.create({
   bg: { height: 3, backgroundColor: C.border },
   fill: { height: 3, backgroundColor: C.teal },
@@ -98,9 +104,6 @@ const ProgressLine = memo(({ pct }) => (
   </View>
 ));
 
-// ─────────────────────────────────────────────────────────────
-//  Screen styles — defined BEFORE CreateCampaign renders them
-// ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   flex: { flex: 1 },
@@ -120,6 +123,22 @@ const s = StyleSheet.create({
   pageSub: { fontSize: sp(12), color: C.textLight, marginBottom: sp(20) },
   star: { color: C.red, fontWeight: '700' },
   warnText: { fontSize: sp(11), color: C.red, marginTop: sp(4) },
+
+  rejectionBox: {
+    borderWidth: 1,
+    borderColor: C.red,
+    borderRadius: sp(10),
+    backgroundColor: '#FEF2F2',
+    padding: sp(12),
+    marginBottom: sp(18),
+  },
+  rejectionLabel: {
+    fontSize: sp(11),
+    fontWeight: '700',
+    color: C.red,
+    marginBottom: sp(4),
+  },
+  rejectionText: { fontSize: sp(13), color: C.dark, lineHeight: sp(19) },
 
   fieldBlock: { marginBottom: sp(14) },
   inputFocused: { borderColor: C.teal, borderWidth: 1.5 },
@@ -203,7 +222,6 @@ const s = StyleSheet.create({
   },
   infoTxt: { flex: 1, fontSize: sp(13), color: C.infoText, lineHeight: sp(19) },
 
-
   footer: {
     paddingHorizontal: sp(18),
     paddingTop: sp(12),
@@ -254,16 +272,12 @@ const ios = StyleSheet.create({
   picker: { alignSelf: 'center' },
 });
 
-// ─────────────────────────────────────────────────────────────
-//  CreateCampaign — main screen component
-// ─────────────────────────────────────────────────────────────
 const CreateCampaign = ({ navigation, route }) => {
-  // ✅ Memoized so this doesn't create a new object reference on
-  // every render (fixes exhaustive-deps warning + keeps effects stable).
   const params = useMemo(() => route?.params || {}, [route?.params]);
 
-  // ── Categories — now from the API (category/city/province APIs
-  //    are already integrated elsewhere in the app) ─────────────
+  const isRejection = params.isRejection === true;
+  const rejectionReason = params.rejectionReason || '';
+
   const { data: categoriesData = [], isLoading: categoriesLoading } = useCategories();
   const categoryOptions = useMemo(
     () => categoriesData.filter(c => c.id !== 'all').map(c => c.label),
@@ -271,45 +285,100 @@ const CreateCampaign = ({ navigation, route }) => {
   );
 
   const submitStep1 = useCreateCampaignStep1();
+  const resubmitStep1 = useResubmitCampaignStep1();
+  const isSubmitting = submitStep1.isPending || resubmitStep1.isPending;
 
-  // ── campaignId — kept in LOCAL STATE (not derived inline from
-  //    params on every render). This is the key fix: once a campaign
-  //    is created, we remember its id here even if the user presses
-  //    the back arrow and returns to this same screen instance, so
-  //    pressing Next again UPDATES the existing campaign instead of
-  //    creating a duplicate one. ─────────────────────────────────
   const [campaignId, setCampaignId] = useState(
     params.campaignId ? String(params.campaignId) : null,
   );
 
-  // ── Form state (prefilled from params if editing) ───────────
+  // Only fetched in rejection mode: the notification carries just an id,
+  // so without this the creator would have to retype the whole form.
+  const { data: campaignDetail } = useCampaignDetail(
+    isRejection ? campaignId : null,
+  );
+
   const [title, setTitle] = useState(params.title || '');
   const [category, setCategory] = useState(params.category || '');
   const [goalRaw, setGoalRaw] = useState(params.goal ? String(params.goal) : '');
   const [goalDisplay, setGoalDisplay] = useState(
     params.goal ? Number(params.goal).toLocaleString('en-PK') : '',
   );
-  // ✅ Uses the ISO round-trip value first (reliable), falls back to
-  // parsing the human-readable display string only if ISO is missing.
   const [selectedDate, setSelectedDate] = useState(() =>
     parseDateSafely(params.endDateISO, params.endDate),
   );
   const [tempDate, setTempDate] = useState(new Date());
   const [urgent, setUrgent] = useState(params.urgent ?? false);
 
-  // ── Picker visibility ────────────────────────────────────
   const [showPicker, setShowPicker] = useState(false);
   const [showIOSModal, setShowIOSModal] = useState(false);
 
-  // ── Validation + focus state ─────────────────────────────
   const [errors, setErrors] = useState({});
   const [focus, setFocus] = useState({});
+
+  const [responseModal, setResponseModal] = useState({
+    visible: false,
+    variant: 'error',
+    title: '',
+    message: '',
+    code: '',
+    closeAction: null,
+  });
+
+  const closeResponseModal = useCallback(() => {
+    const action = responseModal.closeAction;
+    setResponseModal(prev => ({ ...prev, visible: false, closeAction: null }));
+
+    if (action === 'exit') {
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+    }
+  }, [responseModal.closeAction, navigation]);
+
+  const showResponse = useCallback(
+    ({ variant = 'error', title: t, message, code = '', closeAction = null }) => {
+      setResponseModal({
+        visible: true,
+        variant,
+        title: t || (variant === 'success' ? 'Success' : 'Error'),
+        message: message || 'Something went wrong. Please try again.',
+        code: code ? String(code) : '',
+        closeAction,
+      });
+    },
+    [],
+  );
+
+  const prefilled = useRef(false);
+
+  // Runs once, and never overwrites anything the creator has already
+  // edited — otherwise a slow detail response would wipe their changes.
+  useEffect(() => {
+    if (!isRejection || prefilled.current || !campaignDetail) return;
+
+    const raw = campaignDetail.raw || {};
+    prefilled.current = true;
+
+    setTitle(prev => prev || raw.title || campaignDetail.title || '');
+    setCategory(prev => prev || raw.category || campaignDetail.category || '');
+
+    const goalValue = raw.fundingGoal ?? campaignDetail.goal;
+    if (goalValue != null) {
+      const digits = String(Math.trunc(Number(goalValue)));
+      setGoalRaw(prev => prev || digits);
+      setGoalDisplay(prev => prev || Number(digits).toLocaleString('en-PK'));
+    }
+
+    const parsedEnd = parseDateSafely(raw.endDate, raw.endDate);
+    if (parsedEnd) setSelectedDate(prev => prev || parsedEnd);
+
+    if (raw.isUrgent != null) setUrgent(!!raw.isUrgent);
+  }, [isRejection, campaignDetail]);
 
   const clearError = key => setErrors(prev => ({ ...prev, [key]: undefined }));
   const setFocused = key => setFocus(f => ({ ...f, [key]: true }));
   const setBlurred = key => setFocus(f => ({ ...f, [key]: false }));
 
-  // ── Fade-in animation ────────────────────────────────────
   const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -321,7 +390,6 @@ const CreateCampaign = ({ navigation, route }) => {
 
   const today = new Date();
 
-  // ── Date picker ──────────────────────────────────────────
   const openDatePicker = () => {
     setTempDate(selectedDate || new Date());
     Platform.OS === 'ios' ? setShowIOSModal(true) : setShowPicker(true);
@@ -345,7 +413,6 @@ const CreateCampaign = ({ navigation, route }) => {
   };
   const onIOSCancel = () => setShowIOSModal(false);
 
-  // ── Goal input ───────────────────────────────────────────
   const handleGoalChange = text => {
     const digits = text.replace(/[^0-9]/g, '');
     setGoalRaw(digits);
@@ -353,7 +420,6 @@ const CreateCampaign = ({ navigation, route }) => {
     if (errors.goal) clearError('goal');
   };
 
-  // ── Validation ───────────────────────────────────────────
   const validate = useCallback(() => {
     const e = {};
     if (!title.trim()) e.title = 'Campaign title is required';
@@ -373,12 +439,64 @@ const CreateCampaign = ({ navigation, route }) => {
     return Object.keys(e).length === 0;
   }, [title, category, goalRaw, selectedDate]);
 
-  // ── Next ─────────────────────────────────────────────────
   const handleNext = useCallback(async () => {
     Keyboard.dismiss();
     if (!validate()) return;
-    if (submitStep1.isPending) return;
+    if (isSubmitting) return;
 
+    // ── Rejection fix-up: update this step only, then leave. ──
+    // The remaining steps are already complete server-side, so walking
+    // the creator back through the whole wizard would be pointless.
+    if (isRejection) {
+      if (!campaignId) {
+        showResponse({
+          message: 'Missing campaign reference. Please open the notification again.',
+        });
+        return;
+      }
+
+      try {
+        const body = await resubmitStep1.mutateAsync({
+          campaignId,
+          title: title.trim(),
+          category,
+          fundingGoal: goalRaw,
+          endDate: formatDateForResubmit(selectedDate),
+          isUrgent: urgent,
+        });
+
+        if (body?.responseCode !== '000') {
+          showResponse({
+            title: 'Update Failed',
+            message: body?.responseMessage || 'Could not update your campaign.',
+            code: body?.responseCode || '',
+          });
+          return;
+        }
+
+        showResponse({
+          variant: 'success',
+          title: 'Campaign Updated',
+          message:
+            body?.responseMessage ||
+            'Your campaign has been updated and submitted for review.',
+          closeAction: 'exit',
+        });
+      } catch (error) {
+        const data = error?.response?.data;
+        showResponse({
+          title: 'Update Failed',
+          message:
+            data?.responseMessage ||
+            error?.message ||
+            'Could not update your campaign. Please try again.',
+          code: data?.responseCode || '',
+        });
+      }
+      return;
+    }
+
+    // ── Normal creation flow (unchanged) ──
     try {
       const response = await submitStep1.mutateAsync({
         campaignId,
@@ -391,22 +509,20 @@ const CreateCampaign = ({ navigation, route }) => {
       });
 
       if (response?.responseCode && response.responseCode !== '000') {
-        Alert.alert('Error', response?.responseMessage || 'Could not save campaign. Please try again.');
+        showResponse({
+          message:
+            response?.responseMessage ||
+            'Could not save campaign. Please try again.',
+          code: response?.responseCode || '',
+        });
         return;
       }
 
-      // ⚠️ Adjust this key if your backend returns the id under a
-      // different name.
       const returnedCampaignId = response?.data?.id ?? campaignId;
       const returnedIdStr = returnedCampaignId ? String(returnedCampaignId) : null;
 
       if (returnedIdStr) {
-        // Remember it locally...
         setCampaignId(returnedIdStr);
-        // ...and persist it onto THIS screen's own route params, so
-        // that if the user later presses the back arrow to return
-        // here, the campaignId survives and Next won't create a
-        // second campaign.
         navigation.setParams({ campaignId: returnedIdStr });
       }
 
@@ -417,21 +533,22 @@ const CreateCampaign = ({ navigation, route }) => {
         category,
         goal: goalRaw,
         endDate: formatDate(selectedDate),
-        // ✅ carried forward so any screen down the line can rebuild
-        // the exact Date object reliably (fixes the End Date not
-        // restoring when editing from Review).
         endDateISO: selectedDate ? selectedDate.toISOString() : null,
         urgent,
       });
     } catch (error) {
-      console.error('🔴 [CreateCampaign] Step1 submit error:', error?.message);
-      Alert.alert(
-        'Error',
-        'Could not save your campaign. Please check your connection and try again.',
-      );
+      const data = error?.response?.data;
+      showResponse({
+        message:
+          data?.responseMessage ||
+          'Could not save your campaign. Please check your connection and try again.',
+        code: data?.responseCode || '',
+      });
     }
   }, [
     validate,
+    isSubmitting,
+    isRejection,
     navigation,
     params,
     campaignId,
@@ -441,11 +558,12 @@ const CreateCampaign = ({ navigation, route }) => {
     selectedDate,
     urgent,
     submitStep1,
+    resubmitStep1,
+    showResponse,
   ]);
 
   const titleWarn = title.length >= 85;
 
-  // ── Render ───────────────────────────────────────────────
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.white} />
@@ -453,7 +571,7 @@ const CreateCampaign = ({ navigation, route }) => {
       <StepHeader
         step={1}
         total={4}
-        title="Create Campaign"
+        title={isRejection ? 'Update Campaign' : 'Create Campaign'}
         onLeft={() => navigation.goBack()}
       />
       <ProgressLine pct={25} />
@@ -469,6 +587,13 @@ const CreateCampaign = ({ navigation, route }) => {
           <Text style={s.pageSub}>
             All fields marked with <Text style={s.star}>*</Text> are required
           </Text>
+
+          {isRejection && !!rejectionReason && (
+            <View style={s.rejectionBox}>
+              <Text style={s.rejectionLabel}>REJECTION REASON</Text>
+              <Text style={s.rejectionText}>{rejectionReason}</Text>
+            </View>
+          )}
 
           {/* ── Campaign Title ──────────────────────────────── */}
           <View style={s.fieldBlock}>
@@ -592,8 +717,6 @@ const CreateCampaign = ({ navigation, route }) => {
             <Text style={s.urgentLabel}>Mark as Urgent 🔥</Text>
           </TouchableOpacity>
 
-          {/* Info banner — always visible, regardless of the
-              urgent checkbox state */}
           <View style={s.infoBanner}>
             <MaterialCommunityIcons
               name="information-outline"
@@ -613,18 +736,20 @@ const CreateCampaign = ({ navigation, route }) => {
         {/* ── Footer ─────────────────────────────────────────── */}
         <View style={s.footer}>
           <TouchableOpacity
-            style={[s.nextBtn, submitStep1.isPending && s.nextBtnDisabled]}
+            style={[s.nextBtn, isSubmitting && s.nextBtnDisabled]}
             activeOpacity={0.85}
             onPress={handleNext}
-            disabled={submitStep1.isPending}
+            disabled={isSubmitting}
           >
-            {submitStep1.isPending ? (
+            {isSubmitting ? (
               <ActivityIndicator size="small" color={C.white} />
             ) : (
               <>
-                <Text style={s.nextBtnTxt}>Next</Text>
+                <Text style={s.nextBtnTxt}>
+                  {isRejection ? 'Update' : 'Next'}
+                </Text>
                 <MaterialCommunityIcons
-                  name="arrow-right"
+                  name={isRejection ? 'check' : 'arrow-right'}
                   size={sp(17)}
                   color={C.white}
                 />
@@ -666,6 +791,15 @@ const CreateCampaign = ({ navigation, route }) => {
           />
         </View>
       </Modal>
+
+      <ResponseModal
+        visible={responseModal.visible}
+        variant={responseModal.variant}
+        title={responseModal.title}
+        message={responseModal.message}
+        code={responseModal.code}
+        onClose={closeResponseModal}
+      />
     </SafeAreaView>
   );
 };
