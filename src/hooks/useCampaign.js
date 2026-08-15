@@ -1,11 +1,13 @@
-// src/hooks/useCampaigns.js
+// src/hooks/useCampaign.js
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
 import {
   getCategories,
   getMyCampaigns,
   getCampaignDetail,
+  deleteCampaign,
+  getCampaignReview,
 } from '../services/campaignService';
 
 // Change this number to 8 if you want 8 urgent campaigns on home.
@@ -61,8 +63,6 @@ export const useUrgentCampaigns = ({
   });
 };
 
-
-
 // ─── All Campaigns Hook (Explore Screen) ────────────────────
 export const useAllCampaigns = ({ category = 'all', userId, isUrgent = false } = {}) => {
   return useQuery({
@@ -108,7 +108,6 @@ export const useAllCampaigns = ({ category = 'all', userId, isUrgent = false } =
     },
   });
 };
-
 
 export const useMyCampaigns = () => {
   return useQuery({
@@ -168,7 +167,6 @@ export const useCategories = () => {
   });
 };
 
-
 // ─── Campaign Detail Hook ────────────────────────────────────
 export const useCampaignDetail = (campaignId) => {
   return useQuery({
@@ -182,6 +180,150 @@ export const useCampaignDetail = (campaignId) => {
       return mapCampaignDetail(body.data);
     },
   });
+};
+
+// ─── Delete Campaign ─────────────────────────────────────────
+/**
+ * The raw body is returned untouched so the caller can distinguish a
+ * real "000" from a backend rejection that still arrives with HTTP 200,
+ * and caches are only invalidated on genuine success — refetching after
+ * a failed delete would just re-render the same list.
+ */
+export const useDeleteCampaign = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (campaignId) => deleteCampaign(campaignId),
+    retry: false,
+    onSuccess: (body) => {
+      if (body?.responseCode && body.responseCode !== '000') return;
+
+      queryClient.invalidateQueries({ queryKey: ['my-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['urgent-campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['all-campaigns'] });
+    },
+  });
+};
+
+// ─── Campaign Review (edit / resume) ─────────────────────────
+/**
+ * Fetched on demand as a mutation rather than a query: it fires from a
+ * button press, so a query would need an enabled flag plus an effect to
+ * navigate once data lands — which races with the fetch itself.
+ */
+export const useFetchCampaignReview = () => {
+  return useMutation({
+    mutationFn: (campaignId) => getCampaignReview(campaignId),
+    retry: false,
+  });
+};
+
+const CAMPAIGN_FLOW_SCREENS = {
+  1: 'CreateCampaign',
+  2: 'CampaignDetails',
+  3: 'PhotosDocuments',
+  4: 'ReviewSubmit',
+};
+
+/**
+ * stepNumber is the last COMPLETED step, so the user resumes at the one
+ * after it. Capped at 4 because ReviewSubmit is the final screen, and
+ * floored at 1 for a campaign that has nothing saved yet.
+ */
+export const resolveCampaignResumeStep = (data) => {
+  const completed = Number(data?.stepNumber);
+
+  if (!Number.isFinite(completed) || completed <= 0) return 1;
+
+  return Math.min(completed + 1, 4);
+};
+
+export const getCampaignFlowScreen = (step) =>
+  CAMPAIGN_FLOW_SCREENS[step] || CAMPAIGN_FLOW_SCREENS[1];
+
+const formatFlowDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const fileNameFromUrl = (url, fallback) => {
+  if (!url) return fallback;
+  try {
+    const parts = String(url).split('?')[0].split('/');
+    return decodeURIComponent(parts[parts.length - 1]) || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+/**
+ * Reshapes the review payload into the exact param names each screen of
+ * the creation flow already reads, so no screen has to learn a second
+ * data shape.
+ *
+ * Media comes back as remote URLs, which display fine but cannot be
+ * re-uploaded as multipart. They're passed as display-only and flagged
+ * with remoteMedia so step 3 can tell a restored file from a picked one.
+ */
+export const mapCampaignReviewToFlowParams = (data) => {
+  if (!data) return {};
+
+  const campaignId = data.campaignId ?? data.id;
+  const goalValue = Number(data.fundingGoal);
+
+  return {
+    campaignId: campaignId ? String(campaignId) : null,
+    editMode: true,
+
+    // Step 1
+    title: data.title || '',
+    category: data.category || '',
+    goal: Number.isFinite(goalValue) && goalValue > 0
+      ? String(Math.trunc(goalValue))
+      : '',
+    endDate: formatFlowDate(data.endDate),
+    endDateISO: data.endDate || null,
+    urgent: !!data.isUrgent,
+
+    // Step 2
+    shortDesc: data.shortDescription || '',
+    fullDesc: data.description || '',
+    beneficiary: data.beneficiaryName || '',
+    relationship: data.relationships || '',
+    province: data.province || '',
+    city: data.city || '',
+
+    // Step 3 — display only
+    coverUri: data.coverImage || null,
+    coverFile: null,
+    images: Array.isArray(data.additionalImages)
+      ? data.additionalImages.map((img, idx) => ({
+          id: String(img.id ?? `img_${idx}`),
+          uri: img.url,
+          isRemote: true,
+        }))
+      : [],
+    docs: Array.isArray(data.documents)
+      ? data.documents.map((doc, idx) => ({
+          id: String(doc.id ?? `doc_${idx}`),
+          uri: doc.url,
+          name: fileNameFromUrl(doc.url, `Document ${idx + 1}`),
+          size: 'Uploaded',
+          type: 'application/pdf',
+          isRemote: true,
+        }))
+      : [],
+    remoteMedia: true,
+
+    raw: data,
+  };
 };
 
 const mapUrgentCampaignToCard = (item) => {
@@ -222,7 +364,6 @@ const mapUrgentCampaignToCard = (item) => {
   };
 };
 
-
 const mapAllCampaignToCard = (item) => {
   const raisedAmount = Number(item?.totalRaised || 0);
   const goalAmount = Number(item?.fundingGoal || 0);
@@ -243,16 +384,16 @@ const mapAllCampaignToCard = (item) => {
     raised: raisedAmount, // Return number for CampaignCard
     goal: goalAmount,     // Return number for CampaignCard
     pct,
-    
+
     // For CampaignCard compatibility
     image: item?.coverImage || null,
     status: 'Active',
     daysLeft: item?.daysLeft || '30',
-    
+
     user: item?.beneficiaryName || item?.creatorName || 'Organizer',
     verified: item?.verified || false,
     badge: item?.isUrgent ? 'URGENT' : null,
-    
+
     isSaved: !!item?.isSaved, // Added isSaved flag
 
     raw: item,
@@ -274,9 +415,14 @@ const mapMyCampaignToCard = (item) => {
 
   const actionsMap = {
     Active: ['View', 'Withdraw'],
-    Pending: ['View'],
+    // Pending is read-only: nothing is editable while an admin has it
+    // under review, so there's no action worth surfacing.
+    Pending: [],
     Draft: ['Edit', 'Delete'],
-    Rejected: ['Edit & Resubmit', 'Delete'],
+    // Rejected campaigns are reopened from the rejection notification,
+    // which carries the specific rejectedStep. A generic resubmit button
+    // here has no way of knowing which step actually needs fixing.
+    Rejected: ['Delete'],
   };
 
   return {

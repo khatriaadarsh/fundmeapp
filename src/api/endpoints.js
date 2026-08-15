@@ -33,6 +33,9 @@ export const ENDPOINTS = {
      RESUBMIT_STEP1: '/campaign/rejected/step-one',
      RESUBMIT_STEP2: '/campaign/rejected/step-two',
      RESUBMIT_STEP3: '/campaign/rejected/step-three',
+     DELETE: (campaignId) => `/delete/campaign/${campaignId}`,
+     REVIEW: (campaignId) => `/campaign/${campaignId}/review`,
+
   },
 
   CATEGORY: {
@@ -73,6 +76,7 @@ RATING: {
 DONOR: {
   RECENT: (campaignId) => `/${campaignId}/recent-donors`,
   PROFILE: (donorId) => `/donor/profile/${donorId}`,
+  SUMMARY: (userId) => `/donor/summary/${userId}`,
 },
 };
 

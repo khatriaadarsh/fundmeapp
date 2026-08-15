@@ -17,6 +17,8 @@ import Icons from 'react-native-vector-icons/Feather';
 import { useAppContext } from '../context/AppContext';
 import { useProfileDetails } from '../hooks/useProfile';
 import { useNotificationList } from '../hooks/useNotifications';
+import { useCreatorStatistics } from '../hooks/useCreator';
+import { useDonorSummary } from '../hooks/useDonor';
 
 const { width: SW } = Dimensions.get('window');
 const sp = n => (SW / 375) * n;
@@ -38,6 +40,30 @@ const P = {
   greenLight: 'rgba(34,197,94,0.10)',
   orange: '#F59E0B',
   orangeLight: 'rgba(245,158,11,0.10)',
+};
+
+// PKR 6,650 / PKR 15.2K / PKR 2.4M — same abbreviated style used by the
+// home StatsRow, so the two never disagree on how a figure reads.
+const formatAmount = n => {
+  if (n === null || n === undefined) return 'N/A';
+  const num = Number(n);
+  if (isNaN(num)) return 'N/A';
+
+  if (num >= 1_000_000) {
+    return `PKR ${(num / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (num >= 1_000) {
+    return `PKR ${(num / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  }
+  return `PKR ${num.toLocaleString('en-PK')}`;
+};
+
+const formatCount = n => {
+  if (n === null || n === undefined) return 'N/A';
+  const num = Number(n);
+  if (isNaN(num)) return 'N/A';
+  if (num >= 1000) return `${(num / 1000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(num);
 };
 
 // NOTE: 'notif' intentionally has no static `badge` value anymore — it's
@@ -130,6 +156,11 @@ const ProfileScreen = ({ navigation }) => {
   const userRole = currentUser?.role || 'donor';
   const userId = currentUser?.id;
 
+  // Positive test rather than a donor allow-list: role arrives as
+  // "user", "donor", or undefined depending on where the session came
+  // from, so "anything that isn't a creator" is the only stable reading.
+  const isCreator = String(userRole).trim().toLowerCase() === 'creator';
+
   // Fetch full profile details — this is now the source of truth for the
   // header (image, name, verified badge), not just the login response.
   const { data: profileData, isLoading } = useProfileDetails(userId);
@@ -137,6 +168,53 @@ const ProfileScreen = ({ navigation }) => {
   // Same notification data source as NotificationsScreen, used here only
   // to derive the unread count for the menu badge.
   const { data: rawNotifications = [] } = useNotificationList(userId);
+
+  // Both stat hooks mount unconditionally — hooks can't sit behind an if
+  // — but each is gated by `enabled`, so only the one matching the role
+  // actually issues a request.
+  const { data: creatorStats, isLoading: creatorStatsLoading } =
+    useCreatorStatistics(userId, { enabled: isCreator });
+
+  const { data: donorStats, isLoading: donorStatsLoading } = useDonorSummary(
+    userId,
+    { enabled: !isCreator },
+  );
+
+  const statsLoading = isCreator ? creatorStatsLoading : donorStatsLoading;
+
+  const stats = useMemo(() => {
+    if (isCreator) {
+      return [
+        {
+          key: 'campaigns',
+          val: formatCount(creatorStats?.totalCampaigns),
+          lbl: 'Campaigns',
+          icon: 'target',
+        },
+        {
+          key: 'raised',
+          val: formatAmount(creatorStats?.totalRaised),
+          lbl: 'Raised',
+          icon: 'trending-up',
+        },
+      ];
+    }
+
+    return [
+      {
+        key: 'donated',
+        val: formatAmount(donorStats?.totalAmount),
+        lbl: 'Donated',
+        icon: 'copy',
+      },
+      {
+        key: 'donations',
+        val: formatCount(donorStats?.totalDonations),
+        lbl: 'Donations',
+        icon: 'heart',
+      },
+    ];
+  }, [isCreator, creatorStats, donorStats]);
 
   // Unread count for the "Notifications" menu badge. Adjust the field
   // check below if your API uses a different flag than `isRead`/`read`.
@@ -209,7 +287,7 @@ const ProfileScreen = ({ navigation }) => {
           navigation.navigate('TermsConditions');
           break;
         default:
-          console.log('Menu:', id);
+          break;
       }
     },
     [navigation, profileData, currentUser, userId],
@@ -288,33 +366,32 @@ const ProfileScreen = ({ navigation }) => {
       </LinearGradient>
 
       <View style={styles.statsCard}>
-        <View style={styles.statItem}>
-          <View style={styles.statTopRow}>
-            <Text style={styles.statVal}>PKR 75,000</Text>
-            <Icons
-              name="copy"
-              size={sp(13)}
-              color={P.light}
-              style={{ marginLeft: sp(4) }}
-            />
-          </View>
-          <Text style={styles.statLbl}>Donated</Text>
-        </View>
+        {stats.map((s, i) => (
+          <React.Fragment key={s.key}>
+            {i > 0 && <View style={styles.statDivider} />}
 
-        <View style={styles.statDivider} />
-
-        <View style={styles.statItem}>
-          <View style={styles.statTopRow}>
-            <Text style={styles.statVal}>15</Text>
-            <Icons
-              name="heart"
-              size={sp(13)}
-              color={P.light}
-              style={{ marginLeft: sp(4) }}
-            />
-          </View>
-          <Text style={styles.statLbl}>Donations</Text>
-        </View>
+            <View style={styles.statItem}>
+              <View style={styles.statTopRow}>
+                {statsLoading ? (
+                  <ActivityIndicator size="small" color={P.teal} />
+                ) : (
+                  <>
+                    <Text style={styles.statVal} numberOfLines={1}>
+                      {s.val}
+                    </Text>
+                    <Icons
+                      name={s.icon}
+                      size={sp(13)}
+                      color={P.light}
+                      style={{ marginLeft: sp(4) }}
+                    />
+                  </>
+                )}
+              </View>
+              <Text style={styles.statLbl}>{s.lbl}</Text>
+            </View>
+          </React.Fragment>
+        ))}
       </View>
 
       <ScrollView
@@ -464,6 +541,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: sp(3),
+    minHeight: sp(20),
   },
   statVal: {
     fontSize: sp(15),

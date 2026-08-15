@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 
 import Icons from 'react-native-vector-icons/Feather';
@@ -14,9 +14,40 @@ const fmtAmount = n => {
   return `${n}`;
 };
 
+/**
+ * ActionLink
+ *
+ * Split out so the press target can carry its own padding and hitSlop.
+ * A bare <Text> inside a TouchableOpacity is only as tall as the glyphs,
+ * which on Android leaves a target well under the 48dp minimum — the tap
+ * lands beside the text and silently does nothing.
+ */
+const ActionLink = memo(({ label, danger, onPress }) => (
+  <TouchableOpacity
+    activeOpacity={0.7}
+    onPress={onPress}
+    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    style={styles.actionBtn}
+  >
+    <Text style={[styles.actionLink, danger && styles.actionDanger]}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+));
+
 const CampaignCard = memo(({ item, onAction }) => {
   const status = STATUS_CONFIG[item.status] || STATUS_CONFIG.Draft;
-  const hasActions = item.actions?.length > 0;
+  const actions = Array.isArray(item?.actions) ? item.actions : [];
+  const hasActions = actions.length > 0;
+
+  const handlePress = useCallback(
+    act => {
+      if (typeof onAction === 'function') {
+        onAction(act);
+      }
+    },
+    [onAction],
+  );
 
   return (
     <View style={styles.card}>
@@ -24,11 +55,11 @@ const CampaignCard = memo(({ item, onAction }) => {
       <View style={styles.topRow}>
         {/* Thumbnail */}
         <View style={styles.thumbWrap}>
-          {item.image ? (
+          {item.coverImage || item.image ? (
             <Image
-              source={{ uri: item.coverImage}}
+              source={{ uri: item.coverImage || item.image }}
               style={styles.thumb}
-               resizeMode="contain"
+              resizeMode="contain"
             />
           ) : (
             <View style={[styles.thumb, styles.thumbFallback]}>
@@ -102,23 +133,15 @@ const CampaignCard = memo(({ item, onAction }) => {
           <View style={styles.divider} />
 
           <View style={styles.actionRow}>
-            {item.actions.map((act, i) => (
+            {actions.map((act, i) => (
               <React.Fragment key={act}>
                 {i > 0 && <View style={styles.dot} />}
 
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => onAction(act)}
-                >
-                  <Text
-                    style={[
-                      styles.actionLink,
-                      act === 'Delete' && styles.actionDanger,
-                    ]}
-                  >
-                    {act}
-                  </Text>
-                </TouchableOpacity>
+                <ActionLink
+                  label={act}
+                  danger={act === 'Delete'}
+                  onPress={() => handlePress(act)}
+                />
               </React.Fragment>
             ))}
           </View>
@@ -148,22 +171,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
 
-  // thumbWrap: {
-  //   width: sp(82),
-  //   height: sp(82),
-  //   borderRadius: sp(12),
-  //   overflow: 'hidden',
-  // },
-
   thumbWrap: {
-  width: sp(82),
-  height: sp(82),
-  borderRadius: sp(12),
-  overflow: 'hidden',
-  backgroundColor: '#F8FAFC',
-  alignItems: 'center',
-  justifyContent: 'center',
-},
+    width: sp(82),
+    height: sp(82),
+    borderRadius: sp(12),
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   thumb: {
     width: '100%',
@@ -273,6 +289,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+  },
+
+  actionBtn: {
+    paddingVertical: sp(6),
+    paddingHorizontal: sp(2),
   },
 
   actionLink: {

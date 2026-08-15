@@ -1,8 +1,9 @@
 // src/components/StatsRow.jsx
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { P, sp } from '../theme/theme';
 import { useCreatorStatistics } from '../hooks/useCreator';
+import { useDonorSummary } from '../hooks/useDonor';
 
 // "N/A" for null/undefined — matches the pattern used elsewhere in the app.
 const naFallback = (value) =>
@@ -28,19 +29,52 @@ const formatCount = (n) => {
   return String(num);
 };
 
-const StatsRow = memo(({ userId }) => {
-  const { data, isLoading } = useCreatorStatistics(userId);
+/**
+ * Same three-cell card for both roles, different source and labels.
+ *
+ * Both hooks are called unconditionally because hooks can't sit behind
+ * an if — but each is gated with `enabled`, so exactly one request goes
+ * out. Without that gate a donor would still hit /creator/statistics on
+ * every home load and get a guaranteed 403/404 back.
+ */
+const StatsRow = memo(({ userId, role }) => {
+  const isCreator = String(role || '').toLowerCase() === 'creator';
 
-  const stats = [
-    { val: formatAmount(data?.totalRaised), lbl: 'Raised' },
-    { val: formatCount(data?.totalDonors), lbl: 'Donors' },
-    { val: formatCount(data?.totalCampaigns), lbl: 'Campaigns' },
-  ];
+  const {
+    data: creatorStats,
+    isLoading: creatorLoading,
+  } = useCreatorStatistics(userId, { enabled: isCreator });
+
+  const {
+    data: donorStats,
+    isLoading: donorLoading,
+  } = useDonorSummary(userId, { enabled: !isCreator });
+
+  const isLoading = isCreator ? creatorLoading : donorLoading;
+
+  const stats = useMemo(() => {
+    if (isCreator) {
+      return [
+        { val: formatAmount(creatorStats?.totalRaised), lbl: 'Raised' },
+        { val: formatCount(creatorStats?.totalDonors), lbl: 'Donors' },
+        { val: formatCount(creatorStats?.totalCampaigns), lbl: 'Campaigns' },
+      ];
+    }
+
+    return [
+      { val: formatAmount(donorStats?.totalAmount), lbl: 'Donated' },
+      { val: formatCount(donorStats?.totalDonations), lbl: 'Donations' },
+      {
+        val: formatCount(donorStats?.totalCampaignsSupported),
+        lbl: 'Campaigns',
+      },
+    ];
+  }, [isCreator, creatorStats, donorStats]);
 
   return (
     <View style={stSt.card}>
       {stats.map((s, i) => (
-        <View key={i} style={[stSt.item, i < 2 && stSt.divider]}>
+        <View key={s.lbl} style={[stSt.item, i < 2 && stSt.divider]}>
           {isLoading ? (
             <ActivityIndicator size="small" color={P.teal} style={stSt.loader} />
           ) : (

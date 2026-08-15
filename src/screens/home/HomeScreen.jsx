@@ -79,6 +79,7 @@ const HomeScreen = ({ navigation }) => {
     data: urgentData = { campaigns: [], isNotFound: false, message: '' },
     isLoading: urgentLoading,
     isError: urgentError,
+    error: urgentErrorObj,
     refetch: refetchUrgentCampaigns,
   } = useUrgentCampaigns({
     category: activeCat,
@@ -155,24 +156,44 @@ const HomeScreen = ({ navigation }) => {
       );
     }
 
+    // "Campaign not found" (023) is a valid empty result, not a failure.
+    // It can arrive two ways depending on the interceptor: mapped by the
+    // hook's select into isNotFound, or rejected as an error carrying the
+    // same code — so both paths are treated as empty rather than broken.
+    const errorBody =
+      urgentErrorObj?.response?.data || urgentErrorObj?.raw || null;
+
+    const isNotFoundError =
+      errorBody?.responseCode === '023' || urgentErrorObj?.code === '023';
+
+    const isEmptyResult =
+      urgentData?.isNotFound ||
+      urgentData?.campaigns?.length === 0 ||
+      isNotFoundError;
+
+    if (isEmptyResult) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyIcon}>🔍</Text>
+          <Text style={styles.emptyTitle}>Campaign Not Found</Text>
+          <Text style={styles.emptySubtitle}>
+            {errorBody?.responseMessage ||
+              urgentData?.message ||
+              'Campaign not found'}
+          </Text>
+        </View>
+      );
+    }
+
     if (urgentError) {
       return (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>⚠️</Text>
           <Text style={styles.emptyTitle}>Something went wrong</Text>
-          <Text style={styles.emptySubtitle}>Unable to load urgent campaigns</Text>
-        </View>
-      );
-    }
-
-    // Handle "Not Found" response code 023 or empty campaigns
-    if (urgentData?.isNotFound || urgentData?.campaigns?.length === 0) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>Not Found</Text>
           <Text style={styles.emptySubtitle}>
-            {urgentData?.message || 'Campaign not found'}
+            {errorBody?.responseMessage ||
+              urgentErrorObj?.message ||
+              'Unable to load urgent campaigns'}
           </Text>
         </View>
       );
@@ -217,9 +238,10 @@ const HomeScreen = ({ navigation }) => {
         <SearchBar value={search} onChange={handleSearchChange} />
         <HeroBanner />
 
-        {/* userId passed from currentUser so StatsRow can fetch this
-            creator's live stats from /creator/statistics/{userId} */}
-        <StatsRow userId={currentUser?.id} />
+        {/* userId + role passed from currentUser so StatsRow can fetch
+            the right stats: /creator/statistics/{userId} for creators,
+            /donor/summary/{userId} for everyone else. */}
+        <StatsRow userId={currentUser?.id} role={currentUser?.role} />
 
         <SectionHeader
           title="Categories"

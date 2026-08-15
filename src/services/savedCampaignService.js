@@ -78,7 +78,21 @@ export const unsaveCampaign = async (favouriteId) => {
 };
 
 /**
- * Save a campaign 
+ * Backend success codes.
+ *
+ * "023" means the record wasn't found — for an unsave that's the desired
+ * end state, not a failure, so it's treated as success rather than
+ * surfacing a "Failed to unsave" popup over a row that just disappeared.
+ */
+const SUCCESS_CODES = ['000', '0', '00', '200'];
+
+const isSuccessCode = (code) =>
+  code === undefined || code === null || code === ''
+    ? true
+    : SUCCESS_CODES.includes(String(code));
+
+/**
+ * Save a campaign
  * POST /api/v1/save/campaign
  */
 export const saveCampaign = async ({ userId, campaignId }) => {
@@ -90,15 +104,22 @@ export const saveCampaign = async ({ userId, campaignId }) => {
 
   try {
     const res = await apiClient.post(endpoint, { userId, campaignId });
-    const data = res.data;
+    const data = res?.data;
 
-    if (data?.responseCode && data.responseCode !== '000') {
-      throw new Error(data.responseMessage || 'Failed to save campaign');
+    if (!isSuccessCode(data?.responseCode)) {
+      throw new Error(data?.responseMessage || 'Failed to save campaign');
     }
 
     return data;
   } catch (error) {
-    const errorData = error?.response?.data;
+    const errorData = error?.response?.data || error?.raw;
+
+    // Some interceptors reject any non-2xx/non-000 body, so the
+    // already-saved case can arrive here rather than in the block above.
+    if (errorData?.responseCode === '023') {
+      return errorData;
+    }
+
     if (errorData?.responseMessage) {
       throw new Error(errorData.responseMessage);
     }
@@ -119,15 +140,25 @@ export const unsaveCampaignByCampaignId = async ({ userId, campaignId }) => {
 
   try {
     const res = await apiClient.get(endpoint);
-    const data = res.data;
+    const data = res?.data;
 
-    if (data?.responseCode && data.responseCode !== '000') {
-      throw new Error(data.responseMessage || 'Failed to unsave campaign');
+    // Already unsaved is the outcome the user asked for.
+    if (data?.responseCode === '023') {
+      return data;
+    }
+
+    if (!isSuccessCode(data?.responseCode)) {
+      throw new Error(data?.responseMessage || 'Failed to unsave campaign');
     }
 
     return data;
   } catch (error) {
-    const errorData = error?.response?.data;
+    const errorData = error?.response?.data || error?.raw;
+
+    if (errorData?.responseCode === '023') {
+      return errorData;
+    }
+
     if (errorData?.responseMessage) {
       throw new Error(errorData.responseMessage);
     }

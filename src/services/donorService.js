@@ -35,3 +35,24 @@ export const getDonorProfile = async (donorId) => {
     throw error;
   }
 };
+
+/**
+ * Donor Summary
+ * GET /donor/summary/{userId}
+ *
+ * The donor-side counterpart to /creator/statistics/{userId}: same slot
+ * on the home screen, different numbers.
+ */
+export const getDonorSummary = async (userId) => {
+  if (!userId) {
+    throw new Error('userId is required');
+  }
+
+  const path =
+    typeof ENDPOINTS?.DONOR?.SUMMARY === 'function'
+      ? ENDPOINTS.DONOR.SUMMARY(userId)
+      : `/donor/summary/${userId}`;
+
+  const res = await apiClient.get(path);
+  return res?.data;
+};

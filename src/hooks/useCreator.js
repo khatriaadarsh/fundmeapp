@@ -152,8 +152,13 @@ export const useCreatorRatings = (creatorId) => {
 
 /**
  * Hook to fetch creator statistics (totalCampaigns, totalDonors, totalRaised)
+ *
+ * `enabled` is exposed because StatsRow renders the same card for both
+ * roles and must call this hook on every render — hooks can't sit behind
+ * an if. Without the gate, a donor would fire /creator/statistics on
+ * every home load and get a guaranteed error back.
  */
-export const useCreatorStatistics = (userId) => {
+export const useCreatorStatistics = (userId, { enabled = true } = {}) => {
   return useQuery({
     queryKey: ['creator-statistics', String(userId)],
     queryFn: async () => {
@@ -163,7 +168,7 @@ export const useCreatorStatistics = (userId) => {
       }
       throw new Error(response?.responseMessage || 'Failed to load creator statistics');
     },
-    enabled: !!userId,
+    enabled: !!userId && enabled,
     staleTime: 1000 * 30,
   });
 };

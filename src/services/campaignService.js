@@ -4,6 +4,16 @@ import apiClient from '../api/client';
 import { ENDPOINTS } from '../api/endpoints';
 import { getUserId } from '../config/session';
 
+/**
+ * Falls back to a literal path when an endpoint constant is missing.
+ *
+ * A missing key makes apiClient.get(undefined) fail before any request
+ * is sent, surfacing as "Cannot read property of undefined" rather than
+ * anything that points at configuration.
+ */
+const resolveCampaignPath = (buildFn, fallbackPath) =>
+  typeof buildFn === 'function' ? buildFn : () => fallbackPath;
+
 export const getUrgentCampaigns = async ({ category } = {}) => {
   const params = { isUrgent: true };
 
@@ -202,6 +212,48 @@ export const submitCampaignForReview = async (campaignId) => {
   );
 
   return res.data;
+};
+
+/**
+ * Delete Campaign
+ * GET /delete/campaign/{campaignId}
+ *
+ * A GET despite being destructive — that's the backend contract.
+ */
+export const deleteCampaign = async (campaignId) => {
+  if (!campaignId) {
+    throw new Error('campaignId is required');
+  }
+
+  const build = resolveCampaignPath(
+    ENDPOINTS?.CAMPAIGNS?.DELETE,
+    `/delete/campaign/${campaignId}`,
+  );
+
+  const res = await apiClient.get(build(campaignId));
+  return res?.data;
+};
+
+/**
+ * Get Campaign Review (everything captured so far)
+ * GET /campaign/{campaignId}/review
+ *
+ * Distinct from CAMPAIGNS.DETAIL: that one is the public-facing
+ * projection, this returns the raw creation-flow fields plus stepNumber
+ * so an in-progress campaign can be reopened without retyping anything.
+ */
+export const getCampaignReview = async (campaignId) => {
+  if (!campaignId) {
+    throw new Error('campaignId is required');
+  }
+
+  const build = resolveCampaignPath(
+    ENDPOINTS?.CAMPAIGNS?.REVIEW,
+    `/campaign/${campaignId}/review`,
+  );
+
+  const res = await apiClient.get(build(campaignId));
+  return res?.data;
 };
 
 // ─── Resubmit after rejection ───────────────────────────────

@@ -1,6 +1,6 @@
 // src/hooks/useDonor.js
 import { useQuery } from '@tanstack/react-query';
-import { getRecentDonors, getDonorProfile } from '../services/donorService';
+import { getRecentDonors, getDonorProfile,getDonorSummary } from '../services/donorService';
 
 const orNA = (value) => {
   if (value === null || value === undefined || value === '') return 'N/A';
@@ -66,6 +66,35 @@ export const useDonorProfile = (donorId) => {
         totalDonated: d.totalDonated ?? d.amountDonated ?? null,
         memberSince: d.memberSince ?? d.joinedDate ?? null,
         totalCampaigns: d.totalCampaigns ?? d.campaignsSupported ?? 0,
+        raw: d,
+      };
+    },
+  });
+};
+
+/**
+ * Donor summary for the home stats row.
+ *
+ * `enabled` is exposed so the caller can keep this mounted but dormant:
+ * StatsRow has to call both this and useCreatorStatistics on every
+ * render (hooks can't be conditional), and firing the wrong one would
+ * mean a guaranteed-useless request on every home load.
+ */
+export const useDonorSummary = (userId, { enabled = true } = {}) => {
+  return useQuery({
+    queryKey: ['donor-summary', String(userId || '')],
+    queryFn: () => getDonorSummary(userId),
+    enabled: !!userId && enabled,
+    retry: false,
+    select: (body) => {
+      if (body?.responseCode !== '000' || !body?.data) return null;
+
+      const d = body.data;
+      return {
+        donorId: d.donorId ?? null,
+        totalCampaignsSupported: Number(d.totalCampaignsSupported ?? 0),
+        totalDonations: Number(d.totalDonations ?? 0),
+        totalAmount: Number(d.totalAmount ?? 0),
         raw: d,
       };
     },
