@@ -232,7 +232,7 @@ const HomeScreen = ({ navigation }) => {
         }
       >
         <SearchBar value={search} onChange={handleSearchChange} />
-        <HeroBanner />
+        <HeroBanner onExplore={() => navigation.navigate('ExploreScreen')} />
 
         {/* userId + role passed from currentUser so StatsRow can fetch
             the right stats: /creator/statistics/{userId} for creators,
@@ -258,7 +258,9 @@ const HomeScreen = ({ navigation }) => {
         <SectionHeader
           title="🔥 Urgent Campaigns"
           linkText="See All"
-          onPress={() => navigation.navigate('ExploreScreen', { category: activeCat })}
+          onPress={() =>
+            navigation.navigate('ExploreScreen', { category: activeCat })
+          }
         />
 
         {renderUrgentCampaigns()}

@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { P, sp } from '../theme/theme';
 
-const HeroBanner = memo(() => (
+const HeroBanner = memo(({ onExplore }) => (
   <LinearGradient
     colors={[P.bannerFrom, P.bannerTo]}
     start={{ x: 0, y: 0 }}
@@ -18,7 +18,11 @@ const HeroBanner = memo(() => (
     </View>
     <Text style={bnSt.title}>{"Fund Someone's\nFuture Today"}</Text>
     <Text style={bnSt.sub}>100% goes to those in need</Text>
-    <TouchableOpacity style={bnSt.exploreBtn} activeOpacity={0.8}>
+    <TouchableOpacity
+      style={bnSt.exploreBtn}
+      activeOpacity={0.8}
+      onPress={onExplore}
+    >
       <Text style={bnSt.exploreTxt}>Explore →</Text>
     </TouchableOpacity>
   </LinearGradient>
