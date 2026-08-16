@@ -31,7 +31,7 @@ import DonorInfoModal from './DonorInfoModal';
 import ResponseModal from '../../components/ResponseModal';
 
 // ── API wiring ──────────────────────────────────────────────
-import { useCampaignDetail } from '../../hooks/useCampaign';
+import { useCampaignDetail, useCampaignUpdates } from '../../hooks/useCampaign';
 import { useRecentDonors, useDonorProfile } from '../../hooks/useDonor';
 import { useAppContext } from '../../context/AppContext';
 
@@ -103,16 +103,63 @@ const formatDonationDateTime = iso => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// ⚠️ DEMO / HARDCODED DATA — "Recent Updates" is still not
-// covered by an API per prior instructions. Recent Donors is
-// now fully live (see useRecentDonors below).
-// ═══════════════════════════════════════════════════════════
-const DEMO = {
-  hoursLeft: 19,
-  update:
-    'Campaign update: First batch of relief funds has been distributed. 15 families received temporary tents today. Thank you 🙏',
-  updateAge: 'Posted 2 days ago',
+/**
+ * Normalises the backend's remainingTime string into a compact pill label.
+ *
+ * The API sends a human phrase ("216 days", "5 hours"), which is too long
+ * for the pill and inconsistent in unit. Parsing the number and rescaling
+ * it keeps the pill short and the unit sensible — 216 days reads better
+ * as "7mo left" than "216d left".
+ */
+const formatRemainingTime = remainingTime => {
+  if (!remainingTime) return null;
+
+  const raw = String(remainingTime).trim();
+
+  if (/^(ended|expired|closed)$/i.test(raw)) return 'Ended';
+
+  const match = raw.match(/(-?\d+(?:\.\d+)?)\s*([a-z]+)/i);
+  if (!match) return raw;
+
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+
+  if (!Number.isFinite(value) || value <= 0) return 'Ended';
+
+  if (unit.startsWith('year')) {
+    return value === 1 ? '1y left' : `${value}y left`;
+  }
+
+  if (unit.startsWith('month')) {
+    return value === 1 ? '1mo left' : `${value}mo left`;
+  }
+
+  if (unit.startsWith('hour')) {
+    if (value >= 24) {
+      const days = Math.floor(value / 24);
+      return days === 1 ? '1d left' : `${days}d left`;
+    }
+    return value === 1 ? '1h left' : `${value}h left`;
+  }
+
+  if (unit.startsWith('min')) {
+    return value === 1 ? '1m left' : `${value}m left`;
+  }
+
+  // Days — rescaled upward so long-running campaigns stay readable.
+  if (unit.startsWith('day')) {
+    if (value >= 365) {
+      const years = Math.floor(value / 365);
+      return years === 1 ? '1y left' : `${years}y left`;
+    }
+    if (value >= 30) {
+      const months = Math.floor(value / 30);
+      return months === 1 ? '1mo left' : `${months}mo left`;
+    }
+    return value === 1 ? '1d left' : `${value}d left`;
+  }
+
+  return raw;
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -335,7 +382,7 @@ const h = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════
 // PROGRESS CARD — driven by real raised/goal/pct/donorsCount
 // ═══════════════════════════════════════════════════════════
-const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
+const ProgressCard = memo(({ raised, goal, pct, donorsCount, timeLeft }) => {
   const fillAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -350,6 +397,14 @@ const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
     inputRange: [0, 1],
     outputRange: ['0%', `${pct}%`],
   });
+
+  // The time pill is dropped entirely when the backend sends no
+  // remainingTime — a placeholder would imply a deadline that isn't set.
+  const pills = [
+    { icon: 'users', label: `${donorsCount} Donors` },
+    ...(timeLeft ? [{ icon: 'clock', label: timeLeft }] : []),
+    { icon: 'percent', label: `${pct}% funded` },
+  ];
 
   return (
     <View style={pg.card}>
@@ -376,11 +431,7 @@ const ProgressCard = memo(({ raised, goal, pct, donorsCount, hoursLeft }) => {
       </View>
 
       <View style={pg.pillRow}>
-        {[
-          { icon: 'users', label: `${donorsCount} Donors` },
-          { icon: 'clock', label: `${hoursLeft}h left` },
-          { icon: 'percent', label: `${pct}% funded` },
-        ].map(p => (
+        {pills.map(p => (
           <View key={p.label} style={pg.pill}>
             <Icons name={p.icon} size={scale(12)} color={C.gray} />
             <Text style={pg.pillTxt}>{p.label}</Text>
@@ -911,20 +962,32 @@ const soc = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════
-// UPDATE CARD (still demo — no API for this yet)
+// UPDATES — creator progress posts, newest first
 // ═══════════════════════════════════════════════════════════
-const UpdateCard = memo(({ updateText, updateAge }) => (
-  <View style={uc.wrap}>
-    <Text style={uc.heading}>Recent Updates</Text>
-    <View style={uc.card}>
-      <View style={uc.accent} />
-      <View style={uc.content}>
-        <Text style={uc.txt}>{updateText}</Text>
-        <Text style={uc.age}>{updateAge}</Text>
-      </View>
+const UpdateCard = memo(({ updates }) => {
+  // Hidden entirely when empty: an empty-state block here would draw
+  // attention to something the donor can't act on.
+  if (!updates || updates.length === 0) return null;
+
+  return (
+    <View style={uc.wrap}>
+      <Text style={uc.heading}>Recent Updates</Text>
+
+      {updates.map((item, idx) => (
+        <View
+          key={item.id}
+          style={[uc.card, idx < updates.length - 1 && uc.cardSpacing]}
+        >
+          <View style={uc.accent} />
+          <View style={uc.content}>
+            <Text style={uc.txt}>{item.text}</Text>
+            {!!item.age && <Text style={uc.age}>{item.age}</Text>}
+          </View>
+        </View>
+      ))}
     </View>
-  </View>
-));
+  );
+});
 
 const uc = StyleSheet.create({
   wrap: { marginBottom: scale(16) },
@@ -941,6 +1004,7 @@ const uc = StyleSheet.create({
     borderRadius: scale(12),
     overflow: 'hidden',
   },
+  cardSpacing: { marginBottom: scale(10) },
   accent: { width: scale(4), backgroundColor: C.indigo },
   content: { flex: 1, padding: scale(14) },
   txt: {
@@ -1252,6 +1316,10 @@ const CampaignDetail = ({ navigation, route }) => {
   const donorsList = donorsData?.donors || [];
   const totalDonors = donorsData?.totalDonors ?? 0;
 
+  // ── Campaign updates — live data ─────────────────────────
+  const { data: updates = [], refetch: refetchUpdates } =
+    useCampaignUpdates(campaignId);
+
   // ── Logged-in user, to detect campaign ownership ──────────
   const { currentUser } = useAppContext();
 
@@ -1265,11 +1333,11 @@ const CampaignDetail = ({ navigation, route }) => {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([refetch(), refetchDonors()]);
+      await Promise.all([refetch(), refetchDonors(), refetchUpdates()]);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetch, refetchDonors]);
+  }, [refetch, refetchDonors, refetchUpdates]);
 
   // ── Auto-refresh whenever this screen comes back into focus ─
   // Catches the "just donated, navigated back" case — raised
@@ -1280,6 +1348,7 @@ const CampaignDetail = ({ navigation, route }) => {
       if (campaignId) {
         refetch();
         refetchDonors();
+        refetchUpdates();
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [campaignId]),
@@ -1345,12 +1414,12 @@ const CampaignDetail = ({ navigation, route }) => {
     try {
       await Linking.openURL(doc.url);
     } catch (err) {
-      console.error('🔴 [CampaignDetail] Open document error:', err?.message);
+      const body = err?.response?.data || err?.raw;
       setErrorModal({
         visible: true,
-        code: err?.response?.data?.responseCode || err?.code || '',
+        code: body?.responseCode || err?.code || '',
         message:
-          err?.response?.data?.responseMessage ||
+          body?.responseMessage ||
           err?.message ||
           'Could not open the document. Please try again.',
       });
@@ -1473,14 +1542,14 @@ const CampaignDetail = ({ navigation, route }) => {
             goal={data.goal}
             pct={data.pct}
             donorsCount={totalDonors}
-            hoursLeft={DEMO.hoursLeft}
+            timeLeft={formatRemainingTime(data.remainingTime)}
           />
           <DonateButton onPress={handleDonate} />
           <CreatorCard creator={data.creator} onViewProfile={handleProfile} />
           <StorySection story={data.story} />
           <MediaGallery media={data.media} onItemPress={handleGalleryPress} />
           <SocialProof donorsList={donorsList} donorsCount={totalDonors} />
-          <UpdateCard updateText={DEMO.update} updateAge={DEMO.updateAge} />
+          <UpdateCard updates={updates} />
 
           <View style={s.section}>
             <Text style={s.sectionTitle}>Recent Donors</Text>

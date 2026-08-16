@@ -322,3 +322,54 @@ export const resubmitCampaignStep3 = async (payload) => {
 
   return res.data;
 };
+
+/**
+ * Get Campaign Updates
+ * GET /campaign-updates/{campaignId}
+ *
+ * Returns the creator's progress posts, newest first. An empty list is a
+ * normal state — most campaigns have no updates yet.
+ */
+export const getCampaignUpdates = async (campaignId) => {
+  if (!campaignId) {
+    throw new Error('campaignId is required');
+  }
+
+  const build = resolveCampaignPath(
+    ENDPOINTS?.CAMPAIGNS?.UPDATES,
+    `/campaign-updates/${campaignId}`,
+  );
+
+  const res = await apiClient.get(build(campaignId));
+  return res?.data;
+};
+
+/**
+ * Post a Campaign Update
+ * POST /campaign-updates  (application/json)
+ *
+ * Creator-authored progress note. userId is sent explicitly rather than
+ * inferred server-side, matching the contract of the other write
+ * endpoints in this service.
+ */
+export const createCampaignUpdate = async ({ campaignId, userId, update }) => {
+  if (!campaignId) throw new Error('campaignId is required');
+  if (!userId) throw new Error('userId is required');
+  if (!update || !String(update).trim()) {
+    throw new Error('update text is required');
+  }
+
+  const path =
+    typeof ENDPOINTS?.CAMPAIGNS?.CREATE_UPDATE === 'string' &&
+    ENDPOINTS.CAMPAIGNS.CREATE_UPDATE
+      ? ENDPOINTS.CAMPAIGNS.CREATE_UPDATE
+      : '/campaign-updates';
+
+  const res = await apiClient.post(path, {
+    campaignId: Number(campaignId),
+    userId: Number(userId),
+    update: String(update).trim(),
+  });
+
+  return res?.data;
+};

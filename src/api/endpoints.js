@@ -35,6 +35,9 @@ export const ENDPOINTS = {
      RESUBMIT_STEP3: '/campaign/rejected/step-three',
      DELETE: (campaignId) => `/delete/campaign/${campaignId}`,
      REVIEW: (campaignId) => `/campaign/${campaignId}/review`,
+     UPDATES: (campaignId) => `/campaign-updates/${campaignId}`,
+     CREATE_UPDATE: '/campaign-updates',
+
 
   },
 

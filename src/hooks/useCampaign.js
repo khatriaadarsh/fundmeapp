@@ -8,6 +8,8 @@ import {
   getCampaignDetail,
   deleteCampaign,
   getCampaignReview,
+  getCampaignUpdates,
+    createCampaignUpdate,
 } from '../services/campaignService';
 
 // Change this number to 8 if you want 8 urgent campaigns on home.
@@ -182,6 +184,76 @@ export const useCampaignDetail = (campaignId) => {
   });
 };
 
+// ─── Campaign Updates ────────────────────────────────────────
+/**
+ * Creator progress posts for a campaign.
+ *
+ * "Not found" resolves to an empty array rather than an error: a
+ * campaign with no updates yet is the common case, and the section
+ * simply hides itself instead of reporting a failure.
+ */
+export const useCampaignUpdates = (campaignId) => {
+  return useQuery({
+    queryKey: ['campaign-updates', String(campaignId || '')],
+    queryFn: async () => {
+      try {
+        return await getCampaignUpdates(campaignId);
+      } catch (error) {
+        const code = String(
+          error?.code ?? error?.response?.data?.responseCode ?? '',
+        );
+        const message = String(
+          error?.message ?? error?.response?.data?.responseMessage ?? '',
+        );
+
+        if (code === '023' || /not\s*found/i.test(message)) {
+          return { responseCode: '023', data: [] };
+        }
+        throw error;
+      }
+    },
+    enabled: !!campaignId,
+    retry: false,
+    select: (body) => {
+      if (body?.responseCode !== '000' || !Array.isArray(body?.data)) {
+        return [];
+      }
+
+      return body.data.map((item, idx) => ({
+        id: String(item?.id ?? idx),
+        campaignId: item?.campaignId ?? null,
+        userId: item?.userId ?? null,
+        text: item?.update || '',
+        createdDate: item?.createdDate || null,
+        age: item?.updateAge || '',
+      }));
+    },
+  });
+};
+
+/**
+ * Post a campaign update.
+ *
+ * Invalidates the update list for this campaign on success so the new
+ * post appears immediately if the creator opens the detail screen —
+ * only on a genuine "000", since the backend returns failures with a
+ * 200 and refetching after one would just re-render the same list.
+ */
+export const useCreateCampaignUpdate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (vars) => createCampaignUpdate(vars),
+    retry: false,
+    onSuccess: (body, variables) => {
+      if (body?.responseCode && body.responseCode !== '000') return;
+
+      queryClient.invalidateQueries({
+        queryKey: ['campaign-updates', String(variables?.campaignId ?? '')],
+      });
+    },
+  });
+};
 // ─── Delete Campaign ─────────────────────────────────────────
 /**
  * The raw body is returned untouched so the caller can distinguish a
@@ -414,7 +486,7 @@ const mapMyCampaignToCard = (item) => {
   const status = statusMap[item?.campaignStatus] || 'Draft';
 
   const actionsMap = {
-    Active: ['View', 'Withdraw'],
+    Active: ['View','Post Update', 'Withdraw'],
     // Pending is read-only: nothing is editable while an admin has it
     // under review, so there's no action worth surfacing.
     Pending: [],
@@ -478,7 +550,7 @@ const mapCampaignDetail = (item) => {
     raised: raisedAmount,
     goal: goalAmount,
     pct,
-
+    remainingTime: item?.remainingTime || '',
     urgent: !!item?.urgent,
     story: item?.description || '',
 

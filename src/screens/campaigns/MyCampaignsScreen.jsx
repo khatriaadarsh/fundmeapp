@@ -1,14 +1,19 @@
 // src/screens/campaigns/MyCampaignsScreen.jsx
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  ScrollView,
   StatusBar,
   ActivityIndicator,
+  Platform,
+  Keyboard,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icons from 'react-native-vector-icons/Feather';
@@ -20,14 +25,21 @@ import FilterTabs from '../../components/shared/FilterTabs';
 import CampaignCard from './CampaignCard';
 import ResponseModal from '../../components/ResponseModal';
 import { FullScreenLoader } from '../../components/common/Loader';
+import { useAppContext } from '../../context/AppContext';
 import {
   useMyCampaigns,
   useDeleteCampaign,
   useFetchCampaignReview,
+  useCreateCampaignUpdate,
   resolveCampaignResumeStep,
   getCampaignFlowScreen,
   mapCampaignReviewToFlowParams,
 } from '../../hooks/useCampaign';
+
+const UPDATE_MAX = 500;
+const UPDATE_MIN = 10;
+
+const { height: SH } = Dimensions.get('window');
 
 /**
  * DeleteConfirmOverlay
@@ -170,14 +182,300 @@ const dcSt = StyleSheet.create({
   deleteTxt: { fontSize: sp(15), fontWeight: '700', color: P.white },
 });
 
+/**
+ * PostUpdateOverlay
+ *
+ * A centered dialog rather than a bottom sheet: this one owns a
+ * multiline TextInput, and anything anchored to the bottom edge sits
+ * directly under the keyboard the moment it opens.
+ *
+ * The real keyboard height is measured and used to shrink the available
+ * area, so the dialog stays centred in whatever space is left. This is
+ * preferred over KeyboardAvoidingView, whose Android 'height' behavior
+ * double-shrinks when windowSoftInputMode is already adjustResize and
+ * under-reacts when it isn't.
+ */
+const PostUpdateOverlay = ({
+  visible,
+  campaignTitle,
+  value,
+  onChangeText,
+  error,
+  loading,
+  onCancel,
+  onSubmit,
+}) => {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvt =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvt, e => {
+      setKeyboardHeight(e?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvt, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) setKeyboardHeight(0);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const remaining = UPDATE_MAX - value.length;
+  const nearLimit = remaining <= 50;
+
+  // Caps the card so it can never grow taller than the space the
+  // keyboard leaves behind; the body scrolls instead.
+  const availableHeight = SH - keyboardHeight;
+  const maxCardHeight = Math.max(availableHeight - sp(48), sp(280));
+
+  return (
+    <View
+      style={[puSt.root, { paddingBottom: keyboardHeight }]}
+      pointerEvents="box-none"
+    >
+      <TouchableOpacity
+        style={puSt.backdrop}
+        activeOpacity={1}
+        onPress={loading ? undefined : onCancel}
+      />
+
+      <View style={[puSt.card, { maxHeight: maxCardHeight }]}>
+        <ScrollView
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={puSt.cardBody}
+        >
+          <View style={puSt.headRow}>
+            <View style={puSt.iconCircle}>
+              <Icons name="edit-3" size={sp(20)} color={P.white} />
+            </View>
+
+            <View style={puSt.headText}>
+              <Text style={puSt.title}>Post an Update</Text>
+              {!!campaignTitle && (
+                <Text style={puSt.subtitle} numberOfLines={1}>
+                  {campaignTitle}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <Text style={puSt.hint}>
+            Share progress with your donors — how funds were used, who was
+            helped, or what happens next.
+          </Text>
+
+          <View style={[puSt.inputWrap, !!error && puSt.inputWrapError]}>
+            <TextInput
+              style={puSt.input}
+              value={value}
+              onChangeText={onChangeText}
+              placeholder="e.g. First batch of relief funds distributed. 15 families received tents today."
+              placeholderTextColor={P.light}
+              multiline
+              textAlignVertical="top"
+              maxLength={UPDATE_MAX}
+              editable={!loading}
+              autoFocus
+            />
+          </View>
+
+          <View style={puSt.metaRow}>
+            {error ? (
+              <View style={puSt.errRow}>
+                <Icons name="alert-circle" size={sp(12)} color={P.red} />
+                <Text style={puSt.errTxt}>{error}</Text>
+              </View>
+            ) : (
+              <View style={puSt.spacer} />
+            )}
+
+            <Text style={[puSt.counter, nearLimit && puSt.counterWarn]}>
+              {value.length}/{UPDATE_MAX}
+            </Text>
+          </View>
+        </ScrollView>
+
+        {/* Outside the ScrollView so the actions stay reachable even
+            when the body is scrolled or the keyboard is open. */}
+        <View style={puSt.btnRow}>
+          <TouchableOpacity
+            style={puSt.cancelBtn}
+            onPress={onCancel}
+            activeOpacity={0.8}
+            disabled={loading}
+          >
+            <Text style={puSt.cancelTxt}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[puSt.postBtn, loading && puSt.postBtnDisabled]}
+            onPress={onSubmit}
+            activeOpacity={0.85}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={P.white} />
+            ) : (
+              <>
+                <Text style={puSt.postTxt}>Post Update</Text>
+                <Icons name="send" size={sp(14)} color={P.white} />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const puSt = StyleSheet.create({
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: sp(20),
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,23,42,0.55)',
+  },
+  card: {
+    width: '100%',
+    backgroundColor: P.white,
+    borderRadius: sp(20),
+    overflow: 'hidden',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+  },
+  cardBody: {
+    paddingHorizontal: sp(20),
+    paddingTop: sp(20),
+  },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp(12),
+    marginBottom: sp(12),
+  },
+  iconCircle: {
+    width: sp(44),
+    height: sp(44),
+    borderRadius: sp(22),
+    backgroundColor: P.darkOcean,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headText: { flex: 1 },
+  title: {
+    fontSize: sp(17),
+    fontWeight: '800',
+    color: P.dark,
+    marginBottom: sp(2),
+  },
+  subtitle: { fontSize: sp(12), color: P.gray },
+  hint: {
+    fontSize: sp(12.5),
+    color: P.gray,
+    lineHeight: sp(18),
+    marginBottom: sp(14),
+  },
+  inputWrap: {
+    borderWidth: 1.5,
+    borderColor: P.border,
+    borderRadius: sp(12),
+    backgroundColor: P.white,
+    paddingHorizontal: sp(14),
+    paddingVertical: sp(12),
+  },
+  inputWrapError: { borderColor: P.red },
+  input: {
+    fontSize: sp(14),
+    color: P.dark,
+    lineHeight: sp(20),
+    padding: 0,
+    minHeight: sp(88),
+    maxHeight: sp(140),
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: sp(8),
+    marginBottom: sp(16),
+    gap: sp(10),
+  },
+  spacer: { flex: 1 },
+  errRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: sp(5),
+  },
+  errTxt: { flex: 1, fontSize: sp(11.5), color: P.red },
+  counter: { fontSize: sp(11.5), color: P.light, fontWeight: '600' },
+  counterWarn: { color: P.red },
+  btnRow: {
+    flexDirection: 'row',
+    gap: sp(10),
+    paddingHorizontal: sp(20),
+    paddingBottom: sp(20),
+  },
+  cancelBtn: {
+    flex: 1,
+    borderRadius: sp(14),
+    paddingVertical: sp(14),
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: P.border,
+    backgroundColor: P.white,
+  },
+  cancelTxt: { fontSize: sp(15), fontWeight: '700', color: P.dark },
+  postBtn: {
+    flex: 1.4,
+    flexDirection: 'row',
+    borderRadius: sp(14),
+    paddingVertical: sp(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: sp(7),
+    backgroundColor: P.darkOcean,
+  },
+  postBtnDisabled: { opacity: 0.7 },
+  postTxt: { fontSize: sp(15), fontWeight: '700', color: P.white },
+});
+
 const MyCampaignsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('All');
+
+  const { currentUser } = useAppContext();
+  const userId = currentUser?.id ?? currentUser?.userId ?? null;
 
   // API
   const { data, refetch } = useMyCampaigns();
   const { mutate: deleteCampaign, isPending: isDeleting } = useDeleteCampaign();
   const { mutate: fetchReview, isPending: isLoadingReview } =
     useFetchCampaignReview();
+  const { mutate: postUpdate, isPending: isPostingUpdate } =
+    useCreateCampaignUpdate();
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -185,6 +483,14 @@ const MyCampaignsScreen = ({ navigation }) => {
     visible: false,
     campaignId: null,
     title: '',
+  });
+
+  const [updateSheet, setUpdateSheet] = useState({
+    visible: false,
+    campaignId: null,
+    title: '',
+    text: '',
+    error: '',
   });
 
   const [responseModal, setResponseModal] = useState({
@@ -295,6 +601,130 @@ const MyCampaignsScreen = ({ navigation }) => {
 
     runDelete(campaignId);
   }, [confirmDelete.campaignId, runDelete, showResponse]);
+
+  // ── Post Update ───────────────────────────────────────────
+  const openUpdateSheet = useCallback(
+    item => {
+      const campaignId = item?.campaignId ?? item?.id ?? null;
+
+      if (!campaignId) {
+        showResponse({ message: 'Missing campaign reference.' });
+        return;
+      }
+
+      if (!userId) {
+        showResponse({
+          message: 'Your session has expired. Please log in again.',
+        });
+        return;
+      }
+
+      setUpdateSheet({
+        visible: true,
+        campaignId,
+        title: item?.title || '',
+        text: '',
+        error: '',
+      });
+    },
+    [userId, showResponse],
+  );
+
+  const closeUpdateSheet = useCallback(() => {
+    if (isPostingUpdate) return;
+    Keyboard.dismiss();
+    setUpdateSheet({
+      visible: false,
+      campaignId: null,
+      title: '',
+      text: '',
+      error: '',
+    });
+  }, [isPostingUpdate]);
+
+  const handleUpdateTextChange = useCallback(text => {
+    setUpdateSheet(prev => ({
+      ...prev,
+      text,
+      // Clearing as the creator types keeps the error tied to the last
+      // submit attempt rather than lingering over corrected input.
+      error: prev.error ? '' : prev.error,
+    }));
+  }, []);
+
+  const handleSubmitUpdate = useCallback(() => {
+    const { campaignId, text } = updateSheet;
+    const trimmed = text.trim();
+
+    if (!trimmed) {
+      setUpdateSheet(prev => ({
+        ...prev,
+        error: 'Please write an update before posting.',
+      }));
+      return;
+    }
+
+    if (trimmed.length < UPDATE_MIN) {
+      setUpdateSheet(prev => ({
+        ...prev,
+        error: `Update must be at least ${UPDATE_MIN} characters.`,
+      }));
+      return;
+    }
+
+    if (!campaignId || !userId) {
+      setUpdateSheet(prev => ({ ...prev, visible: false }));
+      showResponse({ message: 'Missing campaign reference.' });
+      return;
+    }
+
+    Keyboard.dismiss();
+
+    postUpdate(
+      { campaignId, userId, update: trimmed },
+      {
+        onSuccess: body => {
+          if (body?.responseCode && body.responseCode !== '000') {
+            setUpdateSheet(prev => ({
+              ...prev,
+              error:
+                body?.responseMessage ||
+                'Could not post your update. Please try again.',
+            }));
+            return;
+          }
+
+          setUpdateSheet({
+            visible: false,
+            campaignId: null,
+            title: '',
+            text: '',
+            error: '',
+          });
+
+          showResponse({
+            variant: 'success',
+            title: 'Update Posted',
+            message:
+              'Your update is now live on the campaign page — donors will see it right away.',
+          });
+        },
+        onError: error => {
+          const body = error?.response?.data || error?.raw;
+
+          // Kept inside the sheet rather than closing it: the creator's
+          // text is still there and retrying shouldn't mean retyping.
+          setUpdateSheet(prev => ({
+            ...prev,
+            error:
+              body?.responseMessage ||
+              error?.message ||
+              'Could not post your update. Please try again.',
+          }));
+        },
+      },
+    );
+  }, [updateSheet, userId, postUpdate, showResponse]);
 
   // ── Edit ──────────────────────────────────────────────────
   /**
@@ -407,6 +837,11 @@ const MyCampaignsScreen = ({ navigation }) => {
         return;
       }
 
+      if (key === 'post update') {
+        openUpdateSheet(item);
+        return;
+      }
+
       if (key === 'view') {
         handleView(item);
         return;
@@ -424,7 +859,7 @@ const MyCampaignsScreen = ({ navigation }) => {
         });
       }
     },
-    [navigation, handleEdit, handleView],
+    [navigation, handleEdit, handleView, openUpdateSheet],
   );
 
   const renderItem = useCallback(
@@ -489,6 +924,17 @@ const MyCampaignsScreen = ({ navigation }) => {
         loading={isDeleting}
         onCancel={closeConfirmDelete}
         onConfirm={handleConfirmDelete}
+      />
+
+      <PostUpdateOverlay
+        visible={updateSheet.visible}
+        campaignTitle={updateSheet.title}
+        value={updateSheet.text}
+        onChangeText={handleUpdateTextChange}
+        error={updateSheet.error}
+        loading={isPostingUpdate}
+        onCancel={closeUpdateSheet}
+        onSubmit={handleSubmitUpdate}
       />
 
       <FullScreenLoader visible={isLoadingReview} message="Loading campaign…" />
