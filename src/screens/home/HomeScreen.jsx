@@ -1,11 +1,11 @@
 // src/screens/home/HomeScreen.jsx
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  StatusBar, 
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  StatusBar,
   Text,
   ActivityIndicator,
   TouchableOpacity,
@@ -16,15 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { P, sp } from '../../theme/theme';
 import { FEATURED } from '../../constants/mockData';
 
-import TopBar          from '../../components/TopBar';
-import SearchBar       from '../../components/SearchBar';
-import HeroBanner      from '../../components/HeroBanner';
-import StatsRow        from '../../components/StatsRow';
-import SectionHeader   from '../../components/SectionHeader';
-import CategoryChips   from '../../components/shared/CategoryChips';
-import UrgentCard      from '../../components/UrgentCard';
-import FeaturedItem    from '../../components/FeaturedItem';
-import RatingModal     from '../../components/rating/RatingModal';
+import TopBar from '../../components/TopBar';
+import SearchBar from '../../components/SearchBar';
+import HeroBanner from '../../components/HeroBanner';
+import StatsRow from '../../components/StatsRow';
+import SectionHeader from '../../components/SectionHeader';
+import CategoryChips from '../../components/shared/CategoryChips';
+import UrgentCard from '../../components/UrgentCard';
+import FeaturedItem from '../../components/FeaturedItem';
+import RatingModal from '../../components/rating/RatingModal';
 
 import { useAppContext } from '../../context/AppContext';
 import {
@@ -37,7 +37,7 @@ const HomeScreen = ({ navigation }) => {
   const { currentUser } = useAppContext();
 
   const [activeCat, setActiveCat] = useState('all');
-  const [search,    setSearch]    = useState('');
+  const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   // ── TEMPORARY — for previewing RatingModal against the reference
@@ -49,7 +49,7 @@ const HomeScreen = ({ navigation }) => {
   const [ratingVisible, setRatingVisible] = useState(false);
   const [ratingContext, setRatingContext] = useState('app');
 
-  const openRatingTest = useCallback((context) => {
+  const openRatingTest = useCallback(context => {
     setRatingContext(context);
     setRatingVisible(true);
   }, []);
@@ -58,13 +58,13 @@ const HomeScreen = ({ navigation }) => {
     // Would open store link here
   }, []);
 
-  const handleRatingSubmit = useCallback(async (payload) => {
+  const handleRatingSubmit = useCallback(async payload => {
     // Simulate a network call so the SUBMIT button's loading state is
     // visible during testing too.
     await new Promise(resolve => setTimeout(resolve, 600));
   }, []);
 
-  const handleRatingClose = useCallback((reason) => {
+  const handleRatingClose = useCallback(reason => {
     setRatingVisible(false);
   }, []);
   // ── END TEMPORARY BLOCK ──────────────────────────────────────────
@@ -91,20 +91,20 @@ const HomeScreen = ({ navigation }) => {
   // Build user object for TopBar from real API data
   const user = useMemo(() => {
     const firstName = currentUser?.firstName || '';
-    const lastName  = currentUser?.lastName  || '';
-    const fullName  = `${firstName} ${lastName}`.trim() || 'User';
+    const lastName = currentUser?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
 
     return {
-      name:      fullName,
+      name: fullName,
       avatarUri: currentUser?.profileImage || null,
-      role:      currentUser?.role || 'user',
+      role: currentUser?.role || 'user',
     };
   }, [currentUser]);
 
   const isCreator = (currentUser?.role || '').toLowerCase() === 'creator';
 
-  const handleCatChange    = useCallback((id)   => setActiveCat(id), []);
-  const handleSearchChange = useCallback((text) => setSearch(text),  []);
+  const handleCatChange = useCallback(id => setActiveCat(id), []);
+  const handleSearchChange = useCallback(text => setSearch(text), []);
 
   const openProfile = useCallback(() => {
     navigation?.navigate?.('ProfileTab');
@@ -123,21 +123,21 @@ const HomeScreen = ({ navigation }) => {
   }, [navigation]);
 
   // Navigate to campaign details
-  const handleCampaignPress = useCallback((campaign) => {
-    navigation.navigate('CampaignDetail', { 
-      campaignId: campaign.campaignId,
-      campaign: campaign.raw 
-    });
-  }, [navigation]);
+  const handleCampaignPress = useCallback(
+    campaign => {
+      navigation.navigate('CampaignDetail', {
+        campaignId: campaign.campaignId,
+        campaign: campaign.raw,
+      });
+    },
+    [navigation],
+  );
 
   // Pull to refresh handler
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchCategories(),
-        refetchUrgentCampaigns(),
-      ]);
+      await Promise.all([refetchCategories(), refetchUrgentCampaigns()]);
     } catch (error) {
       // Error is handled by React Query states
     } finally {
@@ -201,12 +201,8 @@ const HomeScreen = ({ navigation }) => {
 
     return (
       <View style={styles.urgentList}>
-        {urgentData.campaigns.map((item) => (
-          <UrgentCard 
-            key={item.id} 
-            item={item} 
-            onPress={handleCampaignPress}
-          />
+        {urgentData.campaigns.map(item => (
+          <UrgentCard key={item.id} item={item} onPress={handleCampaignPress} />
         ))}
       </View>
     );
@@ -262,22 +258,10 @@ const HomeScreen = ({ navigation }) => {
         <SectionHeader
           title="🔥 Urgent Campaigns"
           linkText="See All"
-          onPress={() => navigation.navigate('UrgentCampaignsScreen')}
+          onPress={() => navigation.navigate('ExploreScreen', { category: activeCat })}
         />
 
         {renderUrgentCampaigns()}
-
-        <SectionHeader
-          title="⭐ Featured"
-          linkText="See All"
-          onPress={() => {}}
-        />
-
-        <View style={styles.featuredList}>
-          {FEATURED.map((item) => (
-            <FeaturedItem key={item.id} item={item} />
-          ))}
-        </View>
       </ScrollView>
 
       {/* TEMPORARY test triggers — remove once real gating is wired up */}

@@ -50,7 +50,13 @@ const { height: SH } = Dimensions.get('window');
  * window reliably wins — the loser mounts but never appears, which is
  * indistinguishable from the button not firing at all.
  */
-const DeleteConfirmOverlay = ({ visible, title, loading, onCancel, onConfirm }) => {
+const DeleteConfirmOverlay = ({
+  visible,
+  title,
+  loading,
+  onCancel,
+  onConfirm,
+}) => {
   if (!visible) return null;
 
   return (
@@ -825,7 +831,9 @@ const MyCampaignsScreen = ({ navigation }) => {
 
   const handleAction = useCallback(
     (action, item) => {
-      const key = String(action || '').trim().toLowerCase();
+      const key = String(action || '')
+        .trim()
+        .toLowerCase();
       const campaignId = item?.campaignId ?? item?.id ?? null;
 
       if (key === 'delete') {

@@ -256,7 +256,9 @@ const EditProfile = ({ navigation, route }) => {
     firstName: initialData.firstName || '',
     lastName: initialData.lastName || '',
     bio: initialData.bio || '',
-    dateOfBirth: initialData.dateOfBirth ? formatDateForDisplay(initialData.dateOfBirth) : '',
+    dateOfBirth: initialData.dateOfBirth
+      ? formatDateForDisplay(initialData.dateOfBirth)
+      : '',
     gender: initialData.gender ? capitalizeFirst(initialData.gender) : '',
     city: initialData.city || '',
     province: initialData.province || '',
@@ -312,32 +314,38 @@ const EditProfile = ({ navigation, route }) => {
   }, []);
 
   const getInitials = () => {
-    return `${formData.firstName?.[0] || ''}${formData.lastName?.[0] || ''}`.toUpperCase();
+    return `${formData.firstName?.[0] || ''}${
+      formData.lastName?.[0] || ''
+    }`.toUpperCase();
   };
 
-  const handleImagePicker = useCallback(async (type) => {
-    setShowImagePicker(false);
-    const options = {
-      mediaType: 'photo',
-      quality: 0.8,
-      maxWidth: 800,
-      maxHeight: 800,
-    };
+  const handleImagePicker = useCallback(
+    async type => {
+      setShowImagePicker(false);
+      const options = {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 800,
+        maxHeight: 800,
+      };
 
-    try {
-      const result = type === 'camera'
-        ? await launchCamera(options)
-        : await launchImageLibrary(options);
+      try {
+        const result =
+          type === 'camera'
+            ? await launchCamera(options)
+            : await launchImageLibrary(options);
 
-      if (!result.didCancel && result.assets?.[0]?.uri) {
-        updateField('avatar', result.assets[0].uri);
+        if (!result.didCancel && result.assets?.[0]?.uri) {
+          updateField('avatar', result.assets[0].uri);
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Unable to select image');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Unable to select image');
-    }
-  }, [updateField]);
+    },
+    [updateField],
+  );
 
-  const handleProvinceSelect = useCallback((province) => {
+  const handleProvinceSelect = useCallback(province => {
     setFormData(prev => ({ ...prev, province, city: '' }));
     setShowProvincePicker(false);
   }, []);
@@ -364,10 +372,13 @@ const EditProfile = ({ navigation, route }) => {
       province: formData.province,
     };
 
-    console.log('🔵 [EditProfile] Sending payload:', JSON.stringify(payload, null, 2));
+    console.log(
+      '🔵 [EditProfile] Sending payload:',
+      JSON.stringify(payload, null, 2),
+    );
 
     updateProfile(payload, {
-      onSuccess: (response) => {
+      onSuccess: response => {
         console.log('🟢 [EditProfile] Update success:', response);
         if (response?.responseCode === '000') {
           setShowSuccess(true);
@@ -375,7 +386,7 @@ const EditProfile = ({ navigation, route }) => {
           Alert.alert('Error', response?.responseMessage || 'Update failed');
         }
       },
-      onError: (error) => {
+      onError: error => {
         console.error('🔴 [EditProfile] Update error:', error);
         Alert.alert('Error', error.message || 'Failed to update profile');
       },
@@ -393,14 +404,20 @@ const EditProfile = ({ navigation, route }) => {
 
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.headerBtn}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={s.headerBtn}
+        >
           <Icons name="arrow-left" size={scale(22)} color={C.textDark} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Edit Profile</Text>
         <View style={{ width: scale(48) }} />
       </View>
 
-      <KeyboardAvoidingView style={s.kav} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={s.kav}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
           {/* Avatar */}
           <View style={s.avatarSection}>
@@ -416,7 +433,10 @@ const EditProfile = ({ navigation, route }) => {
                   <Text style={s.avatarInitials}>{getInitials()}</Text>
                 </View>
               )}
-              <TouchableOpacity style={s.cameraBadge} onPress={() => setShowImagePicker(true)}>
+              <TouchableOpacity
+                style={s.cameraBadge}
+                onPress={() => setShowImagePicker(true)}
+              >
                 <Icons name="camera" size={scale(13)} color={C.white} />
               </TouchableOpacity>
             </View>
@@ -461,7 +481,8 @@ const EditProfile = ({ navigation, route }) => {
             <Text style={s.label}>Gender</Text>
             <View style={s.genderContainer}>
               {GENDER_OPTIONS.map(option => {
-                const active = formData.gender?.toLowerCase() === option.toLowerCase();
+                const active =
+                  formData.gender?.toLowerCase() === option.toLowerCase();
                 return (
                   <TouchableOpacity
                     key={option}
@@ -490,12 +511,17 @@ const EditProfile = ({ navigation, route }) => {
             value={formData.city}
             onPress={() => {
               if (!formData.province) {
-                Alert.alert('Select Province First', 'Please select a province first.');
+                Alert.alert(
+                  'Select Province First',
+                  'Please select a province first.',
+                );
                 return;
               }
               setShowCityPicker(true);
             }}
-            placeholder={formData.province ? 'Select City' : 'Select Province First'}
+            placeholder={
+              formData.province ? 'Select City' : 'Select Province First'
+            }
           />
 
           <LockedField label="Email Address" value={formData.email} />
@@ -552,7 +578,14 @@ const EditProfile = ({ navigation, route }) => {
 };
 
 // Sub-components
-const InputField = ({ label, value, onChangeText, placeholder, autoCapitalize = 'none', editable = true }) => (
+const InputField = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  autoCapitalize = 'none',
+  editable = true,
+}) => (
   <View style={s.fieldContainer}>
     <Text style={s.label}>{label}</Text>
     <View style={[s.inputWrapper, !editable && s.disabledWrapper]}>
@@ -591,10 +624,18 @@ const DateField = ({ label, value, onPress, placeholder }) => (
   <View style={s.fieldContainer}>
     <Text style={s.label}>{label}</Text>
     <TouchableOpacity style={s.inputWrapper} onPress={onPress}>
-      <Text style={[s.displayText, !value && s.placeholderText]} numberOfLines={1}>
+      <Text
+        style={[s.displayText, !value && s.placeholderText]}
+        numberOfLines={1}
+      >
         {value || placeholder}
       </Text>
-      <Icons name="calendar" size={scale(18)} color={C.textGray} style={s.inputIcon} />
+      <Icons
+        name="calendar"
+        size={scale(18)}
+        color={C.textGray}
+        style={s.inputIcon}
+      />
     </TouchableOpacity>
   </View>
 );
@@ -603,10 +644,18 @@ const DropdownField = ({ label, value, onPress, placeholder }) => (
   <View style={s.fieldContainer}>
     <Text style={s.label}>{label}</Text>
     <TouchableOpacity style={s.inputWrapper} onPress={onPress}>
-      <Text style={[s.displayText, !value && s.placeholderText]} numberOfLines={1}>
+      <Text
+        style={[s.displayText, !value && s.placeholderText]}
+        numberOfLines={1}
+      >
         {value || placeholder}
       </Text>
-      <Icons name="chevron-down" size={scale(18)} color={C.textGray} style={s.inputIcon} />
+      <Icons
+        name="chevron-down"
+        size={scale(18)}
+        color={C.textGray}
+        style={s.inputIcon}
+      />
     </TouchableOpacity>
   </View>
 );
@@ -615,8 +664,15 @@ const LockedField = ({ label, value }) => (
   <View style={s.fieldContainer}>
     <Text style={s.label}>{label}</Text>
     <View style={[s.inputWrapper, s.disabledWrapper]}>
-      <Text style={s.lockedDisplayText} numberOfLines={1}>{value}</Text>
-      <Icons name="lock" size={scale(16)} color={C.textLight} style={s.inputIcon} />
+      <Text style={s.lockedDisplayText} numberOfLines={1}>
+        {value}
+      </Text>
+      <Icons
+        name="lock"
+        size={scale(16)}
+        color={C.textLight}
+        style={s.inputIcon}
+      />
     </View>
   </View>
 );
@@ -642,7 +698,14 @@ const ImagePickerModal = ({ visible, onCamera, onGallery, onClose }) => (
   </Modal>
 );
 
-const PickerModal = ({ visible, title, options, selectedValue, onSelect, onClose }) => (
+const PickerModal = ({
+  visible,
+  title,
+  options,
+  selectedValue,
+  onSelect,
+  onClose,
+}) => (
   <Modal visible={visible} transparent animationType="slide">
     <View style={s.modalOverlay}>
       <View style={s.modalContent}>
@@ -661,10 +724,17 @@ const PickerModal = ({ visible, title, options, selectedValue, onSelect, onClose
                 style={[s.modalItem, isSelected && s.modalItemSelected]}
                 onPress={() => onSelect(option)}
               >
-                <Text style={[s.modalItemText, isSelected && s.modalItemTextSelected]}>
+                <Text
+                  style={[
+                    s.modalItemText,
+                    isSelected && s.modalItemTextSelected,
+                  ]}
+                >
                   {option}
                 </Text>
-                {isSelected && <Icons name="check" size={scale(18)} color={C.primary} />}
+                {isSelected && (
+                  <Icons name="check" size={scale(18)} color={C.primary} />
+                )}
               </TouchableOpacity>
             );
           })}
@@ -678,7 +748,11 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   kav: { flex: 1 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: scale(20), paddingTop: scale(20), paddingBottom: scale(8) },
+  scrollContent: {
+    paddingHorizontal: scale(20),
+    paddingTop: scale(20),
+    paddingBottom: scale(8),
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -693,7 +767,11 @@ const s = StyleSheet.create({
   avatarSection: { alignItems: 'center', marginBottom: scale(28) },
   avatarContainer: { position: 'relative', marginBottom: scale(10) },
   avatar: { width: scale(88), height: scale(88), borderRadius: scale(44) },
-  avatarFallback: { backgroundColor: C.avatarBg, alignItems: 'center', justifyContent: 'center' },
+  avatarFallback: {
+    backgroundColor: C.avatarBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatarInitials: { fontSize: scale(28), fontWeight: '700', color: C.white },
   cameraBadge: {
     position: 'absolute',
@@ -710,7 +788,12 @@ const s = StyleSheet.create({
   },
   changePhotoText: { fontSize: scale(13), fontWeight: '600', color: C.primary },
   fieldContainer: { marginBottom: scale(16) },
-  label: { fontSize: scale(13), fontWeight: '500', color: C.textGray, marginBottom: scale(7) },
+  label: {
+    fontSize: scale(13),
+    fontWeight: '500',
+    color: C.textGray,
+    marginBottom: scale(7),
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -727,10 +810,28 @@ const s = StyleSheet.create({
   displayText: { flex: 1, fontSize: scale(15), color: C.textDark },
   placeholderText: { color: C.textLight },
   lockedDisplayText: { flex: 1, fontSize: scale(15), color: C.textGray },
-  textAreaWrapper: { height: scale(104), alignItems: 'flex-start', paddingTop: scale(12) },
-  textAreaInner: { flex: 1, width: '100%', fontSize: scale(15), color: C.textDark, lineHeight: scale(22) },
+  textAreaWrapper: {
+    height: scale(104),
+    alignItems: 'flex-start',
+    paddingTop: scale(12),
+  },
+  textAreaInner: {
+    flex: 1,
+    width: '100%',
+    fontSize: scale(15),
+    color: C.textDark,
+    lineHeight: scale(22),
+  },
   genderContainer: { flexDirection: 'row', gap: scale(10) },
-  genderPill: { flex: 1, height: scale(42), borderRadius: scale(21), borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  genderPill: {
+    flex: 1,
+    height: scale(42),
+    borderRadius: scale(21),
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   genderPillActive: { backgroundColor: C.teal, borderColor: C.teal },
   genderText: { fontSize: scale(14), fontWeight: '500', color: C.textGray },
   genderTextActive: { color: C.white, fontWeight: '600' },
@@ -751,7 +852,11 @@ const s = StyleSheet.create({
   },
   saveBtnLoading: { opacity: 0.72 },
   saveBtnText: { color: C.white, fontSize: scale(16), fontWeight: '700' },
-  modalOverlay: { flex: 1, backgroundColor: C.overlay, justifyContent: 'flex-end' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: C.overlay,
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     backgroundColor: C.white,
     borderTopLeftRadius: scale(20),
@@ -813,7 +918,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imagePickerCancelText: { fontSize: scale(15), fontWeight: '600', color: C.textGray },
+  imagePickerCancelText: {
+    fontSize: scale(15),
+    fontWeight: '600',
+    color: C.textGray,
+  },
 
   // Success Modal Styles - Original
   successOverlay: {
