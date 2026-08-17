@@ -96,9 +96,9 @@ export const login = async ({ email, password }) => {
     },
   };
 
-  console.log('🔵 login payload:', payload);
+  // console.log('🔵 login payload:', payload);
   const res = await apiClient.post(ENDPOINTS.AUTH.LOGIN, payload);
-  console.log('🟢 login response:', res.data);
+  // console.log('🟢 login response:', res.data);
   return res.data;
 };
 

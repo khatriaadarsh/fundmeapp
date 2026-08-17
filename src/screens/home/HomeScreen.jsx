@@ -267,31 +267,7 @@ const HomeScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* TEMPORARY test triggers — remove once real gating is wired up */}
-      <View style={styles.testDock} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.testBtn}
-          activeOpacity={0.85}
-          onPress={() => openRatingTest('app')}
-        >
-          <Text style={styles.testBtnTxt}>Test: App Rating</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.testBtn, styles.testBtnAlt]}
-          activeOpacity={0.85}
-          onPress={() => openRatingTest('creator')}
-        >
-          <Text style={styles.testBtnTxt}>Test: Creator Rating</Text>
-        </TouchableOpacity>
-      </View>
-
-      <RatingModal
-        visible={ratingVisible}
-        context={ratingContext}
-        targetName="Ahmed Khan"
-        onRateNow={handleRateNow}
-        onSubmit={handleRatingSubmit}
-        onClose={handleRatingClose}
-      />
+      
     </SafeAreaView>
   );
 };
