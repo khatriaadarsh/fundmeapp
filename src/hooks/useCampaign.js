@@ -477,7 +477,7 @@ const mapMyCampaignToCard = (item) => {
   const goalAmount = Number(item?.fundingGoal || 0);
 
   const statusMap = {
-    APPROVED: 'Active',
+    ACTIVE: 'Active',
     PENDING: 'Pending',
     REJECTED: 'Rejected',
     DRAFT: 'Draft',
