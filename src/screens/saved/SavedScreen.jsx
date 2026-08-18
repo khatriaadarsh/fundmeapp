@@ -91,25 +91,8 @@ const SavedScreen = ({ navigation }) => {
 
   const { mutate: unsaveCampaign } = useUnsaveCampaignByCampaignId(userId);
 
-
   const EMPTY_RESULT_CODES = ['023', '024', '404'];
 
-   /**
-   * "Nothing saved" is not a failure.
-   *
-   * The backend reports it with an inconsistent responseCode but a
-   * consistent message ("Favourite not found"), so matching on the code
-   * alone kept letting it through. The list is already showing an empty
-   * state, and the modal is only worth opening for something the user
-   * can actually act on — so this errs toward silence.
-   */
-  /**
-   * "Nothing saved" is not a failure.
-   *
-   * The client flattens business errors to a top-level { code, message },
-   * so this reads both that shape and the nested axios/raw one before
-   * deciding anything is worth reporting.
-   */
   useEffect(() => {
     if (!isError) return;
 
@@ -129,8 +112,6 @@ const SavedScreen = ({ navigation }) => {
 
     if (isEmpty) return;
 
-    // Whatever went wrong, an empty list is already a coherent thing to
-    // show — a dialog on top of it adds noise, not information.
     if (Array.isArray(saved) && saved.length === 0) return;
 
     showModal(
@@ -153,12 +134,8 @@ const SavedScreen = ({ navigation }) => {
     }
   }, [refetch, showModal]);
 
-    const handleUnsave = useCallback(
+  const handleUnsave = useCallback(
     (payload) => {
-      // The card's callback signature has drifted before (favouriteId vs
-      // the whole item), and a bare `payload?.campaignId` read fails
-      // silently against a raw id — producing a "Failed" modal with no
-      // backend message, since nothing was ever requested.
       let campaignId = null;
 
       if (payload && typeof payload === 'object') {
@@ -190,8 +167,6 @@ const SavedScreen = ({ navigation }) => {
       unsaveCampaign(
         { userId, campaignId: validCampaignId },
         {
-          // Success is intentionally silent — the row disappearing and
-          // the list refreshing is the confirmation.
           onError: (err) => {
             const body = err?.response?.data || err?.raw;
             showModal(
@@ -209,7 +184,8 @@ const SavedScreen = ({ navigation }) => {
 
   const handleCardPress = useCallback(
     (item) => {
-      navigation?.navigate?.('CampaignDetail', { id: item.campaignId });
+      // Fixed: pass campaignId instead of id
+      navigation?.navigate?.('CampaignDetail', { campaignId: item.campaignId });
     },
     [navigation],
   );
